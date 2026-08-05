@@ -42,6 +42,7 @@ class AiServiceTests(unittest.TestCase):
         payload = build_prompt_payload("money", chart(), None)
         self.assertIn("allowed_facts", payload)
         self.assertIn("Карта 1: Солнце в Овен, дом 1", payload["allowed_facts"])
+        self.assertTrue(payload["sections"][1]["guidance"])
 
     def test_validates_expected_section_order_and_references(self):
         report_type = "money"

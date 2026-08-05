@@ -16,7 +16,6 @@ from services.astro import (
     is_approximate_time,
     parse_date,
     parse_time,
-    teaser,
 )
 from config.settings import settings
 from database.repository import (
@@ -761,8 +760,7 @@ async def show_teaser(
     builder.button(text="⬅️ Назад", callback_data="back:menu")
     builder.adjust(1)
     await message.answer(
-        f"Ваш бесплатный тизер — {NAMES[scenario_name]}:\n\n{teaser(chart, scenario_name, second_chart)}\n\n"
-        "Это только начало. Полный отчёт содержит подробный персональный разбор.",
+        f"{NAMES[scenario_name]} · готово 35%",
         reply_markup=builder.as_markup(),
     )
 
