@@ -29,7 +29,7 @@ SYSTEM_PROMPT = """
   "disclaimer": "string"
 }
 Список sections должен содержать каждый переданный раздел ровно один раз и в том же порядке.
-Каждый раздел: 180–500 слов, минимум две конкретные ссылки из allowed_facts. Не повторяй
+Каждый раздел: 70–110 слов, минимум две конкретные ссылки из allowed_facts. Не повторяй
 одни и те же формулировки и не используй данные, отсутствующие в allowed_facts.
 """.strip()
 
@@ -100,7 +100,7 @@ def _validate_content(
         return None
     if not all(
         isinstance(section.get("content"), str)
-        and len(section["content"].split()) >= 100
+        and 70 <= len(section["content"].split()) <= 110
         and isinstance(section.get("references"), list)
         and len(section["references"]) >= 2
         and all(reference in allowed_facts for reference in section["references"])
