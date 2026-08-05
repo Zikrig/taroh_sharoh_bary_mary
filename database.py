@@ -29,7 +29,34 @@ async def init_db() -> None:
                 status TEXT NOT NULL DEFAULT 'pending',
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             );
+            CREATE TABLE IF NOT EXISTS app_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+            INSERT OR IGNORE INTO app_settings (key, value)
+            VALUES ('test_mode', '0');
             """
+        )
+        await db.commit()
+
+
+async def get_test_mode() -> bool:
+    async with aiosqlite.connect(settings.database_path) as db:
+        async with db.execute(
+            "SELECT value FROM app_settings WHERE key = 'test_mode'"
+        ) as cur:
+            row = await cur.fetchone()
+            return bool(row and row[0] == "1")
+
+
+async def set_test_mode(enabled: bool) -> None:
+    async with aiosqlite.connect(settings.database_path) as db:
+        await db.execute(
+            """
+            INSERT INTO app_settings (key, value) VALUES ('test_mode', ?)
+            ON CONFLICT(key) DO UPDATE SET value=excluded.value
+            """,
+            ("1" if enabled else "0",),
         )
         await db.commit()
 

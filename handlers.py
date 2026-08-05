@@ -8,7 +8,14 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from ai_service import generate_report_content
 from astro import calculate_chart, geocode, parse_date, parse_time, teaser
 from config import settings
-from database import complete_order, create_order, get_profile, save_profile
+from database import (
+    complete_order,
+    create_order,
+    get_profile,
+    get_test_mode,
+    save_profile,
+    set_test_mode,
+)
 from reports import generate_report
 
 router = Router()
@@ -34,6 +41,48 @@ def menu():
     builder.button(text="📤 Поделиться", switch_inline_query="Узнай себя по звёздам →")
     builder.adjust(1)
     return builder.as_markup()
+
+
+def admin_menu(test_mode: bool):
+    builder = InlineKeyboardBuilder()
+    label = "🟢 Тестовый режим: ВКЛ" if test_mode else "⚪ Тестовый режим: ВЫКЛ"
+    builder.button(text=label, callback_data="admin:test_toggle")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def is_admin(user_id: int) -> bool:
+    return user_id in settings.admin_ids
+
+
+@router.message(Command("admin"))
+async def admin(message: Message):
+    if not is_admin(message.from_user.id):
+        await message.answer("Команда доступна только администраторам.")
+        return
+    test_mode = await get_test_mode()
+    await message.answer(
+        "Панель администратора\n\n"
+        "В тестовом режиме реальные Telegram Stars не списываются: "
+        "после нажатия кнопки покупки PDF формируется сразу.",
+        reply_markup=admin_menu(test_mode),
+    )
+
+
+@router.callback_query(F.data == "admin:test_toggle")
+async def toggle_test_mode(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    enabled = not await get_test_mode()
+    await set_test_mode(enabled)
+    await callback.answer("Тестовый режим включён" if enabled else "Тестовый режим выключен")
+    await callback.message.edit_text(
+        "Панель администратора\n\n"
+        "В тестовом режиме реальные Telegram Stars не списываются: "
+        "после нажатия кнопки покупки PDF формируется сразу.",
+        reply_markup=admin_menu(enabled),
+    )
 
 
 @router.message(Command("start"))
@@ -218,6 +267,10 @@ async def back_menu(callback: CallbackQuery):
 async def buy(callback: CallbackQuery):
     scenario_name = callback.data.split(":", 1)[1]
     order_id = await create_order(callback.from_user.id, scenario_name, PRICES[scenario_name])
+    if await get_test_mode():
+        await callback.answer("Тестовый заказ принят")
+        await deliver_report(callback.message, scenario_name, order_id, "TEST")
+        return
     payload = f"report:{scenario_name}:{order_id}"
     await callback.answer()
     await callback.message.answer_invoice(
@@ -240,17 +293,21 @@ async def paid(message: Message):
         await message.answer("Платёж получен, но не удалось определить отчёт. Напишите в поддержку.")
         return
     scenario_name, order_id = parts[1], int(parts[2])
-    await complete_order(order_id, payment.telegram_payment_charge_id)
+    await deliver_report(message, scenario_name, order_id, payment.telegram_payment_charge_id)
+
+
+async def deliver_report(message: Message, scenario_name: str, order_id: int, payment_id: str):
+    await complete_order(order_id, payment_id)
     profile = await get_profile(message.from_user.id)
     if not profile:
-        await message.answer("Платёж получен. Сначала заполните профиль через /edit.")
+        await message.answer("Заказ принят. Сначала заполните профиль через /edit.")
         return
     charts = PENDING_REPORTS.pop(message.from_user.id, None)
     chart = charts[0] if charts else calculate_chart(
         profile["birth_date"], profile["birth_time"], profile["latitude"], profile["longitude"]
     )
     second_chart = charts[1] if charts else None
-    await message.answer("Оплата прошла ✅ Готовлю ваш персональный отчёт…")
+    await message.answer("Заказ принят ✅ Готовлю ваш персональный отчёт…")
     content = await generate_report_content(scenario_name, chart, second_chart)
     path = generate_report(scenario_name, chart, second_chart, content)
     await message.answer_document(FSInputFile(path), caption=f"{NAMES[scenario_name]} · ASTRO MARY")
