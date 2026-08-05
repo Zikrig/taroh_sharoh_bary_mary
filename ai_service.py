@@ -102,3 +102,27 @@ async def generate_report_content(
     except Exception:
         logger.exception("Неожиданная ошибка генерации AI-отчёта")
         return None
+
+
+async def get_aitunnel_balance() -> dict[str, float] | None:
+    """Fetch the current AITUNNEL account balance without exposing the API key."""
+    if not settings.ai_api_key:
+        return None
+    try:
+        import httpx
+
+        balance_url = f"{settings.ai_base_url.rstrip('/')}/aitunnel/balance"
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(
+                balance_url,
+                headers={"Authorization": f"Bearer {settings.ai_api_key}"},
+            )
+            response.raise_for_status()
+        data = response.json()
+        balance = data.get("balance")
+        if not isinstance(balance, (int, float)):
+            return None
+        return {"balance": float(balance)}
+    except Exception:
+        logger.exception("Не удалось получить баланс AITUNNEL")
+        return None

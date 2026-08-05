@@ -5,7 +5,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, FSInputFile, LabeledPrice, Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from ai_service import generate_report_content
+from ai_service import generate_report_content, get_aitunnel_balance
 from astro import calculate_chart, geocode, parse_date, parse_time, teaser
 from config import settings
 from database import (
@@ -51,6 +51,21 @@ def admin_menu(test_mode: bool):
     return builder.as_markup()
 
 
+def admin_text(test_mode: bool, balance_data: dict[str, float] | None) -> str:
+    mode = "ВКЛ" if test_mode else "ВЫКЛ"
+    if balance_data is None:
+        balance = "недоступен — проверьте ключ AITUNNEL и подключение"
+    else:
+        balance = f"{balance_data['balance']:.2f} ₽"
+    return (
+        "Панель администратора\n\n"
+        f"Баланс AITUNNEL: {balance}\n"
+        f"Тестовый режим: {mode}\n\n"
+        "В тестовом режиме реальные Telegram Stars не списываются: "
+        "после нажатия кнопки покупки PDF формируется сразу."
+    )
+
+
 def is_admin(user_id: int) -> bool:
     return user_id in settings.admin_ids
 
@@ -61,12 +76,8 @@ async def admin(message: Message):
         await message.answer("Команда доступна только администраторам.")
         return
     test_mode = await get_test_mode()
-    await message.answer(
-        "Панель администратора\n\n"
-        "В тестовом режиме реальные Telegram Stars не списываются: "
-        "после нажатия кнопки покупки PDF формируется сразу.",
-        reply_markup=admin_menu(test_mode),
-    )
+    balance = await get_aitunnel_balance()
+    await message.answer(admin_text(test_mode, balance), reply_markup=admin_menu(test_mode))
 
 
 @router.callback_query(F.data == "admin:test_toggle")
@@ -76,11 +87,10 @@ async def toggle_test_mode(callback: CallbackQuery):
         return
     enabled = not await get_test_mode()
     await set_test_mode(enabled)
+    balance = await get_aitunnel_balance()
     await callback.answer("Тестовый режим включён" if enabled else "Тестовый режим выключен")
     await callback.message.edit_text(
-        "Панель администратора\n\n"
-        "В тестовом режиме реальные Telegram Stars не списываются: "
-        "после нажатия кнопки покупки PDF формируется сразу.",
+        admin_text(enabled, balance),
         reply_markup=admin_menu(enabled),
     )
 
