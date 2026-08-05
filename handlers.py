@@ -1,4 +1,5 @@
 from aiogram import F, Router
+from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -55,6 +56,7 @@ class BirthStates(StatesGroup):
 class AdminStates(StatesGroup):
     support_text = State()
     share_text = State()
+    main_menu_text = State()
 
 
 async def menu():
@@ -69,6 +71,14 @@ async def menu():
     builder.button(text="🆘 Поддержка", callback_data="support")
     builder.adjust(1)
     return builder.as_markup()
+
+
+async def get_main_menu_text() -> str:
+    return await get_app_setting("main_menu_text") or (
+        "Добро пожаловать в <b>ASTRO MARY</b> ✨\n\n"
+        "Выберите сценарий — я построю карту по вашим данным, покажу короткий "
+        "персональный тизер и предложу полный PDF."
+    )
 
 
 def back_to_menu():
@@ -97,10 +107,28 @@ def admin_menu(test_mode: bool):
     builder = InlineKeyboardBuilder()
     label = "🟢 Тестовый режим: ВКЛ" if test_mode else "⚪ Тестовый режим: ВЫКЛ"
     builder.button(text=label, callback_data="admin:test_toggle")
-    builder.button(text="✏️ Изменить текст поддержки", callback_data="admin:support_text")
-    builder.button(text="📤 Изменить текст «Поделиться»", callback_data="admin:share_text")
+    builder.button(text="📝 Настройки текстов", callback_data="admin:texts")
     builder.adjust(1)
     return builder.as_markup()
+
+
+def text_settings_menu():
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🏠 Описание главного меню", callback_data="admin:main_menu_text")
+    builder.button(text="🆘 Текст поддержки", callback_data="admin:support_text")
+    builder.button(text="📤 Текст «Поделиться»", callback_data="admin:share_text")
+    builder.button(text="⬅️ Назад в админку", callback_data="admin:back")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def text_settings_message() -> str:
+    return (
+        "Настройки текстов\n\n"
+        "Выберите, какой текст изменить.\n"
+        "Для описания главного меню поддерживается Telegram HTML-разметка: "
+        "<b>жирный</b>, <i>курсив</i>, <a href=\"https://example.com\">ссылка</a>."
+    )
 
 
 def admin_text(test_mode: bool, balance_data: dict[str, float] | None) -> str:
@@ -147,6 +175,26 @@ async def toggle_test_mode(callback: CallbackQuery):
     )
 
 
+@router.callback_query(F.data == "admin:texts")
+async def open_text_settings(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    await callback.answer()
+    await callback.message.edit_text(text_settings_message(), reply_markup=text_settings_menu())
+
+
+@router.callback_query(F.data == "admin:back")
+async def back_to_admin(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    await callback.answer()
+    test_mode = await get_test_mode()
+    balance = await get_aitunnel_balance()
+    await callback.message.edit_text(admin_text(test_mode, balance), reply_markup=admin_menu(test_mode))
+
+
 @router.callback_query(F.data == "admin:support_text")
 async def edit_support_text(callback: CallbackQuery, state: FSMContext):
     if not is_admin(callback.from_user.id):
@@ -161,6 +209,48 @@ async def edit_support_text(callback: CallbackQuery, state: FSMContext):
         "Можно добавить ссылку, Telegram username и переносы строк.",
         reply_markup=builder.as_markup(),
     )
+
+
+@router.callback_query(F.data == "admin:main_menu_text")
+async def edit_main_menu_text(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    await callback.answer()
+    await state.set_state(AdminStates.main_menu_text)
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Отмена", callback_data="admin:cancel_main_menu_edit")
+    await callback.message.answer(
+        "Отправьте новое описание главного меню.\n"
+        "Можно использовать Telegram HTML: <b>жирный</b>, <i>курсив</i>, "
+        "<a href=\"https://example.com\">ссылка</a>.",
+        reply_markup=builder.as_markup(),
+    )
+
+
+@router.callback_query(F.data == "admin:cancel_main_menu_edit")
+async def cancel_main_menu_text_edit(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    await state.clear()
+    await callback.answer("Изменение отменено")
+    await callback.message.edit_text(text_settings_message(), reply_markup=text_settings_menu())
+
+
+@router.message(AdminStates.main_menu_text)
+async def save_main_menu_text(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await message.answer("Команда доступна только администраторам.")
+        return
+    text = (message.text or "").strip()
+    if not text:
+        await message.answer("Описание не должно быть пустым. Попробуйте ещё раз.")
+        return
+    await set_app_setting("main_menu_text", text)
+    await state.clear()
+    await message.answer("Описание главного меню обновлено ✅", reply_markup=back_to_menu())
 
 
 @router.callback_query(F.data == "admin:share_text")
@@ -237,9 +327,8 @@ async def save_support_text(message: Message, state: FSMContext):
 @router.message(Command("start"))
 async def start(message: Message):
     await message.answer(
-        "Добро пожаловать в ASTRO MARY ✨\n\n"
-        "Выберите сценарий — я построю карту по вашим данным, покажу короткий "
-        "персональный тизер и предложу полный PDF.",
+        await get_main_menu_text(),
+        parse_mode=ParseMode.HTML,
         reply_markup=await menu(),
     )
 
@@ -516,7 +605,11 @@ async def show_teaser(message: Message, scenario_name: str, chart: dict, second_
 @router.callback_query(F.data == "menu")
 async def back_menu(callback: CallbackQuery):
     await callback.answer()
-    await callback.message.answer("Выберите сценарий:", reply_markup=await menu())
+    await callback.message.answer(
+        await get_main_menu_text(),
+        parse_mode=ParseMode.HTML,
+        reply_markup=await menu(),
+    )
 
 
 @router.callback_query(F.data.startswith("buy:"))
@@ -582,7 +675,7 @@ async def deliver_report(message: Message, scenario_name: str, order_id: int, pa
 @router.message()
 async def fallback_message(message: Message):
     await message.answer(
-        "Я помогу выбрать персональный астрологический разбор ✨\n"
-        "Пожалуйста, выберите сценарий в главном меню.",
+        await get_main_menu_text(),
+        parse_mode=ParseMode.HTML,
         reply_markup=await menu(),
     )
