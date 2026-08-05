@@ -1,0 +1,7 @@
+aiogram~=3.29
+aiosqlite~=0.21
+python-dotenv~=1.1
+pyswisseph~=2.10
+geopy~=2.4
+reportlab~=4.4
+openai~=1.99
