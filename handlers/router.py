@@ -221,7 +221,7 @@ async def navigate_back(callback: CallbackQuery, state: FSMContext):
             reply_markup=await menu(callback.from_user.id),
         )
     elif destination == "edit_profile":
-        await start_edit(callback.message, state)
+        await start_edit(callback.message, state, callback.from_user.id)
     elif destination == "text_settings" and is_admin(callback.from_user.id):
         await callback.message.answer(text_settings_message(), reply_markup=text_settings_menu())
 
@@ -416,13 +416,10 @@ async def support_callback(callback: CallbackQuery):
 
 
 @router.message(Command("profile"))
-async def profile(message: Message):
+async def profile(message: Message, state: FSMContext):
     data = await get_profile(message.from_user.id)
     if not data:
-        await message.answer(
-            "Профиль пока пуст. Выберите любой сценарий, чтобы заполнить его.",
-            reply_markup=back_to_menu(),
-        )
+        await start_edit(message, state, message.from_user.id)
         return
     await message.answer(
         f"Ваш профиль:\n📅 {data['birth_date'][8:10]}.{data['birth_date'][5:7]}.{data['birth_date'][:4]}\n"
@@ -433,15 +430,17 @@ async def profile(message: Message):
 
 @router.message(Command("edit"))
 async def edit(message: Message, state: FSMContext):
-    await start_edit(message, state)
+    await start_edit(message, state, message.from_user.id)
 
 
-async def start_edit(message: Message, state: FSMContext):
+async def start_edit(message: Message, state: FSMContext, user_id: int):
     await state.clear()
-    profile = await get_profile(message.from_user.id)
+    profile = await get_profile(user_id)
     if not profile:
+        await state.set_state(BirthStates.own_date)
+        await state.update_data(next_scenario="profile")
         await message.answer(
-            "Профиль пока пуст. Сначала выберите сценарий и заполните данные.",
+            "Укажите дату рождения в формате ДД.ММ.ГГГГ:",
             reply_markup=back_to_menu(),
         )
         return
@@ -459,7 +458,7 @@ async def start_edit(message: Message, state: FSMContext):
 @router.callback_query(F.data == "edit_profile")
 async def edit_profile_callback(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
-    await start_edit(callback.message, state)
+    await start_edit(callback.message, state, callback.from_user.id)
 
 
 @router.callback_query(F.data.startswith("edit:"))
@@ -488,12 +487,15 @@ async def choose_profile_field(callback: CallbackQuery, state: FSMContext):
         )
 
 
-async def save_profile_field(message: Message, field: str, value: str) -> None:
+async def save_profile_field(message: Message, field: str, value: str, state: FSMContext) -> None:
     profile = await get_profile(message.from_user.id)
     if not profile:
+        await state.clear()
+        await state.set_state(BirthStates.own_date)
+        await state.update_data(next_scenario="profile")
         await message.answer(
-            "Профиль пока пуст. Сначала заполните данные через один из сценариев.",
-            reply_markup=back_to_edit_profile(),
+            "Укажите дату рождения в формате ДД.ММ.ГГГГ:",
+            reply_markup=back_to_menu(),
         )
         return
     profile[field] = value
@@ -501,9 +503,9 @@ async def save_profile_field(message: Message, field: str, value: str) -> None:
     await message.answer("Данные сохранены ✅", reply_markup=back_to_edit_profile())
 
 
-async def ask_own_data(message: Message, state: FSMContext, scenario: str):
+async def ask_own_data(message: Message, state: FSMContext, scenario: str, user_id: int):
     await message.answer(SCENARIO_INTROS[scenario])
-    profile = await get_profile(message.from_user.id)
+    profile = await get_profile(user_id)
     if profile and scenario == "compatibility":
         own_chart = calculate_chart(profile["birth_date"], profile["birth_time"],
                                     profile["latitude"], profile["longitude"])
@@ -517,7 +519,7 @@ async def ask_own_data(message: Message, state: FSMContext, scenario: str):
         return
     if profile:
         chart = calculate_chart(profile["birth_date"], profile["birth_time"], profile["latitude"], profile["longitude"])
-        await show_teaser(message, scenario, chart)
+        await show_teaser(message, scenario, chart, user_id=user_id)
         return
     await state.clear()
     await state.set_state(BirthStates.own_date)
@@ -532,7 +534,7 @@ async def ask_own_data(message: Message, state: FSMContext, scenario: str):
 async def scenario(callback: CallbackQuery, state: FSMContext):
     scenario_name = callback.data.split(":", 1)[1]
     await callback.answer()
-    await ask_own_data(callback.message, state, scenario_name)
+    await ask_own_data(callback.message, state, scenario_name, callback.from_user.id)
 
 
 @router.message(BirthStates.own_date)
@@ -544,7 +546,7 @@ async def own_date(message: Message, state: FSMContext):
         return
     data = await state.get_data()
     if data.get("edit_field") == "date":
-        await save_profile_field(message, "birth_date", value)
+        await save_profile_field(message, "birth_date", value, state)
         await state.clear()
         return
     await state.update_data(own_date=value)
@@ -564,7 +566,7 @@ async def own_time(message: Message, state: FSMContext, time_text: str | None = 
         return
     data = await state.get_data()
     if data.get("edit_field") == "time":
-        await save_profile_field(message, "birth_time", value)
+        await save_profile_field(message, "birth_time", value, state)
         await state.clear()
         return
     await state.update_data(own_time=value)
@@ -584,9 +586,11 @@ async def own_place(message: Message, state: FSMContext):
         profile = await get_profile(message.from_user.id)
         if not profile:
             await state.clear()
+            await state.set_state(BirthStates.own_date)
+            await state.update_data(next_scenario="profile")
             await message.answer(
-                "Профиль пока пуст. Сначала заполните данные через один из сценариев.",
-                reply_markup=back_to_edit_profile(),
+                "Укажите дату рождения в формате ДД.ММ.ГГГГ:",
+                reply_markup=back_to_menu(),
             )
             return
         profile.update(birth_place=message.text.strip(), latitude=latitude, longitude=longitude)
@@ -608,7 +612,7 @@ async def own_place(message: Message, state: FSMContext):
         await message.answer("Теперь введите дату рождения партнёра ДД.ММ.ГГГГ:")
     else:
         await state.clear()
-        await show_teaser(message, scenario_name, own_chart)
+        await show_teaser(message, scenario_name, own_chart, user_id=message.from_user.id)
 
 
 @router.message(BirthStates.partner_date)
@@ -658,11 +662,24 @@ async def partner_place(message: Message, state: FSMContext):
         return
     partner = calculate_chart(data["partner_date"], data["partner_time"], latitude, longitude)
     await state.clear()
-    await show_teaser(message, "compatibility", data["own_chart"], partner)
+    await show_teaser(
+        message,
+        "compatibility",
+        data["own_chart"],
+        partner,
+        user_id=message.from_user.id,
+    )
 
 
-async def show_teaser(message: Message, scenario_name: str, chart: dict, second_chart: dict | None = None):
-    PENDING_REPORTS[message.from_user.id] = (chart, second_chart)
+async def show_teaser(
+    message: Message,
+    scenario_name: str,
+    chart: dict,
+    second_chart: dict | None = None,
+    *,
+    user_id: int,
+):
+    PENDING_REPORTS[user_id] = (chart, second_chart)
     builder = InlineKeyboardBuilder()
     builder.button(text=f"🔓 Получить полный PDF · {PRICES[scenario_name]}⭐",
                    callback_data=f"buy:{scenario_name}")
@@ -747,18 +764,21 @@ async def deliver_report(
     payment_id: str,
 ):
     await complete_order(order_id, payment_id)
-    profile = await get_profile(user_id)
-    if not profile:
-        await message.answer(
-            "Заказ принят. Сначала заполните профиль через /edit.",
-            reply_markup=back_to_menu(),
-        )
-        return
     charts = await get_report_context(order_id) or PENDING_REPORTS.pop(user_id, None)
-    chart = charts[0] if charts else calculate_chart(
-        profile["birth_date"], profile["birth_time"], profile["latitude"], profile["longitude"]
-    )
-    second_chart = charts[1] if charts else None
+    if charts:
+        chart, second_chart = charts
+    else:
+        profile = await get_profile(user_id)
+        if not profile:
+            await message.answer(
+                "Не удалось восстановить данные для отчёта. Выберите сценарий заново.",
+                reply_markup=back_to_menu(),
+            )
+            return
+        chart = calculate_chart(
+            profile["birth_date"], profile["birth_time"], profile["latitude"], profile["longitude"]
+        )
+        second_chart = None
     await message.answer("Заказ принят ✅ Готовлю ваш персональный отчёт…")
     content = await generate_report_content(scenario_name, chart, second_chart)
     profile_photo = await get_profile_photo(message, user_id)
