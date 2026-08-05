@@ -69,6 +69,12 @@ def menu():
     return builder.as_markup()
 
 
+def back_to_menu():
+    builder = InlineKeyboardBuilder()
+    builder.button(text="⬅️ Главное меню", callback_data="menu")
+    return builder.as_markup()
+
+
 def admin_menu(test_mode: bool):
     builder = InlineKeyboardBuilder()
     label = "🟢 Тестовый режим: ВКЛ" if test_mode else "⚪ Тестовый режим: ВЫКЛ"
@@ -145,7 +151,10 @@ async def cancel_support_text_edit(callback: CallbackQuery, state: FSMContext):
         return
     await state.clear()
     await callback.answer("Изменение отменено")
-    await callback.message.edit_text("Изменение текста поддержки отменено.")
+    await callback.message.edit_text(
+        "Изменение текста поддержки отменено.",
+        reply_markup=admin_menu(await get_test_mode()),
+    )
 
 
 @router.message(AdminStates.support_text)
@@ -156,11 +165,11 @@ async def save_support_text(message: Message, state: FSMContext):
         return
     text = (message.text or "").strip()
     if not text:
-        await message.answer("Текст не должен быть пустым. Попробуйте ещё раз или отправьте /cancel.")
+        await message.answer("Текст не должен быть пустым. Попробуйте ещё раз.")
         return
     await set_app_setting("support_text", text)
     await state.clear()
-    await message.answer("Текст поддержки обновлён ✅")
+    await message.answer("Текст поддержки обновлён ✅", reply_markup=back_to_menu())
 
 
 @router.message(Command("start"))
@@ -192,7 +201,8 @@ async def send_help(message: Message):
         "✏️ Изменить данные — обновите дату, время или место рождения для "
         "максимально точного разбора.\n\n"
         "📖 Инструкция — вернитесь к этому описанию в любой момент.\n\n"
-        "🆘 Поддержка — мы рядом, если появятся вопросы."
+        "🆘 Поддержка — мы рядом, если появятся вопросы.",
+        reply_markup=back_to_menu(),
     )
 
 
@@ -205,7 +215,7 @@ async def help_callback(callback: CallbackQuery):
 @router.message(Command("support"))
 async def support(message: Message):
     text = await get_app_setting("support_text")
-    await message.answer(text or f"По вопросам: {settings.support_url}")
+    await message.answer(text or f"По вопросам: {settings.support_url}", reply_markup=back_to_menu())
 
 
 @router.callback_query(F.data == "support")
@@ -218,11 +228,15 @@ async def support_callback(callback: CallbackQuery):
 async def profile(message: Message):
     data = await get_profile(message.from_user.id)
     if not data:
-        await message.answer("Профиль пока пуст. Выберите любой сценарий, чтобы заполнить его.", reply_markup=menu())
+        await message.answer(
+            "Профиль пока пуст. Выберите любой сценарий, чтобы заполнить его.",
+            reply_markup=back_to_menu(),
+        )
         return
     await message.answer(
         f"Ваш профиль:\n📅 {data['birth_date'][8:10]}.{data['birth_date'][5:7]}.{data['birth_date'][:4]}\n"
-        f"🕐 {data['birth_time']}\n📍 {data['birth_place']}\n\n/edit — изменить"
+        f"🕐 {data['birth_time']}\n📍 {data['birth_place']}\n\n/edit — изменить",
+        reply_markup=back_to_menu(),
     )
 
 
@@ -311,7 +325,7 @@ async def own_place(message: Message, state: FSMContext):
     own_chart = calculate_chart(profile["birth_date"], profile["birth_time"], latitude, longitude)
     if scenario_name == "profile":
         await state.clear()
-        await message.answer("Профиль сохранён ✅", reply_markup=menu())
+        await message.answer("Профиль сохранён ✅", reply_markup=back_to_menu())
     elif scenario_name == "compatibility":
         await state.update_data(own_chart=own_chart)
         await state.set_state(BirthStates.partner_date)
@@ -405,7 +419,10 @@ async def paid(message: Message):
     payment = message.successful_payment
     parts = payment.invoice_payload.split(":")
     if len(parts) != 3:
-        await message.answer("Платёж получен, но не удалось определить отчёт. Напишите в поддержку.")
+        await message.answer(
+            "Платёж получен, но не удалось определить отчёт. Напишите в поддержку.",
+            reply_markup=back_to_menu(),
+        )
         return
     scenario_name, order_id = parts[1], int(parts[2])
     await deliver_report(message, scenario_name, order_id, payment.telegram_payment_charge_id)
@@ -415,7 +432,10 @@ async def deliver_report(message: Message, scenario_name: str, order_id: int, pa
     await complete_order(order_id, payment_id)
     profile = await get_profile(message.from_user.id)
     if not profile:
-        await message.answer("Заказ принят. Сначала заполните профиль через /edit.")
+        await message.answer(
+            "Заказ принят. Сначала заполните профиль через /edit.",
+            reply_markup=back_to_menu(),
+        )
         return
     charts = PENDING_REPORTS.pop(message.from_user.id, None)
     chart = charts[0] if charts else calculate_chart(
@@ -425,4 +445,8 @@ async def deliver_report(message: Message, scenario_name: str, order_id: int, pa
     await message.answer("Заказ принят ✅ Готовлю ваш персональный отчёт…")
     content = await generate_report_content(scenario_name, chart, second_chart)
     path = generate_report(scenario_name, chart, second_chart, content)
-    await message.answer_document(FSInputFile(path), caption=f"{NAMES[scenario_name]} · ASTRO MARY")
+    await message.answer_document(
+        FSInputFile(path),
+        caption=f"{NAMES[scenario_name]} · ASTRO MARY",
+        reply_markup=back_to_menu(),
+    )
