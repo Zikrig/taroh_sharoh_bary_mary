@@ -7,7 +7,11 @@
 2. Создайте виртуальное окружение и установите зависимости:
    `python -m venv .venv` и `pip install -r requirements.txt`.
 3. Заполните `.env`: `BOT_TOKEN` из @BotFather и ссылку `SUPPORT_URL`.
-4. Запустите: `python bot.py`.
+4. Запустите из корня проекта: `python bot.py`.
+
+Проверка после изменений:
+
+`python -m unittest discover -s tests`
 
 Для доступа к админке добавьте в `.env` свой Telegram ID:
 `ADMINS_ID=123456789` или несколько ID через запятую. Откройте в боте

@@ -6,10 +6,10 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, FSInputFile, LabeledPrice, Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from ai_service import generate_report_content, get_aitunnel_balance
-from astro import calculate_chart, geocode, parse_date, parse_time, teaser
-from config import settings
-from database import (
+from services.ai import generate_report_content, get_aitunnel_balance
+from services.astro import calculate_chart, geocode, parse_date, parse_time, teaser
+from config.settings import settings
+from database.repository import (
     complete_order,
     create_order,
     get_profile,
@@ -19,7 +19,7 @@ from database import (
     set_app_setting,
     set_test_mode,
 )
-from reports import generate_report
+from services.reports import generate_report
 
 router = Router()
 PRICES = {"personality": 349, "compatibility": 449, "money": 399}
@@ -59,14 +59,16 @@ class AdminStates(StatesGroup):
     main_menu_text = State()
 
 
-async def menu():
+async def menu(user_id: int):
     share_text = await get_app_setting("share_text") or "Узнай себя по звёздам →"
+    has_profile = await get_profile(user_id) is not None
     builder = InlineKeyboardBuilder()
     builder.button(text="✨ Разбор личности", callback_data="scenario:personality")
     builder.button(text="💞 Совместимость", callback_data="scenario:compatibility")
     builder.button(text="💰 Денежный код", callback_data="scenario:money")
     builder.button(text="📤 Поделиться", switch_inline_query=share_text)
-    builder.button(text="✏️ Изменить данные", callback_data="edit_profile")
+    if has_profile:
+        builder.button(text="✏️ Изменить данные", callback_data="edit_profile")
     builder.button(text="📖 Инструкция", callback_data="help")
     builder.button(text="🆘 Поддержка", callback_data="support")
     builder.adjust(1)
@@ -214,7 +216,7 @@ async def navigate_back(callback: CallbackQuery, state: FSMContext):
         await callback.message.answer(
             await get_main_menu_text(),
             parse_mode=ParseMode.HTML,
-            reply_markup=await menu(),
+            reply_markup=await menu(callback.from_user.id),
         )
     elif destination == "edit_profile":
         await start_edit(callback.message, state)
@@ -365,7 +367,7 @@ async def start(message: Message):
     await message.answer(
         await get_main_menu_text(),
         parse_mode=ParseMode.HTML,
-        reply_markup=await menu(),
+        reply_markup=await menu(message.from_user.id),
     )
 
 
@@ -677,7 +679,7 @@ async def back_menu(callback: CallbackQuery):
     await callback.message.answer(
         await get_main_menu_text(),
         parse_mode=ParseMode.HTML,
-        reply_markup=await menu(),
+        reply_markup=await menu(callback.from_user.id),
     )
 
 
@@ -746,5 +748,5 @@ async def fallback_message(message: Message):
     await message.answer(
         await get_main_menu_text(),
         parse_mode=ParseMode.HTML,
-        reply_markup=await menu(),
+        reply_markup=await menu(message.from_user.id),
     )

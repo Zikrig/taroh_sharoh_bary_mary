@@ -1,7 +1,7 @@
 import unittest
 
-from ai_service import _validate_content, build_prompt_payload
-from reports import SECTIONS
+from services.ai import _validate_content, build_prompt_payload
+from services.reports import SECTIONS
 
 
 def chart() -> dict:

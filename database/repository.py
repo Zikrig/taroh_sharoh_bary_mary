@@ -3,7 +3,7 @@ from typing import Any
 
 import aiosqlite
 
-from config import settings
+from config.settings import settings
 
 
 async def init_db() -> None:

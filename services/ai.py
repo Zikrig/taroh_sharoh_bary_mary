@@ -2,9 +2,9 @@ import json
 import logging
 from typing import Any
 
-from astro import calculate_synastry
-from config import settings
-from reports import SECTIONS
+from services.astro import calculate_synastry
+from config.settings import settings
+from services.reports import SECTIONS
 
 logger = logging.getLogger(__name__)
 

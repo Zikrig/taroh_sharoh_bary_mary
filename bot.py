@@ -3,9 +3,9 @@ import logging
 
 from aiogram import Bot, Dispatcher
 
-from config import settings
-from database import init_db
-from handlers import router
+from config.settings import settings
+from database.repository import init_db
+from handlers.router import router
 
 
 async def main() -> None:
