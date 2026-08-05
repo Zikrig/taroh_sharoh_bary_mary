@@ -39,6 +39,9 @@ def menu():
     builder.button(text="💞 Совместимость", callback_data="scenario:compatibility")
     builder.button(text="💰 Денежный код", callback_data="scenario:money")
     builder.button(text="📤 Поделиться", switch_inline_query="Узнай себя по звёздам →")
+    builder.button(text="✏️ Изменить данные", callback_data="edit_profile")
+    builder.button(text="📖 Инструкция", callback_data="help")
+    builder.button(text="🆘 Поддержка", callback_data="support")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -107,6 +110,10 @@ async def start(message: Message):
 
 @router.message(Command("help"))
 async def help_command(message: Message):
+    await send_help(message)
+
+
+async def send_help(message: Message):
     await message.answer(
         "Как пользоваться:\n"
         "1. Выберите сценарий.\n2. Введите дату в формате ДД.ММ.ГГГГ.\n"
@@ -115,9 +122,21 @@ async def help_command(message: Message):
     )
 
 
+@router.callback_query(F.data == "help")
+async def help_callback(callback: CallbackQuery):
+    await callback.answer()
+    await send_help(callback.message)
+
+
 @router.message(Command("support"))
 async def support(message: Message):
     await message.answer(f"По вопросам: {settings.support_url}")
+
+
+@router.callback_query(F.data == "support")
+async def support_callback(callback: CallbackQuery):
+    await callback.answer()
+    await support(callback.message)
 
 
 @router.message(Command("profile"))
@@ -134,10 +153,20 @@ async def profile(message: Message):
 
 @router.message(Command("edit"))
 async def edit(message: Message, state: FSMContext):
+    await start_edit(message, state)
+
+
+async def start_edit(message: Message, state: FSMContext):
     await state.clear()
     await state.set_state(BirthStates.own_date)
     await state.update_data(next_scenario="profile")
     await message.answer("Введите вашу дату рождения в формате ДД.ММ.ГГГГ:")
+
+
+@router.callback_query(F.data == "edit_profile")
+async def edit_profile_callback(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await start_edit(callback.message, state)
 
 
 async def ask_own_data(message: Message, state: FSMContext, scenario: str):
