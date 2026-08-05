@@ -2,7 +2,8 @@
 
 ## Локально
 
-1. Установите Python 3.12+ (для Docker используется Python 3.14).
+1. Установите Python 3.12+ (для Docker используется Python 3.12 из-за
+   совместимости нативной библиотеки Swiss Ephemeris).
 2. Создайте виртуальное окружение и установите зависимости:
    `python -m venv .venv` и `pip install -r requirements.txt`.
 3. Заполните `.env`: `BOT_TOKEN` из @BotFather и ссылку `SUPPORT_URL`.
