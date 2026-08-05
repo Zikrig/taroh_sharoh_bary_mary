@@ -1,3 +1,4 @@
+from html import escape
 from pathlib import Path
 from datetime import datetime
 from typing import Any
@@ -8,7 +9,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer
+from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer
 
 FONT = "Helvetica"
 for font_path in (
@@ -71,7 +72,7 @@ SECTIONS = {
 
 
 def _paragraph(text: str, style: ParagraphStyle) -> Paragraph:
-    return Paragraph(text.replace("&", "&amp;").replace("\n", "<br/>"), style)
+    return Paragraph(escape(text).replace("\n", "<br/>"), style)
 
 
 def generate_report(
@@ -79,6 +80,9 @@ def generate_report(
     chart: dict,
     second_chart: dict | None = None,
     content: dict[str, Any] | None = None,
+    recipient_name: str | None = None,
+    recipient_username: str | None = None,
+    recipient_photo: Any | None = None,
 ) -> Path:
     output_dir = Path("reports")
     output_dir.mkdir(exist_ok=True)
@@ -92,7 +96,14 @@ def generate_report(
                           fontSize=10.5, leading=16, textColor="#172033")
     report_title = content.get("title", "Персональный отчёт по вашей карте") if content else "Персональный отчёт по вашей карте"
     story = [_paragraph("ASTRO MARY", title), Spacer(1, 10 * mm),
-             _paragraph(report_title, body), Spacer(1, 8 * mm)]
+             _paragraph(report_title, body), Spacer(1, 4 * mm)]
+    if recipient_photo:
+        story.extend([Image(recipient_photo, width=28 * mm, height=28 * mm), Spacer(1, 3 * mm)])
+    if recipient_name:
+        username = f" · @{recipient_username}" if recipient_username else ""
+        story.extend([_paragraph(f"Для: {recipient_name}{username}", body), Spacer(1, 4 * mm)])
+    else:
+        story.append(Spacer(1, 4 * mm))
     planets = chart["planets"]
     summary = (
         f"Дата: {chart['date']}<br/>Время: {chart['time']}<br/>"

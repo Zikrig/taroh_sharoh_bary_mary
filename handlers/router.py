@@ -3,7 +3,7 @@ from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, FSInputFile, LabeledPrice, Message
+from aiogram.types import CallbackQuery, FSInputFile, LabeledPrice, Message, User
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from services.ai import generate_report_content, get_aitunnel_balance
@@ -14,8 +14,10 @@ from database.repository import (
     create_order,
     get_profile,
     get_app_setting,
+    get_report_context,
     get_test_mode,
     save_profile,
+    save_report_context,
     set_app_setting,
     set_test_mode,
 )
@@ -687,9 +689,19 @@ async def back_menu(callback: CallbackQuery):
 async def buy(callback: CallbackQuery):
     scenario_name = callback.data.split(":", 1)[1]
     order_id = await create_order(callback.from_user.id, scenario_name, PRICES[scenario_name])
+    charts = PENDING_REPORTS.get(callback.from_user.id)
+    if charts:
+        await save_report_context(order_id, *charts)
     if await get_test_mode():
         await callback.answer("Тестовый заказ принят")
-        await deliver_report(callback.message, scenario_name, order_id, "TEST")
+        await deliver_report(
+            callback.message,
+            callback.from_user.id,
+            callback.from_user,
+            scenario_name,
+            order_id,
+            "TEST",
+        )
         return
     payload = f"report:{scenario_name}:{order_id}"
     await callback.answer()
@@ -716,31 +728,65 @@ async def paid(message: Message):
         )
         return
     scenario_name, order_id = parts[1], int(parts[2])
-    await deliver_report(message, scenario_name, order_id, payment.telegram_payment_charge_id)
+    await deliver_report(
+        message,
+        message.from_user.id,
+        message.from_user,
+        scenario_name,
+        order_id,
+        payment.telegram_payment_charge_id,
+    )
 
 
-async def deliver_report(message: Message, scenario_name: str, order_id: int, payment_id: str):
+async def deliver_report(
+    message: Message,
+    user_id: int,
+    recipient: User,
+    scenario_name: str,
+    order_id: int,
+    payment_id: str,
+):
     await complete_order(order_id, payment_id)
-    profile = await get_profile(message.from_user.id)
+    profile = await get_profile(user_id)
     if not profile:
         await message.answer(
             "Заказ принят. Сначала заполните профиль через /edit.",
             reply_markup=back_to_menu(),
         )
         return
-    charts = PENDING_REPORTS.pop(message.from_user.id, None)
+    charts = await get_report_context(order_id) or PENDING_REPORTS.pop(user_id, None)
     chart = charts[0] if charts else calculate_chart(
         profile["birth_date"], profile["birth_time"], profile["latitude"], profile["longitude"]
     )
     second_chart = charts[1] if charts else None
     await message.answer("Заказ принят ✅ Готовлю ваш персональный отчёт…")
     content = await generate_report_content(scenario_name, chart, second_chart)
-    path = generate_report(scenario_name, chart, second_chart, content)
+    profile_photo = await get_profile_photo(message, user_id)
+    path = generate_report(
+        scenario_name,
+        chart,
+        second_chart,
+        content,
+        recipient.full_name,
+        recipient.username,
+        profile_photo,
+    )
     await message.answer_document(
         FSInputFile(path),
         caption=f"{NAMES[scenario_name]} · ASTRO MARY",
         reply_markup=back_to_menu(),
     )
+
+
+async def get_profile_photo(message: Message, user_id: int):
+    try:
+        photos = await message.bot.get_user_profile_photos(user_id, limit=1)
+        if not photos.photos:
+            return None
+        file = await message.bot.get_file(photos.photos[0][-1].file_id)
+        return await message.bot.download_file(file.file_path)
+    except Exception:
+        return None
 
 
 @router.message()

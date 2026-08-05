@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,12 @@ async def init_db() -> None:
             CREATE TABLE IF NOT EXISTS app_settings (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS report_contexts (
+                order_id INTEGER PRIMARY KEY,
+                chart_json TEXT NOT NULL,
+                second_chart_json TEXT,
+                FOREIGN KEY (order_id) REFERENCES orders(id)
             );
             INSERT OR IGNORE INTO app_settings (key, value)
             VALUES ('test_mode', '0');
@@ -115,6 +122,39 @@ async def create_order(user_id: int, report_type: str, amount: int) -> int:
         )
         await db.commit()
         return cur.lastrowid
+
+
+async def save_report_context(
+    order_id: int, chart: dict[str, Any], second_chart: dict[str, Any] | None
+) -> None:
+    async with aiosqlite.connect(settings.database_path) as db:
+        await db.execute(
+            """
+            INSERT INTO report_contexts (order_id, chart_json, second_chart_json)
+            VALUES (?, ?, ?)
+            ON CONFLICT(order_id) DO UPDATE SET
+                chart_json=excluded.chart_json,
+                second_chart_json=excluded.second_chart_json
+            """,
+            (
+                order_id,
+                json.dumps(chart, ensure_ascii=False),
+                json.dumps(second_chart, ensure_ascii=False) if second_chart else None,
+            ),
+        )
+        await db.commit()
+
+
+async def get_report_context(order_id: int) -> tuple[dict[str, Any], dict[str, Any] | None] | None:
+    async with aiosqlite.connect(settings.database_path) as db:
+        async with db.execute(
+            "SELECT chart_json, second_chart_json FROM report_contexts WHERE order_id = ?",
+            (order_id,),
+        ) as cur:
+            row = await cur.fetchone()
+    if not row:
+        return None
+    return json.loads(row[0]), json.loads(row[1]) if row[1] else None
 
 
 async def complete_order(order_id: int, payment_id: str) -> None:
