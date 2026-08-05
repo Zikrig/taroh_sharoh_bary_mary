@@ -54,14 +54,16 @@ class BirthStates(StatesGroup):
 
 class AdminStates(StatesGroup):
     support_text = State()
+    share_text = State()
 
 
-def menu():
+async def menu():
+    share_text = await get_app_setting("share_text") or "Узнай себя по звёздам →"
     builder = InlineKeyboardBuilder()
     builder.button(text="✨ Разбор личности", callback_data="scenario:personality")
     builder.button(text="💞 Совместимость", callback_data="scenario:compatibility")
     builder.button(text="💰 Денежный код", callback_data="scenario:money")
-    builder.button(text="📤 Поделиться", switch_inline_query="Узнай себя по звёздам →")
+    builder.button(text="📤 Поделиться", switch_inline_query=share_text)
     builder.button(text="✏️ Изменить данные", callback_data="edit_profile")
     builder.button(text="📖 Инструкция", callback_data="help")
     builder.button(text="🆘 Поддержка", callback_data="support")
@@ -80,6 +82,7 @@ def admin_menu(test_mode: bool):
     label = "🟢 Тестовый режим: ВКЛ" if test_mode else "⚪ Тестовый режим: ВЫКЛ"
     builder.button(text=label, callback_data="admin:test_toggle")
     builder.button(text="✏️ Изменить текст поддержки", callback_data="admin:support_text")
+    builder.button(text="📤 Изменить текст «Поделиться»", callback_data="admin:share_text")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -144,6 +147,49 @@ async def edit_support_text(callback: CallbackQuery, state: FSMContext):
     )
 
 
+@router.callback_query(F.data == "admin:share_text")
+async def edit_share_text(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    await callback.answer()
+    await state.set_state(AdminStates.share_text)
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Отмена", callback_data="admin:cancel_share_edit")
+    await callback.message.answer(
+        "Отправьте текст, который будет подставляться при нажатии «Поделиться».",
+        reply_markup=builder.as_markup(),
+    )
+
+
+@router.callback_query(F.data == "admin:cancel_share_edit")
+async def cancel_share_text_edit(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    await state.clear()
+    await callback.answer("Изменение отменено")
+    await callback.message.edit_text(
+        "Изменение текста «Поделиться» отменено.",
+        reply_markup=admin_menu(await get_test_mode()),
+    )
+
+
+@router.message(AdminStates.share_text)
+async def save_share_text(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await message.answer("Команда доступна только администраторам.")
+        return
+    text = (message.text or "").strip()
+    if not text:
+        await message.answer("Текст не должен быть пустым. Попробуйте ещё раз.")
+        return
+    await set_app_setting("share_text", text)
+    await state.clear()
+    await message.answer("Текст «Поделиться» обновлён ✅", reply_markup=back_to_menu())
+
+
 @router.callback_query(F.data == "admin:cancel_support_edit")
 async def cancel_support_text_edit(callback: CallbackQuery, state: FSMContext):
     if not is_admin(callback.from_user.id):
@@ -178,7 +224,7 @@ async def start(message: Message):
         "Добро пожаловать в ASTRO MARY ✨\n\n"
         "Выберите сценарий — я построю карту по вашим данным, покажу короткий "
         "персональный тизер и предложу полный PDF.",
-        reply_markup=menu(),
+        reply_markup=await menu(),
     )
 
 
@@ -389,7 +435,7 @@ async def show_teaser(message: Message, scenario_name: str, chart: dict, second_
 @router.callback_query(F.data == "menu")
 async def back_menu(callback: CallbackQuery):
     await callback.answer()
-    await callback.message.answer("Выберите сценарий:", reply_markup=menu())
+    await callback.message.answer("Выберите сценарий:", reply_markup=await menu())
 
 
 @router.callback_query(F.data.startswith("buy:"))
@@ -449,4 +495,13 @@ async def deliver_report(message: Message, scenario_name: str, order_id: int, pa
         FSInputFile(path),
         caption=f"{NAMES[scenario_name]} · ASTRO MARY",
         reply_markup=back_to_menu(),
+    )
+
+
+@router.message()
+async def fallback_message(message: Message):
+    await message.answer(
+        "Я помогу выбрать персональный астрологический разбор ✨\n"
+        "Пожалуйста, выберите сценарий в главном меню.",
+        reply_markup=await menu(),
     )
