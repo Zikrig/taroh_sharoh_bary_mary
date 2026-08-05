@@ -35,9 +35,9 @@ class BirthStates(StatesGroup):
 
 def menu():
     builder = InlineKeyboardBuilder()
-    builder.button(text="✨ Разбор личности · 349⭐", callback_data="scenario:personality")
-    builder.button(text="💞 Совместимость · 449⭐", callback_data="scenario:compatibility")
-    builder.button(text="💰 Денежный код · 399⭐", callback_data="scenario:money")
+    builder.button(text="✨ Разбор личности", callback_data="scenario:personality")
+    builder.button(text="💞 Совместимость", callback_data="scenario:compatibility")
+    builder.button(text="💰 Денежный код", callback_data="scenario:money")
     builder.button(text="📤 Поделиться", switch_inline_query="Узнай себя по звёздам →")
     builder.adjust(1)
     return builder.as_markup()
@@ -89,8 +89,8 @@ async def toggle_test_mode(callback: CallbackQuery):
 async def start(message: Message):
     await message.answer(
         "Добро пожаловать в ASTRO MARY ✨\n\n"
-        "Выберите отчёт — я построю карту по вашим данным, покажу короткий тизер "
-        "и предложу полный персональный PDF.",
+        "Выберите сценарий — я построю карту по вашим данным, покажу короткий "
+        "персональный тизер и предложу полный PDF.",
         reply_markup=menu(),
     )
 
