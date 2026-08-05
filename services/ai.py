@@ -21,22 +21,53 @@ SYSTEM_PROMPT = """
 {
   "title": "string",
   "intro": "string",
-  "sections": [{"title": "string", "content": "string"}],
+  "sections": [{
+    "title": "string",
+    "content": "string",
+    "references": ["точные факты из allowed_facts"]
+  }],
   "disclaimer": "string"
 }
 Список sections должен содержать каждый переданный раздел ровно один раз и в том же порядке.
+Каждый раздел: 180–500 слов, минимум две конкретные ссылки из allowed_facts. Не повторяй
+одни и те же формулировки и не используй данные, отсутствующие в allowed_facts.
 """.strip()
 
 
 def _chart_for_prompt(chart: dict) -> dict[str, Any]:
     return {
         "birth_date": chart["date"],
-        "birth_time": chart["time"],
+        "birth_time_local": chart["time"],
+        "birth_time_utc": chart["utc_time"],
+        "timezone": chart["timezone"],
+        "time_is_approximate": chart["time_is_approximate"],
         "ascendant": chart["ascendant"],
         "houses": chart["houses"],
         "planets": chart["planets"],
         "aspects": chart["aspects"],
     }
+
+
+def _allowed_facts(chart: dict, second_chart: dict | None) -> list[str]:
+    facts = []
+    for label, value in (("Карта 1", chart), ("Карта 2", second_chart)):
+        if value is None:
+            continue
+        for planet, position in value["planets"].items():
+            facts.append(
+                f"{label}: {planet} в {position['sign']}, дом {position['house']}"
+            )
+        facts.append(f"{label}: Асцендент в {value['ascendant']['sign']}")
+        for aspect in value["aspects"]:
+            facts.append(
+                f"{label}: {aspect['first']} {aspect['type']} {aspect['second']}"
+            )
+    if second_chart:
+        for aspect in calculate_synastry(chart, second_chart):
+            facts.append(
+                f"Синастрия: {aspect['first']} {aspect['type']} {aspect['second']}"
+            )
+    return facts
 
 
 def build_prompt_payload(report_type: str, chart: dict, second_chart: dict | None) -> dict[str, Any]:
@@ -49,11 +80,16 @@ def build_prompt_payload(report_type: str, chart: dict, second_chart: dict | Non
         "primary_chart": _chart_for_prompt(chart),
         "partner_chart": _chart_for_prompt(second_chart) if second_chart else None,
         "synastry_aspects": calculate_synastry(chart, second_chart) if second_chart else [],
+        "allowed_facts": _allowed_facts(chart, second_chart),
     }
     return payload
 
 
-def _validate_content(content: Any, report_type: str) -> dict[str, Any] | None:
+def _validate_content(
+    content: Any,
+    report_type: str,
+    allowed_facts: set[str],
+) -> dict[str, Any] | None:
     if not isinstance(content, dict) or not all(isinstance(content.get(key), str) for key in ("title", "intro", "disclaimer")):
         return None
     expected_titles = [title for title, _ in SECTIONS[report_type]]
@@ -62,7 +98,14 @@ def _validate_content(content: Any, report_type: str) -> dict[str, Any] | None:
         return None
     if [section.get("title") for section in sections] != expected_titles:
         return None
-    if not all(isinstance(section.get("content"), str) and section["content"].strip() for section in sections):
+    if not all(
+        isinstance(section.get("content"), str)
+        and len(section["content"].split()) >= 100
+        and isinstance(section.get("references"), list)
+        and len(section["references"]) >= 2
+        and all(reference in allowed_facts for reference in section["references"])
+        for section in sections
+    ):
         return None
     return content
 
@@ -70,7 +113,7 @@ def _validate_content(content: Any, report_type: str) -> dict[str, Any] | None:
 async def generate_report_content(
     report_type: str, chart: dict, second_chart: dict | None = None
 ) -> dict[str, Any] | None:
-    """Return AI content or None, allowing PDF generation to use its local fallback."""
+    """Return validated AI content or None when a report cannot be generated."""
     if not settings.ai_api_key:
         return None
     try:
@@ -95,7 +138,11 @@ async def generate_report_content(
         raw_content = response.choices[0].message.content
         if not raw_content:
             return None
-        return _validate_content(json.loads(raw_content), report_type)
+        return _validate_content(
+            json.loads(raw_content),
+            report_type,
+            set(_allowed_facts(chart, second_chart)),
+        )
     except (ImportError, json.JSONDecodeError, TimeoutError, ValueError) as error:
         logger.warning("Не удалось получить AI-отчёт: %s", error)
         return None

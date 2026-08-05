@@ -16,6 +16,7 @@ async def init_db() -> None:
                 user_id INTEGER PRIMARY KEY,
                 birth_date TEXT NOT NULL,
                 birth_time TEXT NOT NULL,
+                time_is_approximate INTEGER NOT NULL DEFAULT 0,
                 birth_place TEXT NOT NULL,
                 latitude REAL NOT NULL,
                 longitude REAL NOT NULL,
@@ -44,6 +45,13 @@ async def init_db() -> None:
             VALUES ('test_mode', '0');
             """
         )
+        columns = {
+            row[1] for row in await (await db.execute("PRAGMA table_info(profiles)")).fetchall()
+        }
+        if "time_is_approximate" not in columns:
+            await db.execute(
+                "ALTER TABLE profiles ADD COLUMN time_is_approximate INTEGER NOT NULL DEFAULT 0"
+            )
         await db.commit()
 
 
@@ -101,15 +109,26 @@ async def save_profile(user_id: int, profile: dict[str, Any]) -> None:
     async with aiosqlite.connect(settings.database_path) as db:
         await db.execute(
             """
-            INSERT INTO profiles (user_id, birth_date, birth_time, birth_place, latitude, longitude)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO profiles (
+                user_id, birth_date, birth_time, time_is_approximate,
+                birth_place, latitude, longitude
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id) DO UPDATE SET
                 birth_date=excluded.birth_date, birth_time=excluded.birth_time,
+                time_is_approximate=excluded.time_is_approximate,
                 birth_place=excluded.birth_place, latitude=excluded.latitude,
                 longitude=excluded.longitude, updated_at=CURRENT_TIMESTAMP
             """,
-            (user_id, profile["birth_date"], profile["birth_time"], profile["birth_place"],
-             profile["latitude"], profile["longitude"]),
+            (
+                user_id,
+                profile["birth_date"],
+                profile["birth_time"],
+                int(profile.get("time_is_approximate", False)),
+                profile["birth_place"],
+                profile["latitude"],
+                profile["longitude"],
+            ),
         )
         await db.commit()
 
@@ -164,3 +183,20 @@ async def complete_order(order_id: int, payment_id: str) -> None:
             (payment_id, order_id),
         )
         await db.commit()
+
+
+async def set_order_status(order_id: int, status: str) -> None:
+    async with aiosqlite.connect(settings.database_path) as db:
+        await db.execute("UPDATE orders SET status=? WHERE id=?", (status, order_id))
+        await db.commit()
+
+
+async def get_order(order_id: int, user_id: int) -> dict[str, Any] | None:
+    async with aiosqlite.connect(settings.database_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM orders WHERE id=? AND user_id=?",
+            (order_id, user_id),
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None

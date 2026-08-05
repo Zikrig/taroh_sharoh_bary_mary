@@ -10,17 +10,26 @@ from aiogram.types import CallbackQuery, FSInputFile, LabeledPrice, Message, Use
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from services.ai import generate_report_content, get_aitunnel_balance
-from services.astro import calculate_chart, geocode, parse_date, parse_time, teaser
+from services.astro import (
+    calculate_chart,
+    geocode,
+    is_approximate_time,
+    parse_date,
+    parse_time,
+    teaser,
+)
 from config.settings import settings
 from database.repository import (
     complete_order,
     create_order,
+    get_order,
     get_profile,
     get_app_setting,
     get_report_context,
     get_test_mode,
     save_profile,
     save_report_context,
+    set_order_status,
     set_app_setting,
     set_test_mode,
 )
@@ -519,8 +528,13 @@ async def ask_own_data(message: Message, state: FSMContext, scenario: str, user_
     await message.answer(SCENARIO_INTROS[scenario])
     profile = await get_profile(user_id)
     if profile and scenario == "compatibility":
-        own_chart = calculate_chart(profile["birth_date"], profile["birth_time"],
-                                    profile["latitude"], profile["longitude"])
+        own_chart = calculate_chart(
+            profile["birth_date"],
+            profile["birth_time"],
+            profile["latitude"],
+            profile["longitude"],
+            time_is_approximate=bool(profile["time_is_approximate"]),
+        )
         await state.clear()
         await state.update_data(own_chart=own_chart, next_scenario=scenario)
         await state.set_state(BirthStates.partner_date)
@@ -530,7 +544,13 @@ async def ask_own_data(message: Message, state: FSMContext, scenario: str, user_
         )
         return
     if profile:
-        chart = calculate_chart(profile["birth_date"], profile["birth_time"], profile["latitude"], profile["longitude"])
+        chart = calculate_chart(
+            profile["birth_date"],
+            profile["birth_time"],
+            profile["latitude"],
+            profile["longitude"],
+            time_is_approximate=bool(profile["time_is_approximate"]),
+        )
         await show_teaser(message, scenario, chart, user_id=user_id)
         return
     await state.clear()
@@ -578,10 +598,24 @@ async def own_time(message: Message, state: FSMContext, time_text: str | None = 
         return
     data = await state.get_data()
     if data.get("edit_field") == "time":
-        await save_profile_field(message, "birth_time", value, state)
+        profile = await get_profile(message.from_user.id)
+        if profile:
+            profile["birth_time"] = value
+            profile["time_is_approximate"] = is_approximate_time(
+                time_text if time_text is not None else message.text
+            )
+            await save_profile(message.from_user.id, profile)
+            await message.answer("Данные сохранены ✅", reply_markup=back_to_edit_profile())
+        else:
+            await save_profile_field(message, "birth_time", value, state)
         await state.clear()
         return
-    await state.update_data(own_time=value)
+    await state.update_data(
+        own_time=value,
+        own_time_is_approximate=is_approximate_time(
+            time_text if time_text is not None else message.text
+        ),
+    )
     await state.set_state(BirthStates.own_place)
     await message.answer("Напишите город и страну рождения:", reply_markup=back_to_menu())
 
@@ -610,11 +644,23 @@ async def own_place(message: Message, state: FSMContext):
         await state.clear()
         await message.answer("Данные сохранены ✅", reply_markup=back_to_edit_profile())
         return
-    profile = {"birth_date": data["own_date"], "birth_time": data["own_time"],
-               "birth_place": message.text.strip(), "latitude": latitude, "longitude": longitude}
+    profile = {
+        "birth_date": data["own_date"],
+        "birth_time": data["own_time"],
+        "time_is_approximate": data.get("own_time_is_approximate", False),
+        "birth_place": message.text.strip(),
+        "latitude": latitude,
+        "longitude": longitude,
+    }
     await save_profile(message.from_user.id, profile)
     scenario_name = data.get("next_scenario")
-    own_chart = calculate_chart(profile["birth_date"], profile["birth_time"], latitude, longitude)
+    own_chart = calculate_chart(
+        profile["birth_date"],
+        profile["birth_time"],
+        latitude,
+        longitude,
+        time_is_approximate=bool(profile["time_is_approximate"]),
+    )
     if scenario_name == "profile":
         await state.clear()
         await message.answer("Профиль сохранён ✅", reply_markup=back_to_menu())
@@ -649,7 +695,12 @@ async def partner_time(message: Message, state: FSMContext, time_text: str | Non
     except (ValueError, TypeError):
         await message.answer("Введите ЧЧ:ММ или «не знаю».")
         return
-    await state.update_data(partner_time=value)
+    await state.update_data(
+        partner_time=value,
+        partner_time_is_approximate=is_approximate_time(
+            time_text if time_text is not None else message.text
+        ),
+    )
     await state.set_state(BirthStates.partner_place)
     await message.answer("Город и страна рождения партнёра:", reply_markup=back_to_menu())
 
@@ -672,7 +723,13 @@ async def partner_place(message: Message, state: FSMContext):
     except ValueError as error:
         await message.answer(str(error))
         return
-    partner = calculate_chart(data["partner_date"], data["partner_time"], latitude, longitude)
+    partner = calculate_chart(
+        data["partner_date"],
+        data["partner_time"],
+        latitude,
+        longitude,
+        time_is_approximate=data.get("partner_time_is_approximate", False),
+    )
     await state.clear()
     await show_teaser(
         message,
@@ -788,11 +845,23 @@ async def deliver_report(
             )
             return
         chart = calculate_chart(
-            profile["birth_date"], profile["birth_time"], profile["latitude"], profile["longitude"]
+            profile["birth_date"],
+            profile["birth_time"],
+            profile["latitude"],
+            profile["longitude"],
+            time_is_approximate=bool(profile["time_is_approximate"]),
         )
         second_chart = None
     async with report_status_animation(message):
         content = await generate_report_content(scenario_name, chart, second_chart)
+        if content is None:
+            await set_order_status(order_id, "report_pending")
+            await message.answer(
+                "Не удалось получить проверенный текст отчёта. Оплата сохранена — "
+                "попробуйте сформировать PDF ещё раз.",
+                reply_markup=retry_report_keyboard(order_id),
+            )
+            return
         profile_photo = await get_profile_photo(message, user_id)
         path = generate_report(
             scenario_name,
@@ -807,6 +876,37 @@ async def deliver_report(
         FSInputFile(path),
         caption=f"{NAMES[scenario_name]} · ASTRO MARY",
         reply_markup=back_to_menu(),
+    )
+    await set_order_status(order_id, "delivered")
+
+
+def retry_report_keyboard(order_id: int):
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔄 Сформировать PDF повторно", callback_data=f"retry_report:{order_id}")
+    builder.button(text="⬅️ В меню", callback_data="back:menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+@router.callback_query(F.data.startswith("retry_report:"))
+async def retry_report(callback: CallbackQuery):
+    try:
+        order_id = int(callback.data.split(":", 1)[1])
+    except (AttributeError, ValueError):
+        await callback.answer("Не удалось определить заказ.", show_alert=True)
+        return
+    order = await get_order(order_id, callback.from_user.id)
+    if not order or order["status"] not in {"paid", "report_pending"}:
+        await callback.answer("Этот отчёт нельзя сформировать повторно.", show_alert=True)
+        return
+    await callback.answer("Повторно формирую отчёт…")
+    await deliver_report(
+        callback.message,
+        callback.from_user.id,
+        callback.from_user,
+        order["report_type"],
+        order_id,
+        order["telegram_payment_id"] or "RETRY",
     )
 
 

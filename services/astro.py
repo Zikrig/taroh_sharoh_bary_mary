@@ -1,8 +1,10 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import lru_cache
+from zoneinfo import ZoneInfo
 
 import swisseph as swe
 from geopy.geocoders import Nominatim
+from timezonefinder import TimezoneFinder
 
 PLANETS = {
     "Солнце": swe.SUN, "Луна": swe.MOON, "Меркурий": swe.MERCURY,
@@ -19,6 +21,7 @@ ASPECTS = {
     120: ("тригон", 6),
     180: ("оппозиция", 8),
 }
+_TIMEZONE_FINDER = TimezoneFinder()
 
 
 def parse_date(value: str) -> str:
@@ -31,6 +34,10 @@ def parse_time(value: str | None) -> str:
     return datetime.strptime(value.strip(), "%H:%M").strftime("%H:%M")
 
 
+def is_approximate_time(value: str | None) -> bool:
+    return not value or value.lower().strip() in {"нет", "не знаю", "-"}
+
+
 @lru_cache(maxsize=256)
 def geocode(place: str) -> tuple[float, float]:
     location = Nominatim(user_agent="astro_bot_mary").geocode(place, language="ru")
@@ -39,10 +46,38 @@ def geocode(place: str) -> tuple[float, float]:
     return float(location.latitude), float(location.longitude)
 
 
-def calculate_chart(date: str, time: str, latitude: float, longitude: float) -> dict:
-    moment = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M")
-    jd = swe.julday(moment.year, moment.month, moment.day,
-                    moment.hour + moment.minute / 60)
+@lru_cache(maxsize=256)
+def timezone_for_coordinates(latitude: float, longitude: float) -> str:
+    timezone_name = _TIMEZONE_FINDER.timezone_at(lat=latitude, lng=longitude)
+    if not timezone_name:
+        raise ValueError("Не удалось определить часовой пояс для места рождения.")
+    return timezone_name
+
+
+def local_time_to_utc(
+    date: str, time: str, latitude: float, longitude: float
+) -> tuple[datetime, str]:
+    local_time = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M")
+    timezone_name = timezone_for_coordinates(latitude, longitude)
+    localized = local_time.replace(tzinfo=ZoneInfo(timezone_name))
+    return localized.astimezone(timezone.utc), timezone_name
+
+
+def calculate_chart(
+    date: str,
+    time: str,
+    latitude: float,
+    longitude: float,
+    *,
+    time_is_approximate: bool = False,
+) -> dict:
+    utc_moment, timezone_name = local_time_to_utc(date, time, latitude, longitude)
+    jd = swe.julday(
+        utc_moment.year,
+        utc_moment.month,
+        utc_moment.day,
+        utc_moment.hour + utc_moment.minute / 60,
+    )
     positions = {}
     for name, planet in PLANETS.items():
         result, _ = swe.calc_ut(jd, planet)
@@ -60,6 +95,9 @@ def calculate_chart(date: str, time: str, latitude: float, longitude: float) -> 
     return {
         "date": date,
         "time": time,
+        "utc_time": utc_moment.strftime("%Y-%m-%d %H:%M UTC"),
+        "timezone": timezone_name,
+        "time_is_approximate": time_is_approximate,
         "latitude": latitude,
         "longitude": longitude,
         "planets": positions,
