@@ -61,6 +61,27 @@ async def set_test_mode(enabled: bool) -> None:
         await db.commit()
 
 
+async def get_app_setting(key: str) -> str | None:
+    async with aiosqlite.connect(settings.database_path) as db:
+        async with db.execute(
+            "SELECT value FROM app_settings WHERE key = ?", (key,)
+        ) as cur:
+            row = await cur.fetchone()
+            return row[0] if row else None
+
+
+async def set_app_setting(key: str, value: str) -> None:
+    async with aiosqlite.connect(settings.database_path) as db:
+        await db.execute(
+            """
+            INSERT INTO app_settings (key, value) VALUES (?, ?)
+            ON CONFLICT(key) DO UPDATE SET value=excluded.value
+            """,
+            (key, value),
+        )
+        await db.commit()
+
+
 async def get_profile(user_id: int) -> dict[str, Any] | None:
     async with aiosqlite.connect(settings.database_path) as db:
         db.row_factory = aiosqlite.Row

@@ -12,8 +12,10 @@ from database import (
     complete_order,
     create_order,
     get_profile,
+    get_app_setting,
     get_test_mode,
     save_profile,
+    set_app_setting,
     set_test_mode,
 )
 from reports import generate_report
@@ -22,6 +24,23 @@ router = Router()
 PRICES = {"personality": 349, "compatibility": 449, "money": 399}
 NAMES = {"personality": "Разбор личности", "compatibility": "Совместимость", "money": "Денежный код"}
 PENDING_REPORTS: dict[int, tuple[dict, dict | None]] = {}
+SCENARIO_INTROS = {
+    "personality": (
+        "✨ Разбор личности\n\n"
+        "Ваша натальная карта — это персональный код характера, талантов, отношений "
+        "и предназначения. Узнайте, в чём ваша сила и какие возможности раскрыть дальше."
+    ),
+    "compatibility": (
+        "💞 Совместимость\n\n"
+        "Разберём притяжение, эмоциональную близость, общение и возможные точки "
+        "напряжения в вашей паре. Для анализа понадобятся данные вас и партнёра."
+    ),
+    "money": (
+        "💰 Денежный код\n\n"
+        "Карта поможет посмотреть ваши привычные финансовые сценарии, сильные стороны "
+        "и направления, где легче раскрывать потенциал дохода."
+    ),
+}
 
 
 class BirthStates(StatesGroup):
@@ -31,6 +50,10 @@ class BirthStates(StatesGroup):
     partner_date = State()
     partner_time = State()
     partner_place = State()
+
+
+class AdminStates(StatesGroup):
+    support_text = State()
 
 
 def menu():
@@ -50,6 +73,7 @@ def admin_menu(test_mode: bool):
     builder = InlineKeyboardBuilder()
     label = "🟢 Тестовый режим: ВКЛ" if test_mode else "⚪ Тестовый режим: ВЫКЛ"
     builder.button(text=label, callback_data="admin:test_toggle")
+    builder.button(text="✏️ Изменить текст поддержки", callback_data="admin:support_text")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -98,6 +122,39 @@ async def toggle_test_mode(callback: CallbackQuery):
     )
 
 
+@router.callback_query(F.data == "admin:support_text")
+async def edit_support_text(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    await callback.answer()
+    await state.set_state(AdminStates.support_text)
+    await callback.message.answer(
+        "Отправьте новый текст поддержки.\n"
+        "Можно добавить ссылку, Telegram username и переносы строк.\n\n"
+        "Для отмены отправьте /cancel."
+    )
+
+
+@router.message(AdminStates.support_text)
+async def save_support_text(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await message.answer("Команда доступна только администраторам.")
+        return
+    if message.text == "/cancel":
+        await state.clear()
+        await message.answer("Изменение отменено.")
+        return
+    text = (message.text or "").strip()
+    if not text:
+        await message.answer("Текст не должен быть пустым. Попробуйте ещё раз или отправьте /cancel.")
+        return
+    await set_app_setting("support_text", text)
+    await state.clear()
+    await message.answer("Текст поддержки обновлён ✅")
+
+
 @router.message(Command("start"))
 async def start(message: Message):
     await message.answer(
@@ -115,10 +172,19 @@ async def help_command(message: Message):
 
 async def send_help(message: Message):
     await message.answer(
-        "Как пользоваться:\n"
-        "1. Выберите сценарий.\n2. Введите дату в формате ДД.ММ.ГГГГ.\n"
-        "3. Введите время ЧЧ:ММ или «не знаю».\n4. Укажите город и страну.\n\n"
-        "/profile — сохранённые данные\n/edit — изменить данные\n/support — помощь"
+        "Выберите то, что хочется узнать о себе прямо сейчас ✨\n\n"
+        "✨ Разбор личности — раскройте свои сильные стороны, таланты и внутренние "
+        "ресурсы через вашу натальную карту.\n\n"
+        "💞 Совместимость — узнайте, что объединяет вас с партнёром, где живёт "
+        "притяжение и как сделать отношения гармоничнее.\n\n"
+        "💰 Денежный код — найдите свои финансовые опоры, привычки и точки роста, "
+        "чтобы увереннее двигаться к изобилию.\n\n"
+        "📤 Поделиться — отправьте бота близкому человеку и вместе откройте "
+        "подсказки звёзд.\n\n"
+        "✏️ Изменить данные — обновите дату, время или место рождения для "
+        "максимально точного разбора.\n\n"
+        "📖 Инструкция — вернитесь к этому описанию в любой момент.\n\n"
+        "🆘 Поддержка — мы рядом, если появятся вопросы."
     )
 
 
@@ -130,7 +196,8 @@ async def help_callback(callback: CallbackQuery):
 
 @router.message(Command("support"))
 async def support(message: Message):
-    await message.answer(f"По вопросам: {settings.support_url}")
+    text = await get_app_setting("support_text")
+    await message.answer(text or f"По вопросам: {settings.support_url}")
 
 
 @router.callback_query(F.data == "support")
@@ -170,6 +237,7 @@ async def edit_profile_callback(callback: CallbackQuery, state: FSMContext):
 
 
 async def ask_own_data(message: Message, state: FSMContext, scenario: str):
+    await message.answer(SCENARIO_INTROS[scenario])
     profile = await get_profile(message.from_user.id)
     if profile and scenario == "compatibility":
         own_chart = calculate_chart(profile["birth_date"], profile["birth_time"],
@@ -186,7 +254,7 @@ async def ask_own_data(message: Message, state: FSMContext, scenario: str):
     await state.clear()
     await state.set_state(BirthStates.own_date)
     await state.update_data(next_scenario=scenario)
-    await message.answer("Введите вашу дату рождения в формате ДД.ММ.ГГГГ:")
+    await message.answer("Сколько вам лет?\nУкажите дату рождения в формате ДД.ММ.ГГГГ:")
 
 
 @router.callback_query(F.data.startswith("scenario:"))
