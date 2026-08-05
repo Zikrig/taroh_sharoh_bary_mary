@@ -129,11 +129,23 @@ async def edit_support_text(callback: CallbackQuery, state: FSMContext):
         return
     await callback.answer()
     await state.set_state(AdminStates.support_text)
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Отмена", callback_data="admin:cancel_support_edit")
     await callback.message.answer(
         "Отправьте новый текст поддержки.\n"
-        "Можно добавить ссылку, Telegram username и переносы строк.\n\n"
-        "Для отмены отправьте /cancel."
+        "Можно добавить ссылку, Telegram username и переносы строк.",
+        reply_markup=builder.as_markup(),
     )
+
+
+@router.callback_query(F.data == "admin:cancel_support_edit")
+async def cancel_support_text_edit(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    await state.clear()
+    await callback.answer("Изменение отменено")
+    await callback.message.edit_text("Изменение текста поддержки отменено.")
 
 
 @router.message(AdminStates.support_text)
@@ -141,10 +153,6 @@ async def save_support_text(message: Message, state: FSMContext):
     if not is_admin(message.from_user.id):
         await state.clear()
         await message.answer("Команда доступна только администраторам.")
-        return
-    if message.text == "/cancel":
-        await state.clear()
-        await message.answer("Изменение отменено.")
         return
     text = (message.text or "").strip()
     if not text:
