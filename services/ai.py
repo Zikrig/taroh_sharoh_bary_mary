@@ -67,6 +67,7 @@ def _allowed_facts(chart: dict, second_chart: dict | None) -> list[str]:
             facts.append(
                 f"Синастрия: {aspect['first']} {aspect['type']} {aspect['second']}"
             )
+    logger.info("Allowed facts: %s", facts)
     return facts
 
 
