@@ -77,6 +77,22 @@ def back_to_menu():
     return builder.as_markup()
 
 
+def edit_profile_menu():
+    builder = InlineKeyboardBuilder()
+    builder.button(text="📅 Дата рождения", callback_data="edit:date")
+    builder.button(text="🕐 Время рождения", callback_data="edit:time")
+    builder.button(text="📍 Место рождения", callback_data="edit:place")
+    builder.button(text="⬅️ Главное меню", callback_data="menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def unknown_time_keyboard():
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Не знаю", callback_data="time_unknown")
+    return builder.as_markup()
+
+
 def admin_menu(test_mode: bool):
     builder = InlineKeyboardBuilder()
     label = "🟢 Тестовый режим: ВКЛ" if test_mode else "⚪ Тестовый режим: ВЫКЛ"
@@ -293,15 +309,43 @@ async def edit(message: Message, state: FSMContext):
 
 async def start_edit(message: Message, state: FSMContext):
     await state.clear()
-    await state.set_state(BirthStates.own_date)
-    await state.update_data(next_scenario="profile")
-    await message.answer("Введите вашу дату рождения в формате ДД.ММ.ГГГГ:")
+    await message.answer("Что хотите изменить?", reply_markup=edit_profile_menu())
 
 
 @router.callback_query(F.data == "edit_profile")
 async def edit_profile_callback(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
     await start_edit(callback.message, state)
+
+
+@router.callback_query(F.data.startswith("edit:"))
+async def choose_profile_field(callback: CallbackQuery, state: FSMContext):
+    field = callback.data.split(":", 1)[1]
+    await state.clear()
+    await state.update_data(edit_field=field)
+    await callback.answer()
+    if field == "date":
+        await state.set_state(BirthStates.own_date)
+        await callback.message.answer("Введите дату рождения в формате ДД.ММ.ГГГГ:")
+    elif field == "time":
+        await state.set_state(BirthStates.own_time)
+        await callback.message.answer(
+            "Введите время рождения ЧЧ:ММ или выберите вариант ниже:",
+            reply_markup=unknown_time_keyboard(),
+        )
+    elif field == "place":
+        await state.set_state(BirthStates.own_place)
+        await callback.message.answer("Введите город и страну рождения:")
+
+
+async def save_profile_field(message: Message, field: str, value: str) -> None:
+    profile = await get_profile(message.from_user.id)
+    if not profile:
+        await message.answer("Профиль пока пуст. Сначала заполните данные через один из сценариев.")
+        return
+    profile[field] = value
+    await save_profile(message.from_user.id, profile)
+    await message.answer("Данные сохранены ✅", reply_markup=back_to_menu())
 
 
 async def ask_own_data(message: Message, state: FSMContext, scenario: str):
@@ -339,17 +383,30 @@ async def own_date(message: Message, state: FSMContext):
     except (ValueError, TypeError):
         await message.answer("Не понял дату. Используйте формат ДД.ММ.ГГГГ, например 21.03.1990.")
         return
+    data = await state.get_data()
+    if data.get("edit_field") == "date":
+        await save_profile_field(message, "birth_date", value)
+        await state.clear()
+        return
     await state.update_data(own_date=value)
     await state.set_state(BirthStates.own_time)
-    await message.answer("Введите время рождения ЧЧ:ММ или напишите «не знаю»:")
+    await message.answer(
+        "Введите время рождения ЧЧ:ММ или выберите вариант ниже:",
+        reply_markup=unknown_time_keyboard(),
+    )
 
 
 @router.message(BirthStates.own_time)
-async def own_time(message: Message, state: FSMContext):
+async def own_time(message: Message, state: FSMContext, time_text: str | None = None):
     try:
-        value = parse_time(message.text)
+        value = parse_time(time_text if time_text is not None else message.text)
     except (ValueError, TypeError):
         await message.answer("Нужно время в формате ЧЧ:ММ, например 14:30, или «не знаю».")
+        return
+    data = await state.get_data()
+    if data.get("edit_field") == "time":
+        await save_profile_field(message, "birth_time", value)
+        await state.clear()
         return
     await state.update_data(own_time=value)
     await state.set_state(BirthStates.own_place)
@@ -363,6 +420,17 @@ async def own_place(message: Message, state: FSMContext):
         latitude, longitude = geocode(message.text.strip())
     except ValueError as error:
         await message.answer(str(error))
+        return
+    if data.get("edit_field") == "place":
+        profile = await get_profile(message.from_user.id)
+        if not profile:
+            await state.clear()
+            await message.answer("Профиль пока пуст. Сначала заполните данные через один из сценариев.")
+            return
+        profile.update(birth_place=message.text.strip(), latitude=latitude, longitude=longitude)
+        await save_profile(message.from_user.id, profile)
+        await state.clear()
+        await message.answer("Данные сохранены ✅", reply_markup=back_to_menu())
         return
     profile = {"birth_date": data["own_date"], "birth_time": data["own_time"],
                "birth_place": message.text.strip(), "latitude": latitude, "longitude": longitude}
@@ -390,19 +458,32 @@ async def partner_date(message: Message, state: FSMContext):
         return
     await state.update_data(partner_date=value)
     await state.set_state(BirthStates.partner_time)
-    await message.answer("Время рождения партнёра ЧЧ:ММ или «не знаю»:")
+    await message.answer(
+        "Время рождения партнёра ЧЧ:ММ или выберите вариант ниже:",
+        reply_markup=unknown_time_keyboard(),
+    )
 
 
 @router.message(BirthStates.partner_time)
-async def partner_time(message: Message, state: FSMContext):
+async def partner_time(message: Message, state: FSMContext, time_text: str | None = None):
     try:
-        value = parse_time(message.text)
+        value = parse_time(time_text if time_text is not None else message.text)
     except (ValueError, TypeError):
         await message.answer("Введите ЧЧ:ММ или «не знаю».")
         return
     await state.update_data(partner_time=value)
     await state.set_state(BirthStates.partner_place)
     await message.answer("Город и страна рождения партнёра:")
+
+
+@router.callback_query(F.data == "time_unknown")
+async def time_unknown(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    current_state = await state.get_state()
+    if current_state == BirthStates.own_time.state:
+        await own_time(callback.message, state, "не знаю")
+    elif current_state == BirthStates.partner_time.state:
+        await partner_time(callback.message, state, "не знаю")
 
 
 @router.message(BirthStates.partner_place)
