@@ -1,5 +1,6 @@
 import asyncio
 from contextlib import asynccontextmanager, suppress
+from random import randint, uniform
 
 from aiogram import F, Router
 from aiogram.enums import ParseMode
@@ -9,7 +10,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, FSInputFile, LabeledPrice, Message, User
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from services.ai import generate_report_content, get_aitunnel_balance
+from services.ai import AI_TIMEOUT_SECONDS, generate_report_content, get_aitunnel_balance
 from services.astro import (
     calculate_chart,
     geocode,
@@ -38,15 +39,7 @@ router = Router()
 PRICES = {"personality": 349, "compatibility": 449, "money": 399}
 NAMES = {"personality": "Разбор личности", "compatibility": "Совместимость", "money": "Денежный код"}
 PENDING_REPORTS: dict[int, tuple[dict, dict | None]] = {}
-REPORT_STATUS_MESSAGES = (
-    "Заказ принят ✅ Готовлю ваш персональный отчёт…",
-    "Скоро будет готово…",
-    "Уже почти…",
-    "Исследуем звёзды…",
-    "Считаем положения планет…",
-    "Собираем вашу карту…",
-    "Финальные штрихи…",
-)
+REPORT_PROGRESS_TEXT = "Готовлю ваш персональный прогноз"
 SCENARIO_INTROS = {
     "personality": (
         "✨ Разбор личности\n\n"
@@ -856,7 +849,7 @@ async def deliver_report(
             time_is_approximate=bool(profile["time_is_approximate"]),
         )
         second_chart = None
-    async with report_status_animation(message):
+    async with report_status_animation(message) as mark_completed:
         content = await generate_report_content(scenario_name, chart, second_chart)
         if content is None:
             await set_order_status(order_id, "report_pending")
@@ -866,6 +859,7 @@ async def deliver_report(
                 reply_markup=retry_report_keyboard(order_id),
             )
             return
+        mark_completed()
         profile_photo = await get_profile_photo(message, user_id)
         path = generate_report(
             scenario_name,
@@ -925,25 +919,75 @@ async def get_profile_photo(message: Message, user_id: int):
         return None
 
 
-async def _rotate_report_status(status_message: Message) -> None:
-    index = 0
-    while True:
-        await asyncio.sleep(5)
-        index = (index + 1) % len(REPORT_STATUS_MESSAGES)
+async def _report_progress(status_message: Message, finished: asyncio.Event) -> None:
+    progress = 0
+    deadline = asyncio.get_running_loop().time() + AI_TIMEOUT_SECONDS * 1.2
+
+    while not finished.is_set():
+        remaining = deadline - asyncio.get_running_loop().time()
+        if remaining <= 0:
+            progress = 99
+            break
+        pause = min(uniform(0.4, 15.0), remaining)
+        try:
+            await asyncio.wait_for(finished.wait(), timeout=pause)
+            break
+        except asyncio.TimeoutError:
+            if progress < 99:
+                progress = min(99, progress + randint(1, 7))
+                with suppress(Exception):
+                    await status_message.edit_text(
+                        f"{REPORT_PROGRESS_TEXT}… {progress}%"
+                    )
+
+    if not finished.is_set():
+        return
+
+    start_progress = progress
+    completion_deadline = asyncio.get_running_loop().time() + 10.0
+    while progress < 100:
+        remaining = completion_deadline - asyncio.get_running_loop().time()
+        if remaining <= 0:
+            progress = 100
+        else:
+            pause = min(uniform(0.4, 1.0), remaining)
+            try:
+                await asyncio.sleep(pause)
+            except asyncio.CancelledError:
+                raise
+            elapsed = 10.0 - max(
+                0.0,
+                completion_deadline - asyncio.get_running_loop().time(),
+            )
+            progress = min(100, max(progress, round(
+                start_progress + (100 - start_progress) * elapsed / 10.0
+            )))
         with suppress(Exception):
-            await status_message.edit_text(REPORT_STATUS_MESSAGES[index])
+            await status_message.edit_text(f"{REPORT_PROGRESS_TEXT}… {progress}%")
 
 
 @asynccontextmanager
 async def report_status_animation(message: Message):
-    status_message = await message.answer(REPORT_STATUS_MESSAGES[0])
-    animation = asyncio.create_task(_rotate_report_status(status_message))
+    status_message = await message.answer(f"{REPORT_PROGRESS_TEXT}… 0%")
+    finished = asyncio.Event()
+    completed = False
+    animation = asyncio.create_task(_report_progress(status_message, finished))
+
+    def mark_completed() -> None:
+        nonlocal completed
+        completed = True
+
     try:
-        yield status_message
+        yield mark_completed
     finally:
-        animation.cancel()
-        with suppress(asyncio.CancelledError):
-            await animation
+        if completed:
+            finished.set()
+            with suppress(asyncio.CancelledError):
+                await animation
+        else:
+            animation.cancel()
+            with suppress(asyncio.CancelledError):
+                await animation
         with suppress(Exception):
             await status_message.delete()
 

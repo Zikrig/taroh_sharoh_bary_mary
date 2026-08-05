@@ -7,6 +7,7 @@ from config.settings import settings
 from services.reports import SECTIONS
 
 logger = logging.getLogger(__name__)
+AI_TIMEOUT_SECONDS = 300.0
 
 SYSTEM_PROMPT = """
 Ты — автор персональных астрологических отчётов. Подготовь отчёт строго на русском языке.
@@ -195,7 +196,7 @@ async def generate_report_content(
         client = AsyncOpenAI(
             api_key=settings.ai_api_key,
             base_url=settings.ai_base_url,
-            timeout=300.0,
+            timeout=AI_TIMEOUT_SECONDS,
         )
         response = await client.chat.completions.create(
             model=settings.ai_model,
