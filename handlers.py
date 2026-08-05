@@ -81,10 +81,18 @@ async def get_main_menu_text() -> str:
     )
 
 
-def back_to_menu():
+def back_keyboard(destination: str, text: str = "⬅️ Назад"):
     builder = InlineKeyboardBuilder()
-    builder.button(text="⬅️ Главное меню", callback_data="menu")
+    builder.button(text=text, callback_data=f"back:{destination}")
     return builder.as_markup()
+
+
+def back_to_menu():
+    return back_keyboard("menu")
+
+
+def back_to_edit_profile():
+    return back_keyboard("edit_profile")
 
 
 def edit_profile_menu():
@@ -92,14 +100,16 @@ def edit_profile_menu():
     builder.button(text="📅 Дата рождения", callback_data="edit:date")
     builder.button(text="🕐 Время рождения", callback_data="edit:time")
     builder.button(text="📍 Место рождения", callback_data="edit:place")
-    builder.button(text="⬅️ Главное меню", callback_data="menu")
+    builder.button(text="⬅️ Назад", callback_data="back:menu")
     builder.adjust(1)
     return builder.as_markup()
 
 
-def unknown_time_keyboard():
+def unknown_time_keyboard(back_destination: str):
     builder = InlineKeyboardBuilder()
     builder.button(text="Не знаю", callback_data="time_unknown")
+    builder.button(text="⬅️ Назад", callback_data=f"back:{back_destination}")
+    builder.adjust(1)
     return builder.as_markup()
 
 
@@ -117,7 +127,7 @@ def text_settings_menu():
     builder.button(text="🏠 Описание главного меню", callback_data="admin:main_menu_text")
     builder.button(text="🆘 Текст поддержки", callback_data="admin:support_text")
     builder.button(text="📤 Текст «Поделиться»", callback_data="admin:share_text")
-    builder.button(text="⬅️ Назад в админку", callback_data="admin:back")
+    builder.button(text="⬅️ Назад", callback_data="admin:back")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -195,6 +205,23 @@ async def back_to_admin(callback: CallbackQuery):
     await callback.message.edit_text(admin_text(test_mode, balance), reply_markup=admin_menu(test_mode))
 
 
+@router.callback_query(F.data.startswith("back:"))
+async def navigate_back(callback: CallbackQuery, state: FSMContext):
+    destination = callback.data.split(":", 1)[1]
+    await state.clear()
+    await callback.answer()
+    if destination == "menu":
+        await callback.message.answer(
+            await get_main_menu_text(),
+            parse_mode=ParseMode.HTML,
+            reply_markup=await menu(),
+        )
+    elif destination == "edit_profile":
+        await start_edit(callback.message, state)
+    elif destination == "text_settings" and is_admin(callback.from_user.id):
+        await callback.message.answer(text_settings_message(), reply_markup=text_settings_menu())
+
+
 @router.callback_query(F.data == "admin:support_text")
 async def edit_support_text(callback: CallbackQuery, state: FSMContext):
     if not is_admin(callback.from_user.id):
@@ -203,7 +230,7 @@ async def edit_support_text(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
     await state.set_state(AdminStates.support_text)
     builder = InlineKeyboardBuilder()
-    builder.button(text="Отмена", callback_data="admin:cancel_support_edit")
+    builder.button(text="⬅️ Назад", callback_data="admin:cancel_support_edit")
     await callback.message.answer(
         "Отправьте новый текст поддержки.\n"
         "Можно добавить ссылку, Telegram username и переносы строк.",
@@ -219,7 +246,7 @@ async def edit_main_menu_text(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
     await state.set_state(AdminStates.main_menu_text)
     builder = InlineKeyboardBuilder()
-    builder.button(text="Отмена", callback_data="admin:cancel_main_menu_edit")
+    builder.button(text="⬅️ Назад", callback_data="admin:cancel_main_menu_edit")
     await callback.message.answer(
         "Отправьте новое описание главного меню.\n"
         "Можно использовать Telegram HTML: <b>жирный</b>, <i>курсив</i>, "
@@ -250,7 +277,10 @@ async def save_main_menu_text(message: Message, state: FSMContext):
         return
     await set_app_setting("main_menu_text", text)
     await state.clear()
-    await message.answer("Описание главного меню обновлено ✅", reply_markup=back_to_menu())
+    await message.answer(
+        "Описание главного меню обновлено ✅",
+        reply_markup=back_keyboard("text_settings"),
+    )
 
 
 @router.callback_query(F.data == "admin:share_text")
@@ -261,7 +291,7 @@ async def edit_share_text(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
     await state.set_state(AdminStates.share_text)
     builder = InlineKeyboardBuilder()
-    builder.button(text="Отмена", callback_data="admin:cancel_share_edit")
+    builder.button(text="⬅️ Назад", callback_data="admin:cancel_share_edit")
     await callback.message.answer(
         "Отправьте текст, который будет подставляться при нажатии «Поделиться».",
         reply_markup=builder.as_markup(),
@@ -276,8 +306,8 @@ async def cancel_share_text_edit(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.answer("Изменение отменено")
     await callback.message.edit_text(
-        "Изменение текста «Поделиться» отменено.",
-        reply_markup=admin_menu(await get_test_mode()),
+        text_settings_message(),
+        reply_markup=text_settings_menu(),
     )
 
 
@@ -293,7 +323,10 @@ async def save_share_text(message: Message, state: FSMContext):
         return
     await set_app_setting("share_text", text)
     await state.clear()
-    await message.answer("Текст «Поделиться» обновлён ✅", reply_markup=back_to_menu())
+    await message.answer(
+        "Текст «Поделиться» обновлён ✅",
+        reply_markup=back_keyboard("text_settings"),
+    )
 
 
 @router.callback_query(F.data == "admin:cancel_support_edit")
@@ -304,8 +337,8 @@ async def cancel_support_text_edit(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.answer("Изменение отменено")
     await callback.message.edit_text(
-        "Изменение текста поддержки отменено.",
-        reply_markup=admin_menu(await get_test_mode()),
+        text_settings_message(),
+        reply_markup=text_settings_menu(),
     )
 
 
@@ -321,7 +354,10 @@ async def save_support_text(message: Message, state: FSMContext):
         return
     await set_app_setting("support_text", text)
     await state.clear()
-    await message.answer("Текст поддержки обновлён ✅", reply_markup=back_to_menu())
+    await message.answer(
+        "Текст поддержки обновлён ✅",
+        reply_markup=back_keyboard("text_settings"),
+    )
 
 
 @router.message(Command("start"))
@@ -398,7 +434,22 @@ async def edit(message: Message, state: FSMContext):
 
 async def start_edit(message: Message, state: FSMContext):
     await state.clear()
-    await message.answer("Что хотите изменить?", reply_markup=edit_profile_menu())
+    profile = await get_profile(message.from_user.id)
+    if not profile:
+        await message.answer(
+            "Профиль пока пуст. Сначала выберите сценарий и заполните данные.",
+            reply_markup=back_to_menu(),
+        )
+        return
+    await message.answer(
+        "Ваши текущие данные:\n\n"
+        f"📅 Дата рождения: {profile['birth_date'][8:10]}."
+        f"{profile['birth_date'][5:7]}.{profile['birth_date'][:4]}\n"
+        f"🕐 Время рождения: {profile['birth_time']}\n"
+        f"📍 Место рождения: {profile['birth_place']}\n\n"
+        "Что хотите изменить?",
+        reply_markup=edit_profile_menu(),
+    )
 
 
 @router.callback_query(F.data == "edit_profile")
@@ -415,26 +466,35 @@ async def choose_profile_field(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
     if field == "date":
         await state.set_state(BirthStates.own_date)
-        await callback.message.answer("Введите дату рождения в формате ДД.ММ.ГГГГ:")
+        await callback.message.answer(
+            "Введите дату рождения в формате ДД.ММ.ГГГГ:",
+            reply_markup=back_to_edit_profile(),
+        )
     elif field == "time":
         await state.set_state(BirthStates.own_time)
         await callback.message.answer(
             "Введите время рождения ЧЧ:ММ или выберите вариант ниже:",
-            reply_markup=unknown_time_keyboard(),
+            reply_markup=unknown_time_keyboard("edit_profile"),
         )
     elif field == "place":
         await state.set_state(BirthStates.own_place)
-        await callback.message.answer("Введите город и страну рождения:")
+        await callback.message.answer(
+            "Введите город и страну рождения:",
+            reply_markup=back_to_edit_profile(),
+        )
 
 
 async def save_profile_field(message: Message, field: str, value: str) -> None:
     profile = await get_profile(message.from_user.id)
     if not profile:
-        await message.answer("Профиль пока пуст. Сначала заполните данные через один из сценариев.")
+        await message.answer(
+            "Профиль пока пуст. Сначала заполните данные через один из сценариев.",
+            reply_markup=back_to_edit_profile(),
+        )
         return
     profile[field] = value
     await save_profile(message.from_user.id, profile)
-    await message.answer("Данные сохранены ✅", reply_markup=back_to_menu())
+    await message.answer("Данные сохранены ✅", reply_markup=back_to_edit_profile())
 
 
 async def ask_own_data(message: Message, state: FSMContext, scenario: str):
@@ -446,7 +506,10 @@ async def ask_own_data(message: Message, state: FSMContext, scenario: str):
         await state.clear()
         await state.update_data(own_chart=own_chart, next_scenario=scenario)
         await state.set_state(BirthStates.partner_date)
-        await message.answer("Профиль найден ✅\nВведите дату рождения партнёра ДД.ММ.ГГГГ:")
+        await message.answer(
+            "Профиль найден ✅\nВведите дату рождения партнёра ДД.ММ.ГГГГ:",
+            reply_markup=back_to_menu(),
+        )
         return
     if profile:
         chart = calculate_chart(profile["birth_date"], profile["birth_time"], profile["latitude"], profile["longitude"])
@@ -455,7 +518,10 @@ async def ask_own_data(message: Message, state: FSMContext, scenario: str):
     await state.clear()
     await state.set_state(BirthStates.own_date)
     await state.update_data(next_scenario=scenario)
-    await message.answer("Сколько вам лет?\nУкажите дату рождения в формате ДД.ММ.ГГГГ:")
+    await message.answer(
+        "Сколько вам лет?\nУкажите дату рождения в формате ДД.ММ.ГГГГ:",
+        reply_markup=back_to_menu(),
+    )
 
 
 @router.callback_query(F.data.startswith("scenario:"))
@@ -481,7 +547,7 @@ async def own_date(message: Message, state: FSMContext):
     await state.set_state(BirthStates.own_time)
     await message.answer(
         "Введите время рождения ЧЧ:ММ или выберите вариант ниже:",
-        reply_markup=unknown_time_keyboard(),
+        reply_markup=unknown_time_keyboard("menu"),
     )
 
 
@@ -499,7 +565,7 @@ async def own_time(message: Message, state: FSMContext, time_text: str | None = 
         return
     await state.update_data(own_time=value)
     await state.set_state(BirthStates.own_place)
-    await message.answer("Напишите город и страну рождения:")
+    await message.answer("Напишите город и страну рождения:", reply_markup=back_to_menu())
 
 
 @router.message(BirthStates.own_place)
@@ -514,12 +580,15 @@ async def own_place(message: Message, state: FSMContext):
         profile = await get_profile(message.from_user.id)
         if not profile:
             await state.clear()
-            await message.answer("Профиль пока пуст. Сначала заполните данные через один из сценариев.")
+            await message.answer(
+                "Профиль пока пуст. Сначала заполните данные через один из сценариев.",
+                reply_markup=back_to_edit_profile(),
+            )
             return
         profile.update(birth_place=message.text.strip(), latitude=latitude, longitude=longitude)
         await save_profile(message.from_user.id, profile)
         await state.clear()
-        await message.answer("Данные сохранены ✅", reply_markup=back_to_menu())
+        await message.answer("Данные сохранены ✅", reply_markup=back_to_edit_profile())
         return
     profile = {"birth_date": data["own_date"], "birth_time": data["own_time"],
                "birth_place": message.text.strip(), "latitude": latitude, "longitude": longitude}
@@ -549,7 +618,7 @@ async def partner_date(message: Message, state: FSMContext):
     await state.set_state(BirthStates.partner_time)
     await message.answer(
         "Время рождения партнёра ЧЧ:ММ или выберите вариант ниже:",
-        reply_markup=unknown_time_keyboard(),
+        reply_markup=unknown_time_keyboard("menu"),
     )
 
 
@@ -562,7 +631,7 @@ async def partner_time(message: Message, state: FSMContext, time_text: str | Non
         return
     await state.update_data(partner_time=value)
     await state.set_state(BirthStates.partner_place)
-    await message.answer("Город и страна рождения партнёра:")
+    await message.answer("Город и страна рождения партнёра:", reply_markup=back_to_menu())
 
 
 @router.callback_query(F.data == "time_unknown")
@@ -593,7 +662,7 @@ async def show_teaser(message: Message, scenario_name: str, chart: dict, second_
     builder = InlineKeyboardBuilder()
     builder.button(text=f"🔓 Получить полный PDF · {PRICES[scenario_name]}⭐",
                    callback_data=f"buy:{scenario_name}")
-    builder.button(text="🏠 В меню", callback_data="menu")
+    builder.button(text="⬅️ Назад", callback_data="back:menu")
     builder.adjust(1)
     await message.answer(
         f"Ваш бесплатный тизер — {NAMES[scenario_name]}:\n\n{teaser(chart, scenario_name, second_chart)}\n\n"
