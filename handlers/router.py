@@ -590,21 +590,27 @@ async def own_date(message: Message, state: FSMContext):
 
 
 @router.message(BirthStates.own_time)
-async def own_time(message: Message, state: FSMContext, time_text: str | None = None):
+async def own_time(
+    message: Message,
+    state: FSMContext,
+    time_text: str | None = None,
+    user_id: int | None = None,
+):
     try:
         value = parse_time(time_text if time_text is not None else message.text)
     except (ValueError, TypeError):
         await message.answer("Нужно время в формате ЧЧ:ММ, например 14:30, или «не знаю».")
         return
+    user_id = user_id or message.from_user.id
     data = await state.get_data()
     if data.get("edit_field") == "time":
-        profile = await get_profile(message.from_user.id)
+        profile = await get_profile(user_id)
         if profile:
             profile["birth_time"] = value
             profile["time_is_approximate"] = is_approximate_time(
                 time_text if time_text is not None else message.text
             )
-            await save_profile(message.from_user.id, profile)
+            await save_profile(user_id, profile)
             await message.answer("Данные сохранены ✅", reply_markup=back_to_edit_profile())
         else:
             await save_profile_field(message, "birth_time", value, state)
@@ -710,7 +716,7 @@ async def time_unknown(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
     current_state = await state.get_state()
     if current_state == BirthStates.own_time.state:
-        await own_time(callback.message, state, "не знаю")
+        await own_time(callback.message, state, "не знаю", callback.from_user.id)
     elif current_state == BirthStates.partner_time.state:
         await partner_time(callback.message, state, "не знаю")
 
