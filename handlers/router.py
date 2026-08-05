@@ -1,3 +1,6 @@
+import asyncio
+from contextlib import asynccontextmanager, suppress
+
 from aiogram import F, Router
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
@@ -27,6 +30,15 @@ router = Router()
 PRICES = {"personality": 349, "compatibility": 449, "money": 399}
 NAMES = {"personality": "Разбор личности", "compatibility": "Совместимость", "money": "Денежный код"}
 PENDING_REPORTS: dict[int, tuple[dict, dict | None]] = {}
+REPORT_STATUS_MESSAGES = (
+    "Заказ принят ✅ Готовлю ваш персональный отчёт…",
+    "Скоро будет готово…",
+    "Уже почти…",
+    "Исследуем звёзды…",
+    "Считаем положения планет…",
+    "Собираем вашу карту…",
+    "Финальные штрихи…",
+)
 SCENARIO_INTROS = {
     "personality": (
         "✨ Разбор личности\n\n"
@@ -779,18 +791,18 @@ async def deliver_report(
             profile["birth_date"], profile["birth_time"], profile["latitude"], profile["longitude"]
         )
         second_chart = None
-    await message.answer("Заказ принят ✅ Готовлю ваш персональный отчёт…")
-    content = await generate_report_content(scenario_name, chart, second_chart)
-    profile_photo = await get_profile_photo(message, user_id)
-    path = generate_report(
-        scenario_name,
-        chart,
-        second_chart,
-        content,
-        recipient.full_name,
-        recipient.username,
-        profile_photo,
-    )
+    async with report_status_animation(message):
+        content = await generate_report_content(scenario_name, chart, second_chart)
+        profile_photo = await get_profile_photo(message, user_id)
+        path = generate_report(
+            scenario_name,
+            chart,
+            second_chart,
+            content,
+            recipient.full_name,
+            recipient.username,
+            profile_photo,
+        )
     await message.answer_document(
         FSInputFile(path),
         caption=f"{NAMES[scenario_name]} · ASTRO MARY",
@@ -807,6 +819,29 @@ async def get_profile_photo(message: Message, user_id: int):
         return await message.bot.download_file(file.file_path)
     except Exception:
         return None
+
+
+async def _rotate_report_status(status_message: Message) -> None:
+    index = 0
+    while True:
+        await asyncio.sleep(5)
+        index = (index + 1) % len(REPORT_STATUS_MESSAGES)
+        with suppress(Exception):
+            await status_message.edit_text(REPORT_STATUS_MESSAGES[index])
+
+
+@asynccontextmanager
+async def report_status_animation(message: Message):
+    status_message = await message.answer(REPORT_STATUS_MESSAGES[0])
+    animation = asyncio.create_task(_rotate_report_status(status_message))
+    try:
+        yield status_message
+    finally:
+        animation.cancel()
+        with suppress(asyncio.CancelledError):
+            await animation
+        with suppress(Exception):
+            await status_message.delete()
 
 
 @router.message()
