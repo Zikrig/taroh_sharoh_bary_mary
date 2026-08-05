@@ -130,7 +130,7 @@ def _allowed_facts(chart: dict, second_chart: dict | None) -> list[str]:
             facts.append(
                 f"Синастрия: {aspect['first']} {aspect['type']} {aspect['second']}"
             )
-    logger.info("Allowed facts: %s", facts)
+    # logger.info("Allowed facts: %s", facts)
     return facts
 
 
@@ -195,7 +195,7 @@ async def generate_report_content(
         client = AsyncOpenAI(
             api_key=settings.ai_api_key,
             base_url=settings.ai_base_url,
-            timeout=90.0,
+            timeout=300.0,
         )
         response = await client.chat.completions.create(
             model=settings.ai_model,
