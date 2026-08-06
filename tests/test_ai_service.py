@@ -17,6 +17,7 @@ from services.ai import (
     build_prompt_payload,
 )
 from services.astro import local_time_to_utc, timezone_for_coordinates
+from services.prompt_guides.career import build_career_hints
 from services.reports import SECTIONS
 
 
@@ -75,13 +76,19 @@ class AiServiceTests(unittest.TestCase):
         batches = _section_batches(payload["sections"])
         self.assertEqual([len(batch) for batch in batches], [3, 3, 3, 3, 1])
 
-    def test_uses_csv_section_titles_and_career_guidance(self):
+    def test_uses_embedded_sections_and_career_guidance(self):
         self.assertIn(
-            ("Дом денег (2 дом)", "Ваше отношение к личным финансам, способность зарабатывать, накопления."),
+            ("Дом денег", "отношение к личным финансам, доходу и накоплениям"),
             SECTIONS["money"],
         )
         guidance = SECTION_GUIDANCE["personality"]["Карьера и призвание"]
         self.assertIn("2–4 конкретные роли", guidance)
+
+    def test_career_hints_adds_house_themes_and_profession_examples(self):
+        hints = build_career_hints(chart())
+        self.assertEqual(hints["active_house_professions"][0]["house"], 1)
+        self.assertIn("личность", hints["active_house_professions"][0]["themes"])
+        self.assertTrue(hints["active_house_professions"][0]["profession_examples"])
 
 
 if __name__ == "__main__":
