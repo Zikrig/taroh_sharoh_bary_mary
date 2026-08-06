@@ -14,6 +14,7 @@ from services.ai import (
     _allowed_facts,
     _section_batches,
     _validate_batch,
+    build_batch_payload,
     build_prompt_payload,
 )
 from services.astro import local_time_to_utc, timezone_for_coordinates
@@ -25,6 +26,8 @@ def chart() -> dict:
     planets = {
         "Солнце": {"longitude": 10.0, "sign": "Овен", "degree": 10.0, "house": 1},
         "Луна": {"longitude": 70.0, "sign": "Близнецы", "degree": 10.0, "house": 3},
+        "Венера": {"longitude": 100.0, "sign": "Рак", "degree": 10.0, "house": 4},
+        "Уран": {"longitude": 200.0, "sign": "Весы", "degree": 20.0, "house": 7},
     }
     return {
         "date": "1990-01-01",
@@ -35,7 +38,22 @@ def chart() -> dict:
         "ascendant": {"longitude": 0.0, "sign": "Овен"},
         "houses": [index * 30.0 for index in range(12)],
         "planets": planets,
-        "aspects": [],
+        "aspects": [
+            {
+                "first": "Солнце",
+                "second": "Луна",
+                "type": "тригон",
+                "angle": 120,
+                "orb": 1.2,
+            },
+            {
+                "first": "Венера",
+                "second": "Уран",
+                "type": "квадрат",
+                "angle": 90,
+                "orb": 2.0,
+            },
+        ],
     }
 
 
@@ -89,6 +107,29 @@ class AiServiceTests(unittest.TestCase):
         self.assertEqual(hints["active_house_professions"][0]["house"], 1)
         self.assertIn("личность", hints["active_house_professions"][0]["themes"])
         self.assertTrue(hints["active_house_professions"][0]["profession_examples"])
+
+    def test_batch_payload_filters_structured_chart_then_renders_facts(self):
+        payload = build_prompt_payload("personality", chart(), None)
+        batch = [
+            section
+            for section in payload["sections"]
+            if section["title"] in {"Солнечный знак", "Лунный знак", "Введение"}
+        ]
+        trimmed = build_batch_payload(payload, batch)
+        self.assertEqual(set(trimmed["primary_chart"]["planets"]), {"Солнце", "Луна"})
+        self.assertNotIn("houses", trimmed["primary_chart"])
+        self.assertNotIn("career_and_talent_hints", trimmed)
+        self.assertIn("Карта 1: Солнце в Овен, дом 1", trimmed["allowed_facts"])
+        self.assertIn("Карта 1: Луна в Близнецы, дом 3", trimmed["allowed_facts"])
+        self.assertNotIn("Карта 1: Венера в Рак, дом 4", trimmed["allowed_facts"])
+        self.assertIn(
+            "Карта 1: Солнце тригон Луна",
+            trimmed["allowed_facts"],
+        )
+        self.assertNotIn(
+            "Карта 1: Венера квадрат Уран",
+            trimmed["allowed_facts"],
+        )
 
 
 if __name__ == "__main__":
