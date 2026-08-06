@@ -9,7 +9,13 @@ if find_spec("swisseph") is None:
         SATURN=6, URANUS=7, NEPTUNE=8, PLUTO=9,
     )
 
-from services.ai import _allowed_facts, _section_batches, _validate_batch, build_prompt_payload
+from services.ai import (
+    SECTION_GUIDANCE,
+    _allowed_facts,
+    _section_batches,
+    _validate_batch,
+    build_prompt_payload,
+)
 from services.astro import local_time_to_utc, timezone_for_coordinates
 from services.reports import SECTIONS
 
@@ -68,6 +74,14 @@ class AiServiceTests(unittest.TestCase):
         payload = build_prompt_payload("money", chart(), None)
         batches = _section_batches(payload["sections"])
         self.assertEqual([len(batch) for batch in batches], [3, 3, 3, 3, 1])
+
+    def test_uses_csv_section_titles_and_career_guidance(self):
+        self.assertIn(
+            ("Дом денег (2 дом)", "Ваше отношение к личным финансам, способность зарабатывать, накопления."),
+            SECTIONS["money"],
+        )
+        guidance = SECTION_GUIDANCE["personality"]["Карьера и призвание"]
+        self.assertIn("2–4 конкретные роли", guidance)
 
 
 if __name__ == "__main__":
