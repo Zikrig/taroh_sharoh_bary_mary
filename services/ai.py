@@ -55,7 +55,8 @@ SYSTEM_PROMPT = """
 }
 Верни только запрошенные в этом пакете sections, ровно по одному разу и в том же порядке.
 Для каждого раздела напиши содержательный текст и укажи 1–3 точные строки из allowed_facts,
-на которых основана интерпретация. Не используй данные, отсутствующие в allowed_facts.
+на которых основана интерпретация. Объём каждого раздела — от 30 до 140 слов.
+Не используй данные, отсутствующие в allowed_facts.
 """.strip()
 
 SECTION_GUIDANCE = {
@@ -192,7 +193,7 @@ def _validate_batch(
         references = section.get("references")
         if (
             not isinstance(content_text, str)
-            or len(content_text.split()) < 30
+            or not 30 <= len(content_text.split()) <= 140
             or not isinstance(references, list)
         ):
             return None

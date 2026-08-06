@@ -472,11 +472,11 @@ def _chart_summary_table(
             _paragraph("Местное время:", label_style),
             _paragraph(chart["time"], value_style),
         ])
-    table = Table(rows, colWidths=[70 * mm, 65 * mm], hAlign="CENTER")
+    table = Table(rows, colWidths=[80 * mm, 75 * mm], hAlign="CENTER")
     table.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 5 * mm),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 5 * mm),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4 * mm),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4 * mm),
         ("TOPPADDING", (0, 0), (-1, -1), 3 * mm),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 3 * mm),
     ]))
