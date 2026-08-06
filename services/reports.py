@@ -49,6 +49,10 @@ symbol_font_path = Path("C:/Windows/Fonts/seguisym.ttf")
 if symbol_font_path.exists():
     pdfmetrics.registerFont(TTFont("AstroSymbols", str(symbol_font_path)))
     SYMBOL_FONT = "AstroSymbols"
+else:
+    # DejaVu Sans is available in the container and contains the astronomical
+    # and zodiac glyphs used by the report.
+    SYMBOL_FONT = FONT
 
 SECTIONS = {
     "personality": [
@@ -418,14 +422,11 @@ def _chart_summary_table(
     value_style: ParagraphStyle,
 ) -> Table:
     planets = chart["planets"]
-    time_note = " (время приблизительное)" if chart.get("time_is_approximate") else ""
     ascendant_index = int(chart["ascendant"]["longitude"] // 30) % 12
     symbol_span = f'<font name="{SYMBOL_FONT}">'
     rows = [
         [_paragraph("Дата рождения:", label_style),
          _paragraph(_format_date(chart["date"]), value_style)],
-        [_paragraph("Местное время:", label_style),
-         _paragraph(f"{chart['time']}{time_note}", value_style)],
         [_paragraph("Часовой пояс:", label_style),
          _paragraph(chart["timezone"], value_style)],
         [
@@ -453,6 +454,11 @@ def _chart_summary_table(
             ),
         ],
     ]
+    if not chart.get("time_is_approximate"):
+        rows.insert(1, [
+            _paragraph("Местное время:", label_style),
+            _paragraph(chart["time"], value_style),
+        ])
     table = Table(rows, colWidths=[70 * mm, 65 * mm], hAlign="CENTER")
     table.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
@@ -490,9 +496,9 @@ def generate_report(
                              spaceBefore=7 * mm, spaceAfter=3 * mm)
     body = ParagraphStyle("AstroBody", parent=styles["BodyText"], fontName=FONT,
                           fontSize=15, leading=24, textColor=INK,
-                          alignment=4, spaceAfter=3 * mm)
+                          alignment=4, firstLineIndent=8 * mm, spaceAfter=4 * mm)
     caption = ParagraphStyle("AstroCaption", parent=body, fontSize=13, leading=18,
-                             textColor=MUTED, alignment=TA_CENTER)
+                             textColor=MUTED, alignment=TA_CENTER, firstLineIndent=0)
     summary_label = ParagraphStyle(
         "AstroSummaryLabel",
         parent=body,
@@ -501,6 +507,7 @@ def generate_report(
         leading=21,
         alignment=0,
         textColor=INK,
+        firstLineIndent=0,
         spaceAfter=0,
     )
     summary_value = ParagraphStyle(
@@ -511,6 +518,7 @@ def generate_report(
         leading=23,
         alignment=2,
         textColor=INK,
+        firstLineIndent=0,
         spaceAfter=0,
     )
     recipient_style = ParagraphStyle("AstroRecipient", parent=heading, fontSize=22,

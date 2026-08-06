@@ -8,7 +8,7 @@ from config.settings import settings
 from services.reports import SECTIONS
 
 logger = logging.getLogger(__name__)
-AI_TIMEOUT_SECONDS = 900.0
+AI_TIMEOUT_SECONDS = 240.0
 SECTIONS_PER_REQUEST = 3
 MAX_PARALLEL_REQUESTS = 3
 FAILED_BATCH_RETRIES = 1
