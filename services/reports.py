@@ -23,12 +23,12 @@ from reportlab.platypus import (
 )
 from reportlab.platypus.flowables import Flowable
 
-NAVY = colors.HexColor("#07143D")
-GOLD = colors.HexColor("#C49A4A")
-GOLD_LIGHT = colors.HexColor("#E8D7AF")
-PAPER = colors.HexColor("#FFFDF8")
-INK = colors.HexColor("#30394F")
-MUTED = colors.HexColor("#6F7482")
+NAVY = colors.HexColor("#17130F")
+GOLD = colors.HexColor("#17130F")
+GOLD_LIGHT = colors.HexColor("#8E8478")
+PAPER = colors.HexColor("#F3E9D8")
+INK = colors.HexColor("#17130F")
+MUTED = colors.HexColor("#3D3731")
 
 FONT = "Helvetica"
 FONT_BOLD = "Helvetica-Bold"
@@ -193,11 +193,8 @@ def _table(rows: list[list[str]], widths: list[float]) -> Table:
         ("FONTSIZE", (0, 0), (-1, -1), 14),
         ("LEADING", (0, 0), (-1, -1), 18),
         ("FONTNAME", (0, 0), (-1, 0), FONT_BOLD),
-        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("TEXTCOLOR", (0, 1), (-1, -1), INK),
-        ("LINEBELOW", (0, 1), (-1, -2), 0.3, GOLD_LIGHT),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [PAPER, colors.HexColor("#FAF6EC")]),
+        ("TEXTCOLOR", (0, 0), (-1, -1), INK),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.6, INK),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 5),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
@@ -313,7 +310,7 @@ class NatalChartFlowable(Flowable):
         canvas.setLineWidth(1.8)
         canvas.circle(center, center, outer, fill=1, stroke=1)
 
-        canvas.setStrokeColor(GOLD)
+        canvas.setStrokeColor(INK)
         canvas.setLineWidth(1.1)
         canvas.circle(center, center, inner, fill=0, stroke=1)
 
@@ -349,8 +346,8 @@ class NatalChartFlowable(Flowable):
             angle = pi / 2 - position["longitude"] * pi / 180
             planet_x = center + (inner - 5 * mm) * cos(angle)
             planet_y = center + (inner - 5 * mm) * sin(angle)
-            canvas.setFillColor(GOLD)
-            canvas.setStrokeColor(NAVY)
+            canvas.setFillColor(INK)
+            canvas.setStrokeColor(INK)
             canvas.setLineWidth(0.4)
             canvas.circle(planet_x, planet_y, 1.7 * mm, fill=1, stroke=1)
             canvas.setFillColor(INK)
@@ -378,24 +375,8 @@ def _draw_page_frame(canvas: Canvas, doc) -> None:
     canvas.setFillColor(PAPER)
     canvas.rect(0, 0, width, height, fill=1, stroke=0)
 
-    band_width = 14 * mm
-    band_colors = (
-        colors.HexColor("#B98B42"),
-        colors.HexColor("#D4B06A"),
-        colors.HexColor("#E7D09C"),
-        colors.HexColor("#F4E9CF"),
-    )
-    stripe = band_width / len(band_colors)
-    for index, color in enumerate(band_colors):
-        canvas.setFillColor(color)
-        canvas.rect(index * stripe, 0, stripe + 0.5, height, fill=1, stroke=0)
-        canvas.rect(width - (index + 1) * stripe, 0, stripe + 0.5, height, fill=1, stroke=0)
-
-    canvas.setStrokeColor(GOLD)
-    canvas.setLineWidth(0.55)
-    canvas.line(22 * mm, height - 16 * mm, width - 22 * mm, height - 16 * mm)
     canvas.setFont(FONT, 9.5)
-    canvas.setFillColor(MUTED)
+    canvas.setFillColor(INK)
     canvas.drawString(23 * mm, 10 * mm, "ASTRO MARY")
     canvas.drawRightString(width - 23 * mm, 10 * mm, f"{doc.page}")
     canvas.restoreState()
@@ -533,13 +514,6 @@ def generate_report(
         Spacer(1, 18 * mm),
         _paragraph("ASTRO MARY · ПЕРСОНАЛЬНЫЙ ОТЧЁТ", eyebrow),
         _paragraph(type_titles[report_type], title),
-        Table(
-            [[""]],
-            colWidths=[90 * mm],
-            rowHeights=[0.8 * mm],
-            style=TableStyle([("BACKGROUND", (0, 0), (-1, -1), GOLD)]),
-            hAlign="CENTER",
-        ),
         Spacer(1, 15 * mm),
     ]
     if recipient_photo:
