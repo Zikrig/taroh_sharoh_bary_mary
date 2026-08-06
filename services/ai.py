@@ -344,21 +344,31 @@ def _facts_from_prompt_charts(
     synastry_aspects: list[dict[str, Any]] | None,
     *,
     include_ascendant: bool = True,
+    use_labels: bool = True,
 ) -> list[str]:
     """Render citation strings from structured chart JSON for the prompt."""
     facts: list[str] = []
-    for label, chart in (("Карта 1", primary_chart), ("Карта 2", partner_chart)):
+    # If not compatibility, we don't need "Карта 1:" prefix
+    charts = [("Карта 1", primary_chart)]
+    if use_labels:
+        charts.append(("Карта 2", partner_chart))
+    else:
+        # Only primary chart, no prefix
+        charts = [("", primary_chart)]
+
+    for label_prefix, chart in charts:
         if chart is None:
             continue
+        label = f"{label_prefix}: " if label_prefix else ""
         for planet, position in (chart.get("planets") or {}).items():
             facts.append(
-                f"{label}: {planet} в {position['sign']}, дом {position['house']}"
+                f"{label}{planet} в {position['sign']}, дом {position['house']}"
             )
         if include_ascendant and chart.get("ascendant"):
-            facts.append(f"{label}: Асцендент в {chart['ascendant']['sign']}")
+            facts.append(f"{label}Асцендент в {chart['ascendant']['sign']}")
         for aspect in chart.get("aspects") or []:
             facts.append(
-                f"{label}: {aspect['first']} {aspect['type']} {aspect['second']}"
+                f"{label}{aspect['first']} {aspect['type']} {aspect['second']}"
             )
     for aspect in synastry_aspects or []:
         facts.append(
@@ -367,12 +377,13 @@ def _facts_from_prompt_charts(
     return facts
 
 
-def _allowed_facts(chart: dict, second_chart: dict | None) -> list[str]:
+def _allowed_facts(chart: dict, second_chart: dict | None, report_type: str) -> list[str]:
     return _facts_from_prompt_charts(
         _chart_for_prompt(chart),
         _chart_for_prompt(second_chart) if second_chart else None,
         calculate_synastry(chart, second_chart) if second_chart else [],
         include_ascendant=True,
+        use_labels=(report_type == "compatibility"),
     )
 
 
@@ -382,6 +393,7 @@ def build_prompt_payload(report_type: str, chart: dict, second_chart: dict | Non
     primary_chart = _chart_for_prompt(chart)
     partner_chart = _chart_for_prompt(second_chart) if second_chart else None
     synastry_aspects = calculate_synastry(chart, second_chart) if second_chart else []
+    use_labels = (report_type == "compatibility")
     payload: dict[str, Any] = {
         "report_type": report_type,
         "language": "ru",
@@ -402,6 +414,7 @@ def build_prompt_payload(report_type: str, chart: dict, second_chart: dict | Non
             primary_chart,
             partner_chart,
             synastry_aspects,
+            use_labels=use_labels,
         ),
         "career_and_talent_hints": build_career_hints(
             chart,
@@ -539,6 +552,7 @@ def build_batch_payload(
 ) -> dict[str, Any]:
     """Shrink structured chart context for one section batch, then render fact strings."""
     titles = [section["title"] for section in batch]
+    report_type = payload.get("report_type")
     focus = _merge_focus(titles)
     primary_chart = _filter_chart_for_batch(payload.get("primary_chart"), focus)
     partner_chart = _filter_chart_for_batch(payload.get("partner_chart"), focus)
@@ -548,7 +562,7 @@ def build_batch_payload(
         else []
     )
     batch_payload = {
-        "report_type": payload.get("report_type"),
+        "report_type": report_type,
         "language": payload.get("language"),
         "sections": batch,
         "primary_chart": primary_chart,
@@ -559,6 +573,7 @@ def build_batch_payload(
             partner_chart,
             synastry_aspects,
             include_ascendant=focus["ascendant"],
+            use_labels=(report_type == "compatibility"),
         ),
     }
     career_hints = _filter_career_hints(payload.get("career_and_talent_hints"), focus)

@@ -66,12 +66,19 @@ class AiServiceTests(unittest.TestCase):
     def test_payload_contains_only_allowed_chart_facts(self):
         payload = build_prompt_payload("money", chart(), None)
         self.assertIn("allowed_facts", payload)
-        self.assertIn("Карта 1: Солнце в Овен, дом 1", payload["allowed_facts"])
+        # No "Карта 1:" for personal reports
+        self.assertIn("Солнце в Овен, дом 1", payload["allowed_facts"])
         self.assertTrue(payload["sections"][1]["guidance"])
+
+    def test_compatibility_payload_contains_labels(self):
+        payload = build_prompt_payload("compatibility", chart(), chart())
+        self.assertIn("allowed_facts", payload)
+        self.assertIn("Карта 1: Солнце в Овен, дом 1", payload["allowed_facts"])
+        self.assertIn("Карта 2: Солнце в Овен, дом 1", payload["allowed_facts"])
 
     def test_validates_section_batch_and_references(self):
         report_type = "money"
-        allowed_facts = _allowed_facts(chart(), None)
+        allowed_facts = _allowed_facts(chart(), None, report_type)
         titles = [title for title, _ in SECTIONS[report_type][:3]]
         content = {
             "sections": [
@@ -131,15 +138,16 @@ class AiServiceTests(unittest.TestCase):
         self.assertEqual(set(trimmed["primary_chart"]["planets"]), {"Солнце", "Луна"})
         self.assertNotIn("houses", trimmed["primary_chart"])
         self.assertNotIn("career_and_talent_hints", trimmed)
-        self.assertIn("Карта 1: Солнце в Овен, дом 1", trimmed["allowed_facts"])
-        self.assertIn("Карта 1: Луна в Близнецы, дом 3", trimmed["allowed_facts"])
-        self.assertNotIn("Карта 1: Венера в Рак, дом 4", trimmed["allowed_facts"])
+        # No "Карта 1:"
+        self.assertIn("Солнце в Овен, дом 1", trimmed["allowed_facts"])
+        self.assertIn("Луна в Близнецы, дом 3", trimmed["allowed_facts"])
+        self.assertNotIn("Венера в Рак, дом 4", trimmed["allowed_facts"])
         self.assertIn(
-            "Карта 1: Солнце тригон Луна",
+            "Солнце тригон Луна",
             trimmed["allowed_facts"],
         )
         self.assertNotIn(
-            "Карта 1: Венера квадрат Уран",
+            "Венера квадрат Уран",
             trimmed["allowed_facts"],
         )
 

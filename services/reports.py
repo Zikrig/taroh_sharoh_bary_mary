@@ -609,7 +609,6 @@ def generate_report(
         section_content = generated_by_title[section]
         story.extend([
             KeepTogether([
-                _paragraph(f"РАЗДЕЛ {section_number:02d}", eyebrow),
                 _paragraph(section, heading),
             ]),
             _paragraph(section_content["content"], body),
