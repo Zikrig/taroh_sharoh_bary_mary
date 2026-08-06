@@ -76,14 +76,26 @@ class AiServiceTests(unittest.TestCase):
         content = {
             "sections": [
                 {
-                    "title": title,
+                    "title": titles[0],
                     "content": " ".join(["Точный"] * 30),
-                    "references": allowed_facts[:2],
+                    "references": [allowed_facts[0].upper() + "."],  # Test normalization
+                },
+                {
+                    "title": titles[1],
+                    "content": " ".join(["Точный"] * 30),
+                    "references": [allowed_facts[1]],
+                },
+                {
+                    "title": titles[2],
+                    "content": " ".join(["Точный"] * 30),
+                    "references": [allowed_facts[2]],
                 }
-                for title in titles
             ],
         }
-        self.assertIsNotNone(_validate_batch(content, titles, set(allowed_facts)))
+        validated = _validate_batch(content, titles, set(allowed_facts))
+        self.assertIsNotNone(validated)
+        self.assertEqual(validated[0]["references"][0], allowed_facts[0])
+
         content["sections"][0]["references"] = ["Выдуманный факт", allowed_facts[0]]
         self.assertIsNotNone(_validate_batch(content, titles, set(allowed_facts)))
         content["sections"][0]["references"] = ["Выдуманный факт"]

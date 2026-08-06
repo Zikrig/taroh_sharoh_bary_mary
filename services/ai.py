@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -566,6 +567,17 @@ def build_batch_payload(
     return batch_payload
 
 
+def _normalize_fact(text: str) -> str:
+    """Remove noise from a fact string for robust comparison."""
+    if not isinstance(text, str):
+        return ""
+    # Remove dots, extra spaces and convert to lower case
+    clean = re.sub(r"[.\s]+", "", text).lower()
+    # Replace common Latin lookalikes with Cyrillic to avoid encoding mixups
+    replacements = str.maketrans("abcekmnoprtuxy", "авсекмнорртуху")
+    return clean.translate(replacements)
+
+
 def _validate_batch(
     content: Any,
     expected_titles: list[str],
@@ -576,7 +588,12 @@ def _validate_batch(
     sections = content.get("sections")
     if not isinstance(sections, list) or [item.get("title") for item in sections] != expected_titles:
         return None
-    normalized = []
+
+    normalized_allowed = {
+        _normalize_fact(fact): fact for fact in allowed_facts
+    }
+
+    normalized_results = []
     for section in sections:
         content_text = section.get("content")
         references = section.get("references")
@@ -586,18 +603,27 @@ def _validate_batch(
             or not isinstance(references, list)
         ):
             return None
-        exact_references = [
-            reference for reference in references
-            if isinstance(reference, str) and reference in allowed_facts
-        ]
+
+        # Robust reference matching
+        exact_references = []
+        for ref in references:
+            if not isinstance(ref, str):
+                continue
+            norm_ref = _normalize_fact(ref)
+            if norm_ref in normalized_allowed:
+                # Use the original string from allowed_facts, not the AI's version
+                exact_references.append(normalized_allowed[norm_ref])
+
         if not exact_references:
+            # If AI couldn't provide any valid reference, fail this section
             return None
-        normalized.append({
+
+        normalized_results.append({
             "title": section["title"],
             "content": content_text.strip(),
             "references": exact_references[:3],
         })
-    return normalized
+    return normalized_results
 
 
 def _report_shell(report_type: str) -> tuple[str, str]:
