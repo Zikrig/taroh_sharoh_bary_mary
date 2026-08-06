@@ -752,6 +752,10 @@ async def show_teaser(
                    callback_data=f"buy:{scenario_name}")
     builder.button(text="⬅️ Назад", callback_data="back:menu")
     builder.adjust(1)
+    await message.answer(
+        "Выберите действие:",
+        reply_markup=builder.as_markup(),
+    )
 
 
 
