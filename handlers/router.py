@@ -752,10 +752,7 @@ async def show_teaser(
                    callback_data=f"buy:{scenario_name}")
     builder.button(text="⬅️ Назад", callback_data="back:menu")
     builder.adjust(1)
-    await message.answer(
-        f"{NAMES[scenario_name]} · готово 35,0%",
-        reply_markup=builder.as_markup(),
-    )
+
 
 
 @router.callback_query(F.data == "menu")
