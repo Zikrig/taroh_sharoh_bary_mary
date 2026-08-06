@@ -1,6 +1,6 @@
 import asyncio
 from contextlib import asynccontextmanager, suppress
-from random import randint, uniform
+from random import uniform
 
 from aiogram import F, Router
 from aiogram.enums import ParseMode
@@ -753,7 +753,7 @@ async def show_teaser(
     builder.button(text="⬅️ Назад", callback_data="back:menu")
     builder.adjust(1)
     await message.answer(
-        f"{NAMES[scenario_name]} · готово 35%",
+        f"{NAMES[scenario_name]} · готово 35,0%",
         reply_markup=builder.as_markup(),
     )
 
@@ -920,24 +920,24 @@ async def get_profile_photo(message: Message, user_id: int):
 
 
 async def _report_progress(status_message: Message, finished: asyncio.Event) -> None:
-    progress = 0
+    progress = 0.0
     deadline = asyncio.get_running_loop().time() + AI_TIMEOUT_SECONDS * 1.2
 
     while not finished.is_set():
         remaining = deadline - asyncio.get_running_loop().time()
         if remaining <= 0:
-            progress = 99
+            progress = 99.9
             break
         pause = min(uniform(0.4, 15.0), remaining)
         try:
             await asyncio.wait_for(finished.wait(), timeout=pause)
             break
         except asyncio.TimeoutError:
-            if progress < 99:
-                progress = min(99, progress + randint(1, 7))
+            if progress < 99.9:
+                progress = min(99.9, round(progress + uniform(0.1, 2.5), 1))
                 with suppress(Exception):
                     await status_message.edit_text(
-                        f"{REPORT_PROGRESS_TEXT}… {progress}%"
+                        f"{REPORT_PROGRESS_TEXT}… {progress:.1f}%"
                     )
 
     if not finished.is_set():
@@ -959,16 +959,17 @@ async def _report_progress(status_message: Message, finished: asyncio.Event) -> 
                 0.0,
                 completion_deadline - asyncio.get_running_loop().time(),
             )
-            progress = min(100, max(progress, round(
-                start_progress + (100 - start_progress) * elapsed / 10.0
-            )))
+            progress = min(100.0, max(
+                progress,
+                round(start_progress + (100.0 - start_progress) * elapsed / 10.0, 1),
+            ))
         with suppress(Exception):
-            await status_message.edit_text(f"{REPORT_PROGRESS_TEXT}… {progress}%")
+            await status_message.edit_text(f"{REPORT_PROGRESS_TEXT}… {progress:.1f}%")
 
 
 @asynccontextmanager
 async def report_status_animation(message: Message):
-    status_message = await message.answer(f"{REPORT_PROGRESS_TEXT}… 0%")
+    status_message = await message.answer(f"{REPORT_PROGRESS_TEXT}… 0,0%")
     finished = asyncio.Event()
     completed = False
     animation = asyncio.create_task(_report_progress(status_message, finished))

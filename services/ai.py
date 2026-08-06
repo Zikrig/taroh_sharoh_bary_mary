@@ -7,7 +7,7 @@ from config.settings import settings
 from services.reports import SECTIONS
 
 logger = logging.getLogger(__name__)
-AI_TIMEOUT_SECONDS = 300.0
+AI_TIMEOUT_SECONDS = 900.0
 
 SYSTEM_PROMPT = """
 Ты — автор персональных астрологических отчётов. Подготовь отчёт строго на русском языке.
