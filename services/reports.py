@@ -9,6 +9,7 @@ from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
@@ -372,6 +373,34 @@ def _natal_chart(chart: dict) -> NatalChartFlowable:
     return NatalChartFlowable(chart)
 
 
+class RoundedPhotoFlowable(Flowable):
+    def __init__(self, source: Any, size: float = 30 * mm, radius: float = 5 * mm):
+        super().__init__()
+        self.image = ImageReader(source)
+        self.width = size
+        self.height = size
+        self.radius = radius
+        self.hAlign = "CENTER"
+
+    def draw(self) -> None:
+        canvas = self.canv
+        canvas.saveState()
+        clip = canvas.beginPath()
+        clip.roundRect(0, 0, self.width, self.height, self.radius)
+        canvas.clipPath(clip, stroke=0, fill=0)
+        canvas.drawImage(
+            self.image,
+            0,
+            0,
+            width=self.width,
+            height=self.height,
+            preserveAspectRatio=True,
+            anchor="c",
+            mask="auto",
+        )
+        canvas.restoreState()
+
+
 def _draw_page_frame(canvas: Canvas, doc) -> None:
     width, height = A4
     canvas.saveState()
@@ -520,8 +549,7 @@ def generate_report(
         Spacer(1, 15 * mm),
     ]
     if recipient_photo:
-        photo = Image(recipient_photo, width=30 * mm, height=30 * mm)
-        photo.hAlign = "CENTER"
+        photo = RoundedPhotoFlowable(recipient_photo)
         story.extend([photo, Spacer(1, 4 * mm)])
     if recipient_name:
         username = f" · @{recipient_username}" if recipient_username else ""
@@ -576,6 +604,8 @@ def generate_report(
     ])
     generated_by_title = {section["title"]: section for section in content["sections"]}
     for section_number, (section, _) in enumerate(SECTIONS[report_type], start=1):
+        if section_number > 1:
+            story.append(PageBreak())
         section_content = generated_by_title[section]
         story.extend([
             KeepTogether([
