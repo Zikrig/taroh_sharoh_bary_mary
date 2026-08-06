@@ -1,6 +1,7 @@
 from datetime import datetime
 from html import escape
 from pathlib import Path
+import re
 from typing import Any
 
 from reportlab.lib import colors
@@ -166,7 +167,9 @@ def _zodiac_image_path(index: int) -> Path:
 
 
 def _paragraph(text: str, style: ParagraphStyle) -> Paragraph:
-    return Paragraph(escape(text).replace("\n", "<br/>"), style)
+    markup = escape(text).replace("\n", "<br/>")
+    markup = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", markup, flags=re.DOTALL)
+    return Paragraph(markup, style)
 
 
 def _format_date(value: str) -> str:
