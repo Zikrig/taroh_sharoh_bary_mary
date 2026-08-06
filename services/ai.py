@@ -193,7 +193,7 @@ def _validate_batch(
         references = section.get("references")
         if (
             not isinstance(content_text, str)
-            or not 30 <= len(content_text.split()) <= 140
+            or len(content_text.split()) < 30
             or not isinstance(references, list)
         ):
             return None
@@ -252,6 +252,13 @@ async def generate_report_content(
             expected_titles = [section["title"] for section in batch]
             for attempt in range(FAILED_BATCH_RETRIES + 1):
                 try:
+                    user_payload = json.dumps(batch_payload, ensure_ascii=False)
+                    logger.info(
+                        "AI user payload, sections=%s, attempt=%s: %s",
+                        expected_titles,
+                        attempt + 1,
+                        user_payload,
+                    )
                     async with semaphore:
                         response = await client.chat.completions.create(
                             model=settings.ai_model,
@@ -260,11 +267,17 @@ async def generate_report_content(
                                 {"role": "system", "content": SYSTEM_PROMPT},
                                 {
                                     "role": "user",
-                                    "content": json.dumps(batch_payload, ensure_ascii=False),
+                                    "content": user_payload,
                                 },
                             ],
                         )
                     raw_content = response.choices[0].message.content
+                    logger.info(
+                        "AI raw response, sections=%s, attempt=%s: %s",
+                        expected_titles,
+                        attempt + 1,
+                        raw_content,
+                    )
                     if raw_content:
                         validated = _validate_batch(
                             json.loads(raw_content),
