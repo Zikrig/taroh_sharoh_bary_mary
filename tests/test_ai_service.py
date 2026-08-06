@@ -9,7 +9,7 @@ if find_spec("swisseph") is None:
         SATURN=6, URANUS=7, NEPTUNE=8, PLUTO=9,
     )
 
-from services.ai import _allowed_facts, _validate_content, build_prompt_payload
+from services.ai import _allowed_facts, _section_batches, _validate_batch, build_prompt_payload
 from services.astro import local_time_to_utc, timezone_for_coordinates
 from services.reports import SECTIONS
 
@@ -44,25 +44,30 @@ class AiServiceTests(unittest.TestCase):
         self.assertIn("Карта 1: Солнце в Овен, дом 1", payload["allowed_facts"])
         self.assertTrue(payload["sections"][1]["guidance"])
 
-    def test_validates_expected_section_order_and_references(self):
+    def test_validates_section_batch_and_references(self):
         report_type = "money"
         allowed_facts = _allowed_facts(chart(), None)
+        titles = [title for title, _ in SECTIONS[report_type][:3]]
         content = {
-            "title": "Отчёт",
-            "intro": "Введение",
             "sections": [
                 {
                     "title": title,
-                    "content": " ".join(["Точный"] * 100),
+                    "content": " ".join(["Точный"] * 30),
                     "references": allowed_facts[:2],
                 }
-                for title, _ in SECTIONS[report_type]
+                for title in titles
             ],
-            "disclaimer": "Развлекательный материал.",
         }
-        self.assertEqual(_validate_content(content, report_type, set(allowed_facts)), content)
+        self.assertIsNotNone(_validate_batch(content, titles, set(allowed_facts)))
         content["sections"][0]["references"] = ["Выдуманный факт", allowed_facts[0]]
-        self.assertIsNone(_validate_content(content, report_type, set(allowed_facts)))
+        self.assertIsNotNone(_validate_batch(content, titles, set(allowed_facts)))
+        content["sections"][0]["references"] = ["Выдуманный факт"]
+        self.assertIsNone(_validate_batch(content, titles, set(allowed_facts)))
+
+    def test_splits_sections_into_three_item_batches(self):
+        payload = build_prompt_payload("money", chart(), None)
+        batches = _section_batches(payload["sections"])
+        self.assertEqual([len(batch) for batch in batches], [3, 3, 3, 3, 1])
 
 
 if __name__ == "__main__":

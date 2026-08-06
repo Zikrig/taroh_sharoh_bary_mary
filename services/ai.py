@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from typing import Any
@@ -8,6 +9,9 @@ from services.reports import SECTIONS
 
 logger = logging.getLogger(__name__)
 AI_TIMEOUT_SECONDS = 900.0
+SECTIONS_PER_REQUEST = 3
+MAX_PARALLEL_REQUESTS = 3
+FAILED_BATCH_RETRIES = 1
 
 SYSTEM_PROMPT = """
 Ты — автор персональных астрологических отчётов. Подготовь отчёт строго на русском языке.
@@ -34,20 +38,17 @@ SYSTEM_PROMPT = """
 гарантировать доход, отношения или будущие события. Астрологические интерпретации подавай
 как символический, развлекательный способ саморефлексии, а не как установленный факт.
 
-Верни только JSON без Markdown:
+Верни только JSON без Markdown в формате:
 {
-  "title": "string",
-  "intro": "string",
   "sections": [{
     "title": "string",
     "content": "string",
     "references": ["точные факты из allowed_facts"]
-  }],
-  "disclaimer": "string"
+  }]
 }
-Список sections должен содержать каждый переданный раздел ровно один раз и в том же порядке.
-Каждый раздел: 70–110 слов, минимум две конкретные ссылки из allowed_facts. Не повторяй
-одни и те же формулировки и не используй данные, отсутствующие в allowed_facts.
+Верни только запрошенные в этом пакете sections, ровно по одному разу и в том же порядке.
+Для каждого раздела напиши содержательный текст и укажи 1–3 точные строки из allowed_facts,
+на которых основана интерпретация. Не используй данные, отсутствующие в allowed_facts.
 """.strip()
 
 SECTION_GUIDANCE = {
@@ -159,35 +160,65 @@ def build_prompt_payload(report_type: str, chart: dict, second_chart: dict | Non
     return payload
 
 
-def _validate_content(
+def _section_batches(sections: list[dict[str, str]]) -> list[list[dict[str, str]]]:
+    return [
+        sections[index:index + SECTIONS_PER_REQUEST]
+        for index in range(0, len(sections), SECTIONS_PER_REQUEST)
+    ]
+
+
+def _validate_batch(
     content: Any,
-    report_type: str,
+    expected_titles: list[str],
     allowed_facts: set[str],
-) -> dict[str, Any] | None:
-    if not isinstance(content, dict) or not all(isinstance(content.get(key), str) for key in ("title", "intro", "disclaimer")):
+) -> list[dict[str, Any]] | None:
+    if not isinstance(content, dict):
         return None
-    expected_titles = [title for title, _ in SECTIONS[report_type]]
     sections = content.get("sections")
-    if not isinstance(sections, list) or len(sections) != len(expected_titles):
+    if not isinstance(sections, list) or [item.get("title") for item in sections] != expected_titles:
         return None
-    if [section.get("title") for section in sections] != expected_titles:
-        return None
-    if not all(
-        isinstance(section.get("content"), str)
-        and 70 <= len(section["content"].split()) <= 110
-        and isinstance(section.get("references"), list)
-        and len(section["references"]) >= 2
-        and all(reference in allowed_facts for reference in section["references"])
-        for section in sections
-    ):
-        return None
-    return content
+    normalized = []
+    for section in sections:
+        content_text = section.get("content")
+        references = section.get("references")
+        if (
+            not isinstance(content_text, str)
+            or len(content_text.split()) < 30
+            or not isinstance(references, list)
+        ):
+            return None
+        exact_references = [
+            reference for reference in references
+            if isinstance(reference, str) and reference in allowed_facts
+        ]
+        if not exact_references:
+            return None
+        normalized.append({
+            "title": section["title"],
+            "content": content_text.strip(),
+            "references": exact_references[:3],
+        })
+    return normalized
+
+
+def _report_shell(report_type: str) -> tuple[str, str]:
+    titles = {
+        "personality": "Ваш персональный разбор",
+        "compatibility": "Потенциал вашей совместимости",
+        "money": "Ваш денежный код",
+    }
+    intros = {
+        "personality": "Ниже — ключевые символические темы вашей натальной карты.",
+        "compatibility": "Ниже — ключевые символические темы взаимодействия вашей пары.",
+        "money": "Ниже — ключевые символические темы вашего отношения к ресурсам и реализации.",
+    }
+    return titles[report_type], intros[report_type]
 
 
 async def generate_report_content(
     report_type: str, chart: dict, second_chart: dict | None = None
 ) -> dict[str, Any] | None:
-    """Return validated AI content or None when a report cannot be generated."""
+    """Generate independent section batches and combine their validated results."""
     if not settings.ai_api_key:
         return None
     try:
@@ -197,31 +228,79 @@ async def generate_report_content(
             api_key=settings.ai_api_key,
             base_url=settings.ai_base_url,
             timeout=AI_TIMEOUT_SECONDS,
+            max_retries=0,
         )
-        response = await client.chat.completions.create(
-            model=settings.ai_model,
-            response_format={"type": "json_object"},
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": json.dumps(build_prompt_payload(report_type, chart, second_chart), ensure_ascii=False),
-                },
-            ],
-        )
-        raw_content = response.choices[0].message.content
-        if not raw_content:
+        payload = build_prompt_payload(report_type, chart, second_chart)
+        allowed_facts = set(payload["allowed_facts"])
+        semaphore = asyncio.Semaphore(MAX_PARALLEL_REQUESTS)
+
+        async def generate_batch(batch: list[dict[str, str]]) -> list[dict[str, Any]] | None:
+            batch_payload = {
+                **payload,
+                "sections": batch,
+            }
+            expected_titles = [section["title"] for section in batch]
+            for attempt in range(FAILED_BATCH_RETRIES + 1):
+                try:
+                    async with semaphore:
+                        response = await client.chat.completions.create(
+                            model=settings.ai_model,
+                            response_format={"type": "json_object"},
+                            messages=[
+                                {"role": "system", "content": SYSTEM_PROMPT},
+                                {
+                                    "role": "user",
+                                    "content": json.dumps(batch_payload, ensure_ascii=False),
+                                },
+                            ],
+                        )
+                    raw_content = response.choices[0].message.content
+                    if raw_content:
+                        validated = _validate_batch(
+                            json.loads(raw_content),
+                            expected_titles,
+                            allowed_facts,
+                        )
+                        if validated:
+                            return validated
+                    logger.warning(
+                        "AI вернул неполный пакет разделов %s, попытка %s",
+                        expected_titles,
+                        attempt + 1,
+                    )
+                except (json.JSONDecodeError, TimeoutError, ValueError) as error:
+                    logger.warning(
+                        "Не удалось получить пакет разделов %s: %s",
+                        expected_titles,
+                        error,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Неожиданная ошибка при генерации пакета разделов %s",
+                        expected_titles,
+                    )
             return None
-        return _validate_content(
-            json.loads(raw_content),
-            report_type,
-            set(_allowed_facts(chart, second_chart)),
+
+        results = await asyncio.gather(
+            *(generate_batch(batch) for batch in _section_batches(payload["sections"]))
         )
-    except (ImportError, json.JSONDecodeError, TimeoutError, ValueError) as error:
-        logger.warning("Не удалось получить AI-отчёт: %s", error)
+        if any(result is None for result in results):
+            return None
+        title, intro = _report_shell(report_type)
+        return {
+            "title": title,
+            "intro": intro,
+            "sections": [section for batch in results for section in batch],
+            "disclaimer": (
+                "Материал носит символический и развлекательный характер и "
+                "предназначен для саморефлексии."
+            ),
+        }
+    except (ImportError, ValueError) as error:
+        logger.warning("Не удалось подготовить AI-отчёт: %s", error)
         return None
     except Exception:
-        logger.exception("Неожиданная ошибка генерации AI-отчёта")
+        logger.exception("Неожиданная ошибка при сборке AI-отчёта")
         return None
 
 
