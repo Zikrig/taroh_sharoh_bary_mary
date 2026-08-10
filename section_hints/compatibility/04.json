@@ -1,0 +1,313 @@
+{
+  "schema_version": "section-hint.v1",
+  "section_id": "compatibility.04",
+  "report_type": "compatibility",
+  "title_ru": "Общение",
+  "brief": "как вы разговариваете и слышите друг друга",
+  "prompt_requirements": {
+    "min_words": 150,
+    "max_words": 250,
+    "style_notes": [
+      "Тема раздела: как вы разговариваете и слышите друг друга.",
+      "Минимум воды. Только наблюдения, связанные с фактами карты."
+    ],
+    "avoid_repeating_sections": []
+  },
+  "hint_cards": [
+    {
+      "id": "moon_cancer",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "cancer"
+      },
+      "text_ru": "Луна в Рак: эмоции и чувство безопасности через эмоциональную близость и безопасность.",
+      "priority": 100
+    },
+    {
+      "id": "moon_scorpio",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "scorpio"
+      },
+      "text_ru": "Луна в Скорпион: эмоции и чувство безопасности через глубину и собранность.",
+      "priority": 90
+    },
+    {
+      "id": "mercury_virgo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "virgo"
+      },
+      "text_ru": "Меркурий в Дева: мышление и общение через анализ и внимание к деталям.",
+      "priority": 80
+    },
+    {
+      "id": "moon_aries",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "aries"
+      },
+      "text_ru": "Луна в Овен: эмоции и чувство безопасности через инициативу и прямое действие.",
+      "priority": 0
+    },
+    {
+      "id": "moon_taurus",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "taurus"
+      },
+      "text_ru": "Луна в Телец: эмоции и чувство безопасности через устойчивость и практичность.",
+      "priority": 0
+    },
+    {
+      "id": "moon_gemini",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "gemini"
+      },
+      "text_ru": "Луна в Близнецы: эмоции и чувство безопасности через гибкость и обмен информацией.",
+      "priority": 0
+    },
+    {
+      "id": "moon_leo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "leo"
+      },
+      "text_ru": "Луна в Лев: эмоции и чувство безопасности через самовыражение и признание.",
+      "priority": 0
+    },
+    {
+      "id": "moon_virgo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "virgo"
+      },
+      "text_ru": "Луна в Дева: эмоции и чувство безопасности через анализ и внимание к деталям.",
+      "priority": 0
+    },
+    {
+      "id": "moon_libra",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "libra"
+      },
+      "text_ru": "Луна в Весы: эмоции и чувство безопасности через гармонию и взаимодействие.",
+      "priority": 0
+    },
+    {
+      "id": "moon_sagittarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "sagittarius"
+      },
+      "text_ru": "Луна в Стрелец: эмоции и чувство безопасности через расширение горизонтов и поиск смысла.",
+      "priority": 0
+    },
+    {
+      "id": "moon_capricorn",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "capricorn"
+      },
+      "text_ru": "Луна в Козерог: эмоции и чувство безопасности через дисциплину и долгосрочную цель.",
+      "priority": 0
+    },
+    {
+      "id": "moon_aquarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "aquarius"
+      },
+      "text_ru": "Луна в Водолей: эмоции и чувство безопасности через самостоятельность и нестандартный взгляд.",
+      "priority": 0
+    },
+    {
+      "id": "moon_pisces",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "pisces"
+      },
+      "text_ru": "Луна в Рыбы: эмоции и чувство безопасности через чуткость и образное восприятие.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_aries",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "aries"
+      },
+      "text_ru": "Меркурий в Овен: мышление и общение через инициативу и прямое действие.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_taurus",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "taurus"
+      },
+      "text_ru": "Меркурий в Телец: мышление и общение через устойчивость и практичность.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_gemini",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "gemini"
+      },
+      "text_ru": "Меркурий в Близнецы: мышление и общение через гибкость и обмен информацией.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_cancer",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "cancer"
+      },
+      "text_ru": "Меркурий в Рак: мышление и общение через эмоциональную близость и безопасность.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_leo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "leo"
+      },
+      "text_ru": "Меркурий в Лев: мышление и общение через самовыражение и признание.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_libra",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "libra"
+      },
+      "text_ru": "Меркурий в Весы: мышление и общение через гармонию и взаимодействие.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_scorpio",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "scorpio"
+      },
+      "text_ru": "Меркурий в Скорпион: мышление и общение через глубину и собранность.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_sagittarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "sagittarius"
+      },
+      "text_ru": "Меркурий в Стрелец: мышление и общение через расширение горизонтов и поиск смысла.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_capricorn",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "capricorn"
+      },
+      "text_ru": "Меркурий в Козерог: мышление и общение через дисциплину и долгосрочную цель.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_aquarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "aquarius"
+      },
+      "text_ru": "Меркурий в Водолей: мышление и общение через самостоятельность и нестандартный взгляд.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_pisces",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "pisces"
+      },
+      "text_ru": "Меркурий в Рыбы: мышление и общение через чуткость и образное восприятие.",
+      "priority": 0
+    },
+    {
+      "id": "synastry_moon_conjunction_mercury",
+      "when": {
+        "kind": "synastry_aspect",
+        "first": "moon",
+        "second": "mercury",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Синастрия: Луна — Меркурий: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "synastry_moon_sextile_mercury",
+      "when": {
+        "kind": "synastry_aspect",
+        "first": "moon",
+        "second": "mercury",
+        "aspect": "sextile"
+      },
+      "text_ru": "Синастрия: Луна — Меркурий: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "synastry_moon_square_mercury",
+      "when": {
+        "kind": "synastry_aspect",
+        "first": "moon",
+        "second": "mercury",
+        "aspect": "square"
+      },
+      "text_ru": "Синастрия: Луна — Меркурий: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "synastry_moon_trine_mercury",
+      "when": {
+        "kind": "synastry_aspect",
+        "first": "moon",
+        "second": "mercury",
+        "aspect": "trine"
+      },
+      "text_ru": "Синастрия: Луна — Меркурий: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "synastry_moon_opposition_mercury",
+      "when": {
+        "kind": "synastry_aspect",
+        "first": "moon",
+        "second": "mercury",
+        "aspect": "opposition"
+      },
+      "text_ru": "Синастрия: Луна — Меркурий: оппозиция требует баланса между темами.",
+      "priority": 0
+    }
+  ]
+}

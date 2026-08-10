@@ -1,0 +1,586 @@
+{
+  "schema_version": "section-hints-index.v1",
+  "sections": [
+    {
+      "section_id": "personality_free.01",
+      "report_type": "personality_free",
+      "title_ru": "Твой портрет",
+      "path": "personality_free/01.json",
+      "card_count": 122
+    },
+    {
+      "section_id": "personality_free.02",
+      "report_type": "personality_free",
+      "title_ru": "Какой ты человек",
+      "path": "personality_free/02.json",
+      "card_count": 122
+    },
+    {
+      "section_id": "personality_free.03",
+      "report_type": "personality_free",
+      "title_ru": "Как тебя видят другие",
+      "path": "personality_free/03.json",
+      "card_count": 122
+    },
+    {
+      "section_id": "personality_free.04",
+      "report_type": "personality_free",
+      "title_ru": "Твои сильные стороны",
+      "path": "personality_free/04.json",
+      "card_count": 357
+    },
+    {
+      "section_id": "personality_free.05",
+      "report_type": "personality_free",
+      "title_ru": "Что может тебе мешать",
+      "path": "personality_free/05.json",
+      "card_count": 222
+    },
+    {
+      "section_id": "personality_free.06",
+      "report_type": "personality_free",
+      "title_ru": "Скрытая сторона",
+      "path": "personality_free/06.json",
+      "card_count": 222
+    },
+    {
+      "section_id": "personality_free.07",
+      "report_type": "personality_free",
+      "title_ru": "Любовь",
+      "path": "personality_free/07.json",
+      "card_count": 98
+    },
+    {
+      "section_id": "personality_free.08",
+      "report_type": "personality_free",
+      "title_ru": "Деньги и работа",
+      "path": "personality_free/08.json",
+      "card_count": 171
+    },
+    {
+      "section_id": "personality_free.09",
+      "report_type": "personality_free",
+      "title_ru": "Главная точка роста",
+      "path": "personality_free/09.json",
+      "card_count": 357
+    },
+    {
+      "section_id": "personality.01",
+      "report_type": "personality",
+      "title_ru": "Твой главный психологический портрет",
+      "path": "personality/01.json",
+      "card_count": 122
+    },
+    {
+      "section_id": "personality.02",
+      "report_type": "personality",
+      "title_ru": "Твой внутренний мир",
+      "path": "personality/02.json",
+      "card_count": 90
+    },
+    {
+      "section_id": "personality.03",
+      "report_type": "personality",
+      "title_ru": "Как тебя видят люди",
+      "path": "personality/03.json",
+      "card_count": 122
+    },
+    {
+      "section_id": "personality.04",
+      "report_type": "personality",
+      "title_ru": "Твои сильные стороны",
+      "path": "personality/04.json",
+      "card_count": 357
+    },
+    {
+      "section_id": "personality.05",
+      "report_type": "personality",
+      "title_ru": "Твои сложные стороны",
+      "path": "personality/05.json",
+      "card_count": 222
+    },
+    {
+      "section_id": "personality.06",
+      "report_type": "personality",
+      "title_ru": "Твои скрытые качества",
+      "path": "personality/06.json",
+      "card_count": 357
+    },
+    {
+      "section_id": "personality.07",
+      "report_type": "personality",
+      "title_ru": "Твоё мышление",
+      "path": "personality/07.json",
+      "card_count": 78
+    },
+    {
+      "section_id": "personality.08",
+      "report_type": "personality",
+      "title_ru": "Эмоции и стресс",
+      "path": "personality/08.json",
+      "card_count": 78
+    },
+    {
+      "section_id": "personality.09",
+      "report_type": "personality",
+      "title_ru": "Ты в любви",
+      "path": "personality/09.json",
+      "card_count": 98
+    },
+    {
+      "section_id": "personality.10",
+      "report_type": "personality",
+      "title_ru": "Твои повторяющиеся сценарии",
+      "path": "personality/10.json",
+      "card_count": 222
+    },
+    {
+      "section_id": "personality.11",
+      "report_type": "personality",
+      "title_ru": "Какой партнёр тебе подходит",
+      "path": "personality/11.json",
+      "card_count": 98
+    },
+    {
+      "section_id": "personality.12",
+      "report_type": "personality",
+      "title_ru": "С кем тебе может быть сложно",
+      "path": "personality/12.json",
+      "card_count": 80
+    },
+    {
+      "section_id": "personality.13",
+      "report_type": "personality",
+      "title_ru": "Денежный профиль",
+      "path": "personality/13.json",
+      "card_count": 171
+    },
+    {
+      "section_id": "personality.14",
+      "report_type": "personality",
+      "title_ru": "Карьера и реализация",
+      "path": "personality/14.json",
+      "card_count": 375
+    },
+    {
+      "section_id": "personality.15",
+      "report_type": "personality",
+      "title_ru": "Профессиональные направления",
+      "path": "personality/15.json",
+      "card_count": 375
+    },
+    {
+      "section_id": "personality.16",
+      "report_type": "personality",
+      "title_ru": "Главные блоки",
+      "path": "personality/16.json",
+      "card_count": 222
+    },
+    {
+      "section_id": "personality.17",
+      "report_type": "personality",
+      "title_ru": "Точки роста",
+      "path": "personality/17.json",
+      "card_count": 357
+    },
+    {
+      "section_id": "personality.18",
+      "report_type": "personality",
+      "title_ru": "Что ты можешь не замечать в себе",
+      "path": "personality/18.json",
+      "card_count": 357
+    },
+    {
+      "section_id": "personality.19",
+      "report_type": "personality",
+      "title_ru": "Практические рекомендации",
+      "path": "personality/19.json",
+      "card_count": 357
+    },
+    {
+      "section_id": "personality.20",
+      "report_type": "personality",
+      "title_ru": "Итоговый профиль",
+      "path": "personality/20.json",
+      "card_count": 357
+    },
+    {
+      "section_id": "love.01",
+      "report_type": "love",
+      "title_ru": "Как ты влюбляешься",
+      "path": "love/01.json",
+      "card_count": 98
+    },
+    {
+      "section_id": "love.02",
+      "report_type": "love",
+      "title_ru": "Что вызывает притяжение",
+      "path": "love/02.json",
+      "card_count": 98
+    },
+    {
+      "section_id": "love.03",
+      "report_type": "love",
+      "title_ru": "Что важно чувствовать в отношениях",
+      "path": "love/03.json",
+      "card_count": 98
+    },
+    {
+      "section_id": "love.04",
+      "report_type": "love",
+      "title_ru": "Как ты проявляешь любовь",
+      "path": "love/04.json",
+      "card_count": 98
+    },
+    {
+      "section_id": "love.05",
+      "report_type": "love",
+      "title_ru": "Как ты хочешь получать любовь",
+      "path": "love/05.json",
+      "card_count": 98
+    },
+    {
+      "section_id": "love.06",
+      "report_type": "love",
+      "title_ru": "Что вызывает недоверие",
+      "path": "love/06.json",
+      "card_count": 80
+    },
+    {
+      "section_id": "love.07",
+      "report_type": "love",
+      "title_ru": "Как проявляется ревность",
+      "path": "love/07.json",
+      "card_count": 80
+    },
+    {
+      "section_id": "love.08",
+      "report_type": "love",
+      "title_ru": "Реакция на дистанцию",
+      "path": "love/08.json",
+      "card_count": 98
+    },
+    {
+      "section_id": "love.09",
+      "report_type": "love",
+      "title_ru": "Ты в конфликтах",
+      "path": "love/09.json",
+      "card_count": 80
+    },
+    {
+      "section_id": "love.10",
+      "report_type": "love",
+      "title_ru": "Что трудно сказать партнёру",
+      "path": "love/10.json",
+      "card_count": 98
+    },
+    {
+      "section_id": "love.11",
+      "report_type": "love",
+      "title_ru": "Как ты переживаешь расставание",
+      "path": "love/11.json",
+      "card_count": 80
+    },
+    {
+      "section_id": "love.12",
+      "report_type": "love",
+      "title_ru": "Возвращение к прошлому",
+      "path": "love/12.json",
+      "card_count": 98
+    },
+    {
+      "section_id": "love.13",
+      "report_type": "love",
+      "title_ru": "Повторяющиеся сценарии отношений",
+      "path": "love/13.json",
+      "card_count": 80
+    },
+    {
+      "section_id": "love.14",
+      "report_type": "love",
+      "title_ru": "Какой партнёр тебе подходит",
+      "path": "love/14.json",
+      "card_count": 98
+    },
+    {
+      "section_id": "love.15",
+      "report_type": "love",
+      "title_ru": "С кем может быть сложно",
+      "path": "love/15.json",
+      "card_count": 80
+    },
+    {
+      "section_id": "love.16",
+      "report_type": "love",
+      "title_ru": "Что усиливает отношения",
+      "path": "love/16.json",
+      "card_count": 98
+    },
+    {
+      "section_id": "love.17",
+      "report_type": "love",
+      "title_ru": "Что может разрушать отношения",
+      "path": "love/17.json",
+      "card_count": 80
+    },
+    {
+      "section_id": "love.18",
+      "report_type": "love",
+      "title_ru": "Итоговый любовный портрет",
+      "path": "love/18.json",
+      "card_count": 98
+    },
+    {
+      "section_id": "compatibility.01",
+      "report_type": "compatibility",
+      "title_ru": "Общая динамика пары",
+      "path": "compatibility/01.json",
+      "card_count": 357
+    },
+    {
+      "section_id": "compatibility.02",
+      "report_type": "compatibility",
+      "title_ru": "Эмоциональная совместимость",
+      "path": "compatibility/02.json",
+      "card_count": 12
+    },
+    {
+      "section_id": "compatibility.03",
+      "report_type": "compatibility",
+      "title_ru": "Притяжение",
+      "path": "compatibility/03.json",
+      "card_count": 51
+    },
+    {
+      "section_id": "compatibility.04",
+      "report_type": "compatibility",
+      "title_ru": "Общение",
+      "path": "compatibility/04.json",
+      "card_count": 29
+    },
+    {
+      "section_id": "compatibility.05",
+      "report_type": "compatibility",
+      "title_ru": "Интеллектуальная совместимость",
+      "path": "compatibility/05.json",
+      "card_count": 12
+    },
+    {
+      "section_id": "compatibility.06",
+      "report_type": "compatibility",
+      "title_ru": "Доверие",
+      "path": "compatibility/06.json",
+      "card_count": 222
+    },
+    {
+      "section_id": "compatibility.07",
+      "report_type": "compatibility",
+      "title_ru": "Ревность",
+      "path": "compatibility/07.json",
+      "card_count": 60
+    },
+    {
+      "section_id": "compatibility.08",
+      "report_type": "compatibility",
+      "title_ru": "Личные границы",
+      "path": "compatibility/08.json",
+      "card_count": 51
+    },
+    {
+      "section_id": "compatibility.09",
+      "report_type": "compatibility",
+      "title_ru": "Конфликты",
+      "path": "compatibility/09.json",
+      "card_count": 222
+    },
+    {
+      "section_id": "compatibility.10",
+      "report_type": "compatibility",
+      "title_ru": "Что одного притягивает в другом",
+      "path": "compatibility/10.json",
+      "card_count": 357
+    },
+    {
+      "section_id": "compatibility.11",
+      "report_type": "compatibility",
+      "title_ru": "Что может раздражать",
+      "path": "compatibility/11.json",
+      "card_count": 222
+    },
+    {
+      "section_id": "compatibility.12",
+      "report_type": "compatibility",
+      "title_ru": "Что каждому нужно от другого",
+      "path": "compatibility/12.json",
+      "card_count": 357
+    },
+    {
+      "section_id": "compatibility.13",
+      "report_type": "compatibility",
+      "title_ru": "Сильные стороны пары",
+      "path": "compatibility/13.json",
+      "card_count": 357
+    },
+    {
+      "section_id": "compatibility.14",
+      "report_type": "compatibility",
+      "title_ru": "Сложные стороны",
+      "path": "compatibility/14.json",
+      "card_count": 222
+    },
+    {
+      "section_id": "compatibility.15",
+      "report_type": "compatibility",
+      "title_ru": "Повторяющиеся сценарии",
+      "path": "compatibility/15.json",
+      "card_count": 222
+    },
+    {
+      "section_id": "compatibility.16",
+      "report_type": "compatibility",
+      "title_ru": "Как вам лучше общаться",
+      "path": "compatibility/16.json",
+      "card_count": 51
+    },
+    {
+      "section_id": "compatibility.17",
+      "report_type": "compatibility",
+      "title_ru": "Как улучшить отношения",
+      "path": "compatibility/17.json",
+      "card_count": 357
+    },
+    {
+      "section_id": "compatibility.18",
+      "report_type": "compatibility",
+      "title_ru": "Итоговый портрет пары",
+      "path": "compatibility/18.json",
+      "card_count": 357
+    },
+    {
+      "section_id": "money.01",
+      "report_type": "money",
+      "title_ru": "Отношение к деньгам",
+      "path": "money/01.json",
+      "card_count": 171
+    },
+    {
+      "section_id": "money.02",
+      "report_type": "money",
+      "title_ru": "Что мотивирует зарабатывать",
+      "path": "money/02.json",
+      "card_count": 171
+    },
+    {
+      "section_id": "money.03",
+      "report_type": "money",
+      "title_ru": "Отношение к стабильности",
+      "path": "money/03.json",
+      "card_count": 57
+    },
+    {
+      "section_id": "money.04",
+      "report_type": "money",
+      "title_ru": "Отношение к риску",
+      "path": "money/04.json",
+      "card_count": 78
+    },
+    {
+      "section_id": "money.05",
+      "report_type": "money",
+      "title_ru": "Отношение к ответственности",
+      "path": "money/05.json",
+      "card_count": 51
+    },
+    {
+      "section_id": "money.06",
+      "report_type": "money",
+      "title_ru": "Работа в команде",
+      "path": "money/06.json",
+      "card_count": 90
+    },
+    {
+      "section_id": "money.07",
+      "report_type": "money",
+      "title_ru": "Предпринимательский потенциал",
+      "path": "money/07.json",
+      "card_count": 375
+    },
+    {
+      "section_id": "money.08",
+      "report_type": "money",
+      "title_ru": "Что может мешать финансовому росту",
+      "path": "money/08.json",
+      "card_count": 126
+    },
+    {
+      "section_id": "money.09",
+      "report_type": "money",
+      "title_ru": "Качества, которые можно монетизировать",
+      "path": "money/09.json",
+      "card_count": 375
+    },
+    {
+      "section_id": "money.10",
+      "report_type": "money",
+      "title_ru": "Подходящий рабочий формат",
+      "path": "money/10.json",
+      "card_count": 375
+    },
+    {
+      "section_id": "money.11",
+      "report_type": "money",
+      "title_ru": "Подходящая рабочая среда",
+      "path": "money/11.json",
+      "card_count": 375
+    },
+    {
+      "section_id": "money.12",
+      "report_type": "money",
+      "title_ru": "Риск выгорания",
+      "path": "money/12.json",
+      "card_count": 60
+    },
+    {
+      "section_id": "money.13",
+      "report_type": "money",
+      "title_ru": "Навыки для развития",
+      "path": "money/13.json",
+      "card_count": 375
+    },
+    {
+      "section_id": "money.14",
+      "report_type": "money",
+      "title_ru": "Подходящие направления",
+      "path": "money/14.json",
+      "card_count": 375
+    },
+    {
+      "section_id": "money.15",
+      "report_type": "money",
+      "title_ru": "Почему эти направления подходят",
+      "path": "money/15.json",
+      "card_count": 375
+    },
+    {
+      "section_id": "money.16",
+      "report_type": "money",
+      "title_ru": "Что может мешать реализации",
+      "path": "money/16.json",
+      "card_count": 240
+    },
+    {
+      "section_id": "money.17",
+      "report_type": "money",
+      "title_ru": "Главная точка роста",
+      "path": "money/17.json",
+      "card_count": 357
+    },
+    {
+      "section_id": "money.18",
+      "report_type": "money",
+      "title_ru": "Итоговый денежный профиль",
+      "path": "money/18.json",
+      "card_count": 171
+    }
+  ]
+}

@@ -3,6 +3,7 @@ import json
 import logging
 import re
 from datetime import datetime, timezone
+from hashlib import sha1
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -14,10 +15,25 @@ from services.reports import SECTIONS
 
 logger = logging.getLogger(__name__)
 AI_TIMEOUT_SECONDS = 240.0
-SECTIONS_PER_REQUEST = 3
-MAX_PARALLEL_REQUESTS = 3
-FAILED_BATCH_RETRIES = 1
+MAX_PARALLEL_REQUESTS = 5
+FAILED_BATCH_RETRIES = 2
 PAYLOAD_SAMPLES_DIR = Path("data/payload_samples")
+SECTION_HINTS_DIR = Path(__file__).resolve().parent.parent / "section_hints"
+MAX_HINT_CARDS = 6
+MAX_SECTION_SUMMARY_CHARS = 220
+MAX_CACHED_SECTIONS = 512
+
+# Phrases banned by the product brief: fatalism, guarantees and categorical claims.
+FORBIDDEN_PATTERNS: tuple[tuple[str, str], ...] = (
+    (r"гарантирован", "гарантии результата"),
+    (r"\bсуждено\b", "утверждение о судьбе"),
+    (r"обречен|обречён", "утверждение о безысходности"),
+    (r"(ты|вы|тебе|вам)\s+(точно|обязательно|наверняка|всегда|никогда)", "категоричное утверждение"),
+    (r"(всегда|никогда)\s+(будешь|будете|сможешь|сможете)", "категоричное утверждение"),
+    (r"обязательно\s+(будет|встрет|произойд|получ|станет)", "обещание события"),
+    (r"100\s*%|сто процентов", "обещание вероятности"),
+    (r"\bдиагноз", "медицинская формулировка"),
+)
 
 PERSONAL_PLANETS = frozenset({"Солнце", "Луна", "Меркурий", "Венера", "Марс"})
 SOCIAL_PLANETS = frozenset({"Юпитер", "Сатурн"})
@@ -27,91 +43,117 @@ HARD_ASPECTS = frozenset({"квадрат", "оппозиция"})
 
 # Per-section focus: which facts/chart pieces a batch actually needs.
 # "aspects": "involving" | "all" | "hard" | "none"
+_FOCUS_PERSONAL = {
+    "planets": PERSONAL_PLANETS,
+    "ascendant": True,
+    "aspects": "involving",
+}
+_FOCUS_ALL = {
+    "planets": ALL_PLANETS,
+    "ascendant": True,
+    "aspects": "all",
+    "keep_houses": True,
+}
+_FOCUS_LOVE = {
+    "planets": frozenset({"Венера", "Луна", "Марс", "Солнце"}),
+    "houses": frozenset({5, 7}),
+    "ascendant": True,
+    "aspects": "involving",
+}
+_FOCUS_MONEY = {
+    "planets": frozenset({"Венера", "Юпитер", "Сатурн", "Солнце", "Марс", "Меркурий"}),
+    "houses": frozenset({2, 6, 8, 10}),
+    "aspects": "involving",
+    "career": True,
+    "keep_houses": True,
+}
+_FOCUS_CAREER = {
+    "planets": ALL_PLANETS,
+    "houses": frozenset({2, 6, 10}),
+    "aspects": "involving",
+    "career": True,
+    "keep_houses": True,
+}
+_FOCUS_SYNASTRY = {
+    "planets": ALL_PLANETS,
+    "aspects": "involving",
+    "synastry": True,
+    "ascendant": True,
+}
+
 SECTION_CONTEXT_FOCUS: dict[str, dict[str, Any]] = {
-    "Введение": {
-        "planets": frozenset({"Солнце", "Луна"}),
+    # personality_free
+    "Твой портрет": _FOCUS_PERSONAL,
+    "Какой ты человек": _FOCUS_PERSONAL,
+    "Как тебя видят другие": {**_FOCUS_PERSONAL, "ascendant": True},
+    "Твои сильные стороны": _FOCUS_ALL,
+    "Что может тебе мешать": {**_FOCUS_ALL, "aspects": "hard"},
+    "Скрытая сторона": {**_FOCUS_ALL, "aspects": "hard"},
+    "Любовь": _FOCUS_LOVE,
+    "Деньги и работа": _FOCUS_MONEY,
+    "Главная точка роста": {**_FOCUS_ALL, "career": True},
+    # personality full
+    "Твой главный психологический портрет": _FOCUS_PERSONAL,
+    "Твой внутренний мир": {
+        "planets": frozenset({"Луна", "Нептун", "Венера", "Солнце"}),
         "ascendant": True,
         "aspects": "involving",
     },
-    "Солнечный знак": {
-        "planets": frozenset({"Солнце"}),
+    "Как тебя видят люди": {**_FOCUS_PERSONAL, "ascendant": True},
+    "Твои сложные стороны": {**_FOCUS_ALL, "aspects": "hard"},
+    "Твои скрытые качества": _FOCUS_ALL,
+    "Твоё мышление": {
+        "planets": frozenset({"Меркурий", "Солнце", "Уран", "Сатурн"}),
         "aspects": "involving",
     },
-    "Лунный знак": {
-        "planets": frozenset({"Луна"}),
+    "Эмоции и стресс": {
+        "planets": frozenset({"Луна", "Марс", "Сатурн", "Нептун"}),
         "aspects": "involving",
     },
-    "Асцендент": {
-        "planets": frozenset({"Солнце"}),
-        "ascendant": True,
-        "aspects": "involving",
-    },
-    "Личностные планеты": {
-        "planets": PERSONAL_PLANETS,
-        "aspects": "involving",
-    },
-    "Социальные планеты": {
-        "planets": SOCIAL_PLANETS | frozenset({"Солнце", "Уран"}),
-        "aspects": "involving",
-        "career": True,
-    },
-    "Высшие планеты": {
-        "planets": OUTER_PLANETS,
-        "aspects": "involving",
-        "career": True,
-    },
-    "Дома гороскопа": {
-        "planets": ALL_PLANETS,
-        "ascendant": True,
-        "aspects": "none",
-        "keep_houses": True,
-        "career": True,
-    },
-    "Ключевые аспекты": {
-        "planets": ALL_PLANETS,
-        "aspects": "all",
-    },
-    "Кармические задачи": {
-        "planets": ALL_PLANETS,
-        "aspects": "hard",
-    },
-    "Любовь и отношения": {
-        "planets": frozenset({"Венера", "Луна", "Марс"}),
-        "houses": frozenset({7}),
-        "aspects": "involving",
-    },
-    "Карьера и призвание": {
-        "planets": ALL_PLANETS,
-        "houses": frozenset({2, 6, 10}),
-        "aspects": "involving",
-        "career": True,
-    },
-    "Здоровье и энергия": {
-        "planets": frozenset({"Солнце", "Луна", "Марс"}),
-        "aspects": "involving",
-    },
-    "Таланты и способности": {
-        "planets": ALL_PLANETS,
-        "aspects": "involving",
-        "career": True,
-    },
-    "Заключение": {
-        "planets": frozenset({"Солнце", "Луна", "Сатурн"}),
-        "ascendant": True,
-        "aspects": "involving",
-    },
-    "Общий обзор": {
-        "planets": frozenset({"Солнце", "Луна"}),
-        "aspects": "involving",
-        "synastry": True,
-    },
+    "Ты в любви": _FOCUS_LOVE,
+    "Твои повторяющиеся сценарии": {**_FOCUS_ALL, "aspects": "hard"},
+    "Какой партнёр тебе подходит": _FOCUS_LOVE,
+    "С кем тебе может быть сложно": {**_FOCUS_LOVE, "aspects": "hard"},
+    "Денежный профиль": _FOCUS_MONEY,
+    "Карьера и реализация": _FOCUS_CAREER,
+    "Профессиональные направления": _FOCUS_CAREER,
+    "Главные блоки": {**_FOCUS_ALL, "aspects": "hard"},
+    "Точки роста": {**_FOCUS_ALL, "career": True},
+    "Что ты можешь не замечать в себе": _FOCUS_ALL,
+    "Практические рекомендации": {**_FOCUS_ALL, "career": True},
+    "Итоговый профиль": _FOCUS_ALL,
+    # love
+    "Как ты влюбляешься": _FOCUS_LOVE,
+    "Что вызывает притяжение": _FOCUS_LOVE,
+    "Что важно чувствовать в отношениях": _FOCUS_LOVE,
+    "Как ты проявляешь любовь": _FOCUS_LOVE,
+    "Как ты хочешь получать любовь": _FOCUS_LOVE,
+    "Что вызывает недоверие": {**_FOCUS_LOVE, "aspects": "hard"},
+    "Как проявляется ревность": {**_FOCUS_LOVE, "aspects": "hard"},
+    "Реакция на дистанцию": _FOCUS_LOVE,
+    "Ты в конфликтах": {**_FOCUS_LOVE, "aspects": "hard"},
+    "Что трудно сказать партнёру": _FOCUS_LOVE,
+    "Как ты переживаешь расставание": {**_FOCUS_LOVE, "aspects": "hard"},
+    "Возвращение к прошлому": _FOCUS_LOVE,
+    "Повторяющиеся сценарии отношений": {**_FOCUS_LOVE, "aspects": "hard"},
+    "С кем может быть сложно": {**_FOCUS_LOVE, "aspects": "hard"},
+    "Что усиливает отношения": _FOCUS_LOVE,
+    "Что может разрушать отношения": {**_FOCUS_LOVE, "aspects": "hard"},
+    "Итоговый любовный портрет": _FOCUS_LOVE,
+    # compatibility
+    "Общая динамика пары": _FOCUS_SYNASTRY,
     "Эмоциональная совместимость": {
         "planets": frozenset({"Луна"}),
         "aspects": "involving",
         "synastry": True,
     },
-    "Сексуальная совместимость": {
-        "planets": frozenset({"Венера", "Марс"}),
+    "Притяжение": {
+        "planets": frozenset({"Венера", "Марс", "Солнце"}),
+        "aspects": "involving",
+        "synastry": True,
+    },
+    "Общение": {
+        "planets": frozenset({"Меркурий", "Луна"}),
         "aspects": "involving",
         "synastry": True,
     },
@@ -120,92 +162,71 @@ SECTION_CONTEXT_FOCUS: dict[str, dict[str, Any]] = {
         "aspects": "involving",
         "synastry": True,
     },
-    "Бытовая совместимость": {
-        "planets": frozenset({"Сатурн", "Луна", "Венера"}),
-        "aspects": "involving",
-        "synastry": True,
-    },
-    "Кармические аспекты": {
-        "planets": ALL_PLANETS,
+    "Доверие": {**_FOCUS_SYNASTRY, "aspects": "hard"},
+    "Ревность": {
+        "planets": frozenset({"Венера", "Марс", "Луна", "Плутон"}),
         "aspects": "hard",
         "synastry": True,
     },
-    "Сильные стороны пары": {
-        "planets": ALL_PLANETS,
+    "Личные границы": {
+        "planets": frozenset({"Сатурн", "Луна", "Уран"}),
         "aspects": "involving",
         "synastry": True,
     },
-    "Слабые стороны и риски": {
-        "planets": ALL_PLANETS,
+    "Конфликты": {**_FOCUS_SYNASTRY, "aspects": "hard"},
+    "Что одного притягивает в другом": _FOCUS_SYNASTRY,
+    "Что может раздражать": {**_FOCUS_SYNASTRY, "aspects": "hard"},
+    "Что каждому нужно от другого": _FOCUS_SYNASTRY,
+    "Сильные стороны пары": _FOCUS_SYNASTRY,
+    "Сложные стороны": {**_FOCUS_SYNASTRY, "aspects": "hard"},
+    "Повторяющиеся сценарии": {**_FOCUS_SYNASTRY, "aspects": "hard"},
+    "Как вам лучше общаться": {
+        "planets": frozenset({"Меркурий", "Луна", "Венера"}),
+        "aspects": "involving",
+        "synastry": True,
+    },
+    "Как улучшить отношения": _FOCUS_SYNASTRY,
+    "Итоговый портрет пары": _FOCUS_SYNASTRY,
+    # money
+    "Отношение к деньгам": _FOCUS_MONEY,
+    "Что мотивирует зарабатывать": _FOCUS_MONEY,
+    "Отношение к стабильности": {
+        "planets": frozenset({"Сатурн", "Венера", "Луна"}),
+        "houses": frozenset({2, 8}),
+        "aspects": "involving",
+        "career": True,
+    },
+    "Отношение к риску": {
+        "planets": frozenset({"Марс", "Уран", "Юпитер", "Сатурн"}),
+        "aspects": "involving",
+        "career": True,
+    },
+    "Отношение к ответственности": {
+        "planets": frozenset({"Сатурн", "Солнце", "Марс"}),
+        "aspects": "involving",
+        "career": True,
+    },
+    "Работа в команде": {
+        "planets": frozenset({"Меркурий", "Венера", "Луна", "Солнце"}),
+        "houses": frozenset({6, 7, 11}),
+        "aspects": "involving",
+        "career": True,
+    },
+    "Предпринимательский потенциал": _FOCUS_CAREER,
+    "Что может мешать финансовому росту": {**_FOCUS_MONEY, "aspects": "hard"},
+    "Качества, которые можно монетизировать": _FOCUS_CAREER,
+    "Подходящий рабочий формат": _FOCUS_CAREER,
+    "Подходящая рабочая среда": _FOCUS_CAREER,
+    "Риск выгорания": {
+        "planets": frozenset({"Марс", "Сатурн", "Луна", "Солнце"}),
         "aspects": "hard",
-        "synastry": True,
-    },
-    "Совместимость по знакам": {
-        "planets": frozenset({"Солнце", "Луна", "Венера"}),
-        "aspects": "none",
-        "synastry": True,
-    },
-    "Рекомендации": {
-        "planets": frozenset({"Солнце", "Луна", "Венера", "Марс", "Меркурий"}),
-        "aspects": "involving",
-        "synastry": True,
-    },
-    "Финансовый профиль": {
-        "planets": frozenset({"Венера", "Юпитер", "Сатурн", "Солнце"}),
-        "houses": frozenset({2, 8, 10}),
-        "aspects": "involving",
         "career": True,
     },
-    "Дом денег": {
-        "planets": ALL_PLANETS,
-        "houses": frozenset({2}),
-        "aspects": "involving",
-        "career": True,
-    },
-    "Дом работы и услуг": {
-        "planets": ALL_PLANETS | frozenset({"Меркурий"}),
-        "houses": frozenset({6}),
-        "aspects": "involving",
-        "career": True,
-    },
-    "Дом инвестиций и партнёрских денег": {
-        "planets": ALL_PLANETS,
-        "houses": frozenset({8}),
-        "aspects": "involving",
-    },
-    "Венера и Юпитер": {
-        "planets": frozenset({"Венера", "Юпитер"}),
-        "aspects": "involving",
-        "career": True,
-    },
-    "Сатурн и Плутон": {
-        "planets": frozenset({"Сатурн", "Плутон"}),
-        "aspects": "involving",
-    },
-    "Аспекты к денежным домам": {
-        "planets": ALL_PLANETS,
-        "houses": frozenset({2, 6, 8}),
-        "aspects": "all",
-    },
-    "Кармические установки": {
-        "planets": frozenset({"Сатурн", "Плутон", "Луна", "Венера"}),
-        "aspects": "hard",
-    },
-    "Периоды возможностей": {
-        "planets": frozenset({"Юпитер", "Сатурн", "Солнце"}),
-        "aspects": "involving",
-    },
-    "Лучшие профессии": {
-        "planets": ALL_PLANETS,
-        "houses": frozenset({2, 6, 10}),
-        "aspects": "involving",
-        "career": True,
-    },
-    "Практические советы": {
-        "planets": frozenset({"Венера", "Сатурн", "Меркурий"}),
-        "aspects": "involving",
-        "career": True,
-    },
+    "Навыки для развития": _FOCUS_CAREER,
+    "Подходящие направления": _FOCUS_CAREER,
+    "Почему эти направления подходят": _FOCUS_CAREER,
+    "Что может мешать реализации": {**_FOCUS_CAREER, "aspects": "hard"},
+    "Итоговый денежный профиль": _FOCUS_MONEY,
 }
 DEFAULT_SECTION_FOCUS = {
     "planets": frozenset({"Солнце", "Луна"}),
@@ -214,9 +235,9 @@ DEFAULT_SECTION_FOCUS = {
 }
 
 SYSTEM_PROMPT = """
-Ты — автор персональных астрологических отчётов. Подготовь отчёт строго на русском языке.
-Используй только факты из переданных расчётов: не придумывай положения планет, дома, аспекты
-или события. Обращайся к читателю на «вы», пиши живо, бережно и без повторов.
+Ты — автор одного раздела персонального астрологического отчёта. Пиши строго на русском языке.
+Используй только переданные факты карты и подсказки раздела: не придумывай положения планет,
+дома, аспекты, черты характера или события. Обращайся к читателю на «вы», пиши живо и бережно.
 
 Правила интерпретации:
 — положения планет рассчитаны астрономически; их символические значения интерпретируй
@@ -226,13 +247,13 @@ SYSTEM_PROMPT = """
 — знак показывает, как проявляется планета; дом — в какой сфере жизни это заметнее;
 — аспекты описывают связь тем: соединение усиливает их, тригон — более согласованное
 взаимодействие, квадрат — внутреннее напряжение, оппозиция — необходимость баланса;
-— для каждого раздела выбери только 2–4 наиболее значимых факта из allowed_facts, которые
-соответствуют его теме. Не перечисляй все планеты, дома и аспекты подряд и не подставляй
-случайные или слабые детали ради полноты;
+— выбери только 2–4 наиболее значимых факта из facts, которые соответствуют теме раздела.
+Не перечисляй все планеты, дома и аспекты подряд и не подставляй случайные или слабые
+детали ради полноты;
+— если передан covered_sections, не повторяй мысли, примеры и формулировки уже написанных
+разделов: раскрывай тему этого раздела с новой стороны;
 — сначала объясняй важный паттерн карты, затем связывай его со сферой раздела и давай
 мягкий практический ориентир. Не выдавай интерпретацию за факт;
-— если time_is_approximate равно true, не делай уверенных выводов по домам и Асценденту:
-объясни, что они ориентировочны, либо опирайся на планеты в знаках и аспекты.
 — в разделах о карьере, профессиях, доходе, талантах и способностях называй 2–4 конкретных
 варианта: роль, сферу, тип задач или рабочую среду. Для каждого варианта коротко объясняй,
 какие факты карты на него указывают. Примеры конкретики: UX-исследователь, аналитик данных,
@@ -244,64 +265,126 @@ SYSTEM_PROMPT = """
 гарантировать доход, отношения или будущие события. Астрологические интерпретации подавай
 как символический, развлекательный способ саморефлексии, а не как установленный факт.
 
-Верни только JSON без Markdown в формате:
-{
-  "sections": [{
-    "title": "string",
-    "content": "string",
-    "references": ["точные факты из allowed_facts"]
-  }]
-}
-Верни только запрошенные в этом пакете sections, ровно по одному разу и в том же порядке.
-Для каждого раздела напиши содержательный текст и укажи 1–3 точные строки из allowed_facts,
-на которых основана интерпретация. Объём каждого раздела — от 30 до 140 слов.
-Не используй данные, отсутствующие в allowed_facts.
+Запрещённые формулировки: «гарантированно», «суждено», «обречён», «100%», «ты всегда»,
+«ты никогда», «ты точно», «тебе обязательно», «вы точно», «вам обязательно», «обязательно
+будет», «обязательно встретишь». Вместо них используй «может проявляться», «часто
+связывают», «вероятно», «есть склонность».
+
+Верни только текст раздела: без JSON, Markdown, заголовка, ссылок на факты и комментариев.
+Не используй данные, отсутствующие в переданных фактах.
 """.strip()
 
 SECTION_GUIDANCE = {
+    "personality_free": {
+        "Твой портрет": "4–6 предложений цельного портрета без перечисления черт списком",
+        "Твои сильные стороны": "3 главных качества: что это, как проявляется, где помогает",
+        "Что может тебе мешать": "3 сложности без критики; покажите оборот сильной черты",
+        "Скрытая сторона": "2–3 внутренних противоречия, эмоционально точно",
+        "Любовь": "как влюбляется, что важно получать и что отталкивает",
+        "Деньги и работа": "мотивация, формат работы и отношение к риску без гарантий дохода",
+        "Главная точка роста": "одно ясное направление роста",
+    },
     "personality": {
-        "Асцендент": "опишите первое впечатление и внешний стиль только при точном времени рождения",
-        "Личностные планеты": "свяжите мышление, близость и действия с конкретными сильными навыками",
-        "Социальные планеты": "опишите стиль роста, ответственности и профессиональной реализации",
-        "Высшие планеты": "выделите необычный способ создавать новое, видеть системы или работать с образами",
-        "Дома гороскопа": "используйте темы акцентных домов и профессии-подсказки только при точном времени рождения",
-        "Ключевые аспекты": "возьмите наиболее точные и тематически важные аспекты",
-        "Кармические задачи": "говорите о направлениях осознанного роста, а не о долге или предопределении",
-        "Любовь и отношения": "приоритет — Венера, Луна, Марс и 7 дом при точном времени",
-        "Карьера и призвание": "предложите 2–4 конкретные роли или сферы, тип задач и рабочую среду; каждую рекомендацию свяжите с фактами карты",
-        "Здоровье и энергия": "давайте только бережные общие рекомендации по ресурсу, без диагнозов",
-        "Таланты и способности": "назовите 2–4 наблюдаемых навыка или формата деятельности и объясните их связью нескольких показателей",
+        "Твой главный психологический портрет": "целостный портрет и главное противоречие характера",
+        "Твои сильные стороны": "5–7 качеств: проявление → польза → обратная сторона",
+        "Твои сложные стороны": "5–7 сложностей с путём превращения в ресурс",
+        "Твои скрытые качества": "до 7 неожиданных наблюдений",
+        "Ты в любви": "подробно: влюблённость, ревность, дистанция, конфликт, расставание",
+        "Твои повторяющиеся сценарии": "3–5 сценариев с шагами как изменить",
+        "Профессиональные направления": "8–12 направлений: название, почему подходит, формат",
+        "Практические рекомендации": "7–10 конкретных рекомендаций по карте",
+        "Итоговый профиль": "единый портрет и оригинальная фраза профиля",
+    },
+    "love": {
+        "Как ты влюбляешься": "процесс влюблённости через реальные ситуации",
+        "Итоговый любовный портрет": "сводка без предсказаний встречи или разрыва",
     },
     "compatibility": {
-        "Общий обзор": "сопоставьте Солнца и 1–2 важные синастрические связи",
-        "Эмоциональная совместимость": "приоритет — Луна, её аспекты и взаимная поддержка",
-        "Сексуальная совместимость": "приоритет — Венера, Марс и их аспекты без откровенных деталей",
-        "Интеллектуальная совместимость": "приоритет — Меркурий и его связи с личными планетами",
-        "Бытовая совместимость": "выведите практические договорённости из земных тем и аспектов Сатурна",
-        "Кармические аспекты": "опишите важные повторяющиеся уроки как зоны осознанности, без фатализма",
-        "Сильные стороны пары": "выберите 2–3 гармоничных или поддерживающих показателя",
-        "Слабые стороны и риски": "выберите 1–2 напряжения и сразу дайте способ бережного диалога",
-        "Совместимость по знакам": "сопоставьте стихии и качества Солнца, Луны или Венеры",
-        "Рекомендации": "сформулируйте 3 реалистичных действия из уже названных сильных и слабых сторон",
+        "Общая динамика пары": "динамика без процента совместимости",
+        "Итоговый портрет пары": "сводка без «идеальная пара» и без фатализма",
     },
     "money": {
-        "Финансовый профиль": "объясните способ обращаться с ресурсами через Венеру, Юпитер, Сатурн и дома",
-        "Дом денег": "приоритет — 2 дом, его управитель и планеты в нём только при точном времени",
-        "Дом работы и услуг": "приоритет — 6 дом и Меркурий как стиль ежедневной работы",
-        "Дом инвестиций и партнёрских денег": "приоритет — 8 дом и аспекты к его показателям; без советов инвестировать",
-        "Венера и Юпитер": "опишите ценности, возможности роста и стиль создания дохода без гарантий",
-        "Сатурн и Плутон": "покажите дисциплину, границы и изменения отношения к деньгам без пугающих прогнозов",
-        "Аспекты к денежным домам": "выберите самые точные связи с 2, 6 или 8 домом при точном времени",
-        "Кармические установки": "переведите наблюдения в осознанные привычки, не утверждайте прошлые жизни",
-        "Периоды возможностей": "не называйте даты и не обещайте доход; говорите о готовности к возможностям",
-        "Лучшие профессии": "предложите 2–4 конкретные роли или сферы, тип задач и рабочую среду без гарантии дохода",
-        "Практические советы": "дайте конкретные безопасные привычки: бюджет, навыки, последовательность и границы; не советуйте инвестиции, талисманы или аффирмации как способ заработка",
+        "Подходящие направления": "конкретные роли и сферы без гарантии дохода",
+        "Почему эти направления подходят": "свяжите каждое направление с фактами карты",
+        "Итоговый денежный профиль": "сводка без обещания богатства и без инвестсоветов",
     },
 }
 DEFAULT_SECTION_GUIDANCE = (
     "выберите 2–4 наиболее важных факта, прямо связанных с темой раздела, "
     "и объясните их как единый символический паттерн без перечисления всей карты"
 )
+PLANET_CODES = {
+    "Солнце": "sun",
+    "Луна": "moon",
+    "Меркурий": "mercury",
+    "Венера": "venus",
+    "Марс": "mars",
+    "Юпитер": "jupiter",
+    "Сатурн": "saturn",
+    "Уран": "uranus",
+    "Нептун": "neptune",
+    "Плутон": "pluto",
+}
+SIGN_CODES = {
+    "Овен": "aries",
+    "Телец": "taurus",
+    "Близнецы": "gemini",
+    "Рак": "cancer",
+    "Лев": "leo",
+    "Дева": "virgo",
+    "Весы": "libra",
+    "Скорпион": "scorpio",
+    "Стрелец": "sagittarius",
+    "Козерог": "capricorn",
+    "Водолей": "aquarius",
+    "Рыбы": "pisces",
+}
+ASPECT_CODES = {
+    "соединение": "conjunction",
+    "секстиль": "sextile",
+    "квадрат": "square",
+    "тригон": "trine",
+    "оппозиция": "opposition",
+}
+_SECTION_HINT_INDEX: dict[tuple[str, str], Path] | None = None
+_SECTION_CACHE: dict[str, dict[str, Any]] = {}
+
+
+def _redact_payload_sample(kind: str, payload: Any) -> Any:
+    """Keep debug samples useful without birth dates, coordinates or raw charts."""
+    if kind == "response":
+        text = payload if isinstance(payload, str) else str(payload)
+        return {
+            "word_count": len(text.split()),
+            "preview": text[:400],
+        }
+    if not isinstance(payload, dict):
+        return {"kind": type(payload).__name__}
+    section_payload = payload.get("payload") if "payload" in payload else payload
+    if not isinstance(section_payload, dict):
+        return {"rejection": payload.get("rejection")}
+    section = section_payload.get("section") or {}
+    facts = section_payload.get("facts") or []
+    return {
+        "report_type": section_payload.get("report_type"),
+        "section": {
+            "id": section.get("id"),
+            "title": section.get("title"),
+        },
+        "fact_ids": [
+            fact.get("id")
+            for fact in facts
+            if isinstance(fact, dict) and fact.get("id")
+        ],
+        "interpretation_hints": section_payload.get("interpretation_hints") or [],
+        "covered_sections": [
+            item.get("title")
+            for item in (section_payload.get("covered_sections") or [])
+            if isinstance(item, dict)
+        ],
+        "rejection": payload.get("rejection") if "rejection" in payload else None,
+        "time_is_approximate": section_payload.get("time_is_approximate"),
+    }
 
 
 def _save_payload_sample(
@@ -312,12 +395,14 @@ def _save_payload_sample(
     attempt: int,
     request_id: str,
 ) -> None:
+    if not settings.save_payload_samples:
+        return
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     filename = f"{kind}_{timestamp}_{request_id}_{report_type}_attempt{attempt}.json"
     try:
         PAYLOAD_SAMPLES_DIR.mkdir(parents=True, exist_ok=True)
         (PAYLOAD_SAMPLES_DIR / filename).write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2),
+            json.dumps(_redact_payload_sample(kind, payload), ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
     except (OSError, TypeError, ValueError) as error:
@@ -390,6 +475,8 @@ def _allowed_facts(chart: dict, second_chart: dict | None, report_type: str) -> 
 def build_prompt_payload(report_type: str, chart: dict, second_chart: dict | None) -> dict[str, Any]:
     if report_type not in SECTIONS:
         raise ValueError(f"Неизвестный тип отчёта: {report_type}")
+    if report_type == "compatibility" and second_chart is None:
+        raise ValueError("Для отчёта о совместимости нужны обе карты.")
     primary_chart = _chart_for_prompt(chart)
     partner_chart = _chart_for_prompt(second_chart) if second_chart else None
     synastry_aspects = calculate_synastry(chart, second_chart) if second_chart else []
@@ -418,17 +505,15 @@ def build_prompt_payload(report_type: str, chart: dict, second_chart: dict | Non
         ),
         "career_and_talent_hints": build_career_hints(
             chart,
-            include_houses=not chart["time_is_approximate"],
+            include_houses=True,
         ),
     }
     return payload
 
 
 def _section_batches(sections: list[dict[str, str]]) -> list[list[dict[str, str]]]:
-    return [
-        sections[index:index + SECTIONS_PER_REQUEST]
-        for index in range(0, len(sections), SECTIONS_PER_REQUEST)
-    ]
+    """Compatibility helper: production sends exactly one section per request."""
+    return [[section] for section in sections]
 
 
 def _merge_focus(titles: list[str]) -> dict[str, Any]:
@@ -582,6 +667,157 @@ def build_batch_payload(
     return batch_payload
 
 
+def _section_hint_paths() -> dict[tuple[str, str], Path]:
+    global _SECTION_HINT_INDEX
+    if _SECTION_HINT_INDEX is not None:
+        return _SECTION_HINT_INDEX
+    try:
+        index = json.loads((SECTION_HINTS_DIR / "index.json").read_text(encoding="utf-8"))
+        _SECTION_HINT_INDEX = {
+            (item["report_type"], item["title_ru"]): SECTION_HINTS_DIR / item["path"]
+            for item in index["sections"]
+        }
+    except (OSError, KeyError, TypeError, json.JSONDecodeError) as error:
+        raise ValueError(f"Не удалось загрузить JSON-подсказки разделов: {error}") from error
+    return _SECTION_HINT_INDEX
+
+
+def _load_section_hint(report_type: str, title: str) -> dict[str, Any]:
+    path = _section_hint_paths().get((report_type, title))
+    if path is None:
+        raise ValueError(f"Не найдена JSON-подсказка для раздела «{title}».")
+    try:
+        hint = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"Не удалось прочитать JSON-подсказку {path.name}: {error}") from error
+    if hint.get("report_type") != report_type or hint.get("title_ru") != title:
+        raise ValueError(f"Некорректная JSON-подсказка для раздела «{title}».")
+    return hint
+
+
+def _canonical_facts(section_payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Build code-based facts while keeping Russian text only for the model."""
+    facts: list[dict[str, Any]] = []
+    charts = (
+        ("primary", section_payload.get("primary_chart")),
+        ("partner", section_payload.get("partner_chart")),
+    )
+    for scope, chart in charts:
+        if chart is None:
+            continue
+        label = "Карта 1: " if scope == "primary" and section_payload["report_type"] == "compatibility" else ""
+        if scope == "partner":
+            label = "Карта 2: "
+        for planet, position in (chart.get("planets") or {}).items():
+            planet_code = PLANET_CODES.get(planet)
+            sign_code = SIGN_CODES.get(position.get("sign"))
+            if not planet_code or not sign_code:
+                continue
+            facts.append({
+                "id": f"{scope}.planet.{planet_code}.sign.{sign_code}",
+                "scope": scope,
+                "kind": "planet_sign",
+                "planet": planet_code,
+                "sign": sign_code,
+                "house": position.get("house"),
+                "text_ru": f"{label}{planet} в {position['sign']}, дом {position['house']}",
+            })
+        ascendant = chart.get("ascendant") or {}
+        ascendant_sign = SIGN_CODES.get(ascendant.get("sign"))
+        if ascendant_sign:
+            facts.append({
+                "id": f"{scope}.ascendant.{ascendant_sign}",
+                "scope": scope,
+                "kind": "ascendant",
+                "sign": ascendant_sign,
+                "text_ru": f"{label}Асцендент в {ascendant['sign']}",
+            })
+        for aspect in chart.get("aspects") or []:
+            first_code = PLANET_CODES.get(aspect.get("first"))
+            second_code = PLANET_CODES.get(aspect.get("second"))
+            aspect_code = ASPECT_CODES.get(aspect.get("type"))
+            if not first_code or not second_code or not aspect_code:
+                continue
+            facts.append({
+                "id": f"{scope}.aspect.{first_code}.{aspect_code}.{second_code}",
+                "scope": scope,
+                "kind": "aspect",
+                "first": first_code,
+                "second": second_code,
+                "aspect": aspect_code,
+                "text_ru": f"{label}{aspect['first']} {aspect['type']} {aspect['second']}",
+            })
+    for aspect in section_payload.get("synastry_aspects") or []:
+        first_code = PLANET_CODES.get(aspect.get("first"))
+        second_code = PLANET_CODES.get(aspect.get("second"))
+        aspect_code = ASPECT_CODES.get(aspect.get("type"))
+        if not first_code or not second_code or not aspect_code:
+            continue
+        facts.append({
+            "id": f"synastry.{first_code}.{aspect_code}.{second_code}",
+            "kind": "synastry_aspect",
+            "first": first_code,
+            "second": second_code,
+            "aspect": aspect_code,
+            "text_ru": f"Синастрия: {aspect['first']} {aspect['type']} {aspect['second']}",
+        })
+    return facts
+
+
+def _card_priority(card: dict[str, Any]) -> int:
+    priority = card.get("priority")
+    return priority if isinstance(priority, int) else 0
+
+
+def _selected_hint_cards(hint: dict[str, Any], facts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    selected = []
+    for card in hint.get("hint_cards") or []:
+        text = card.get("text_ru")
+        if not isinstance(text, str) or not text.strip():
+            continue
+        condition = card.get("when") or {}
+        if not condition or any(
+            all(fact.get(key) == value for key, value in condition.items())
+            for fact in facts
+        ):
+            selected.append(card)
+    selected.sort(key=_card_priority, reverse=True)
+    return selected[:MAX_HINT_CARDS]
+
+
+def build_section_payload(
+    payload: dict[str, Any],
+    section: dict[str, str],
+    covered_sections: list[dict[str, str]] | None = None,
+) -> dict[str, Any]:
+    """Build the full prompt context for exactly one report section."""
+    section_payload = build_batch_payload(payload, [section])
+    hint = _load_section_hint(payload["report_type"], section["title"])
+    facts = _canonical_facts(section_payload)
+    selected_cards = _selected_hint_cards(hint, facts)
+    requirements = hint.get("prompt_requirements") or {}
+    built = {
+        "report_type": payload["report_type"],
+        "section": {
+            "id": hint["section_id"],
+            "title": hint["title_ru"],
+            "brief": hint.get("brief", section["brief"]),
+            "guidance": section["guidance"],
+            "requirements": requirements,
+        },
+        "facts": facts,
+        "allowed_facts": section_payload["allowed_facts"],
+        "interpretation_hints": [card["text_ru"] for card in selected_cards],
+        "career_and_talent_hints": section_payload.get("career_and_talent_hints"),
+        "time_is_approximate": bool(
+            (section_payload.get("primary_chart") or {}).get("time_is_approximate")
+        ),
+    }
+    if covered_sections:
+        built["covered_sections"] = covered_sections
+    return built
+
+
 def _normalize_fact(text: str) -> str:
     """Remove noise from a fact string for robust comparison."""
     if not isinstance(text, str):
@@ -641,14 +877,87 @@ def _validate_batch(
     return normalized_results
 
 
+def _forbidden_phrases(text: str) -> list[str]:
+    lowered = text.lower()
+    found = []
+    for pattern, label in FORBIDDEN_PATTERNS:
+        if re.search(pattern, lowered) and label not in found:
+            found.append(label)
+    return found
+
+
+def _validate_section(
+    content: Any,
+    section: dict[str, Any],
+    allowed_facts: list[str],
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Check one plain-text section and explain why it was rejected."""
+    if not isinstance(content, str) or not content.strip():
+        return None, "модель вернула пустой ответ"
+    normalized = content.strip()
+    requirements = section.get("requirements") or {}
+    min_words = requirements.get("min_words", 30)
+    max_words = requirements.get("max_words")
+    word_count = len(normalized.split())
+    if word_count < min_words:
+        return None, f"в тексте {word_count} слов, нужно не меньше {min_words}"
+    if isinstance(max_words, int) and word_count > max_words:
+        return None, f"в тексте {word_count} слов, нужно не больше {max_words}"
+    # forbidden = _forbidden_phrases(normalized)
+    # if forbidden:
+    #     return None, "недопустимые формулировки: " + ", ".join(forbidden)
+    return {
+        "title": section["title"],
+        "content": normalized,
+        # References are selected by the application, not requested from the model.
+        "references": allowed_facts[:3],
+    }, None
+
+
+def _section_summary(text: str) -> str:
+    """Condense a finished section so later sections can avoid repeating it."""
+    collapsed = re.sub(r"\s+", " ", text).strip()
+    if len(collapsed) <= MAX_SECTION_SUMMARY_CHARS:
+        return collapsed
+    trimmed = collapsed[:MAX_SECTION_SUMMARY_CHARS].rsplit(" ", 1)[0]
+    return f"{trimmed}…"
+
+
+def _section_cache_key(section_payload: dict[str, Any]) -> str:
+    material = json.dumps(
+        {
+            "report_type": section_payload["report_type"],
+            "section": section_payload["section"],
+            "facts": [fact["id"] for fact in section_payload["facts"]],
+            "hints": section_payload["interpretation_hints"],
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    return sha1(material.encode("utf-8")).hexdigest()
+
+
+def _remember_section(key: str, section: dict[str, Any]) -> None:
+    """Keep validated sections so a repeated report request does not pay for them twice."""
+    if key in _SECTION_CACHE:
+        return
+    while len(_SECTION_CACHE) >= MAX_CACHED_SECTIONS:
+        _SECTION_CACHE.pop(next(iter(_SECTION_CACHE)))
+    _SECTION_CACHE[key] = section
+
+
 def _report_shell(report_type: str) -> tuple[str, str]:
     titles = {
+        "personality_free": "Ваш бесплатный персональный разбор",
         "personality": "Ваш персональный разбор",
+        "love": "Ваш любовный портрет",
         "compatibility": "Потенциал вашей совместимости",
         "money": "Ваш денежный код",
     }
     intros = {
+        "personality_free": "Ниже — короткий символический портрет по вашей натальной карте.",
         "personality": "Ниже — ключевые символические темы вашей натальной карты.",
+        "love": "Ниже — ключевые символические темы вашего стиля любви и близости.",
         "compatibility": "Ниже — ключевые символические темы взаимодействия вашей пары.",
         "money": "Ниже — ключевые символические темы вашего отношения к ресурсам и реализации.",
     }
@@ -658,7 +967,7 @@ def _report_shell(report_type: str) -> tuple[str, str]:
 async def generate_report_content(
     report_type: str, chart: dict, second_chart: dict | None = None
 ) -> dict[str, Any] | None:
-    """Generate independent section batches and combine their validated results."""
+    """Generate independent sections concurrently and combine their text."""
     if not settings.ai_api_key:
         return None
     try:
@@ -673,17 +982,37 @@ async def generate_report_content(
         payload = build_prompt_payload(report_type, chart, second_chart)
         semaphore = asyncio.Semaphore(MAX_PARALLEL_REQUESTS)
 
-        async def generate_batch(batch: list[dict[str, str]]) -> list[dict[str, Any]] | None:
-            batch_payload = build_batch_payload(payload, batch)
-            expected_titles = [section["title"] for section in batch]
-            batch_allowed_facts = set(batch_payload["allowed_facts"])
+        async def generate_section(
+            section: dict[str, str],
+            covered_sections: list[dict[str, str]],
+        ) -> dict[str, Any] | None:
+            section_payload = build_section_payload(payload, section, covered_sections)
+            cache_key = _section_cache_key(section_payload)
+            cached = _SECTION_CACHE.get(cache_key)
+            if cached:
+                return cached
             request_id = uuid4().hex
+            rejection: str | None = None
             for attempt in range(FAILED_BATCH_RETRIES + 1):
                 try:
-                    user_payload = json.dumps(batch_payload, ensure_ascii=False)
+                    messages = [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {
+                            "role": "user",
+                            "content": json.dumps(section_payload, ensure_ascii=False),
+                        },
+                    ]
+                    if rejection:
+                        messages.append({
+                            "role": "user",
+                            "content": (
+                                f"Предыдущий вариант отклонён: {rejection}. "
+                                "Исправь именно это и верни только текст раздела."
+                            ),
+                        })
                     _save_payload_sample(
                         "request",
-                        batch_payload,
+                        {"payload": section_payload, "rejection": rejection},
                         report_type=report_type,
                         attempt=attempt + 1,
                         request_id=request_id,
@@ -691,65 +1020,66 @@ async def generate_report_content(
                     async with semaphore:
                         response = await client.chat.completions.create(
                             model=settings.ai_model,
-                            response_format={"type": "json_object"},
-                            messages=[
-                                {"role": "system", "content": SYSTEM_PROMPT},
-                                {
-                                    "role": "user",
-                                    "content": user_payload,
-                                },
-                            ],
+                            messages=messages,
                         )
                     raw_content = response.choices[0].message.content
-                    response_payload: Any = raw_content or ""
-                    if raw_content:
-                        try:
-                            response_payload = json.loads(raw_content)
-                        except json.JSONDecodeError:
-                            pass
                     _save_payload_sample(
                         "response",
-                        response_payload,
+                        raw_content or "",
                         report_type=report_type,
                         attempt=attempt + 1,
                         request_id=request_id,
                     )
-                    if raw_content:
-                        validated = _validate_batch(
-                            json.loads(raw_content),
-                            expected_titles,
-                            batch_allowed_facts,
-                        )
-                        if validated:
-                            return validated
-                    logger.warning(
-                        "AI вернул неполный пакет разделов %s, попытка %s",
-                        expected_titles,
-                        attempt + 1,
+                    validated, rejection = _validate_section(
+                        raw_content,
+                        section_payload["section"],
+                        section_payload["allowed_facts"],
                     )
-                except (json.JSONDecodeError, TimeoutError, ValueError) as error:
+                    if validated:
+                        _remember_section(cache_key, validated)
+                        return validated
                     logger.warning(
-                        "Не удалось получить пакет разделов %s: %s",
-                        expected_titles,
+                        "AI вернул некорректный текст раздела «%s», попытка %s: %s",
+                        section["title"],
+                        attempt + 1,
+                        rejection,
+                    )
+                except (TimeoutError, ValueError) as error:
+                    logger.warning(
+                        "Не удалось получить раздел «%s»: %s",
+                        section["title"],
                         error,
                     )
                 except Exception:
                     logger.exception(
-                        "Неожиданная ошибка при генерации пакета разделов %s",
-                        expected_titles,
+                        "Неожиданная ошибка при генерации раздела «%s»",
+                        section["title"],
                     )
             return None
 
-        results = await asyncio.gather(
-            *(generate_batch(batch) for batch in _section_batches(payload["sections"]))
-        )
-        if any(result is None for result in results):
-            return None
+        sections = payload["sections"]
+        results: list[dict[str, Any]] = []
+        covered: list[dict[str, str]] = []
+        # Waves keep the existing concurrency limit while letting each section
+        # see what previous sections already covered.
+        for start in range(0, len(sections), MAX_PARALLEL_REQUESTS):
+            wave = sections[start:start + MAX_PARALLEL_REQUESTS]
+            snapshot = list(covered)
+            wave_results = await asyncio.gather(
+                *(generate_section(section, snapshot) for section in wave)
+            )
+            if any(result is None for result in wave_results):
+                return None
+            results.extend(wave_results)
+            covered.extend(
+                {"title": result["title"], "summary": _section_summary(result["content"])}
+                for result in wave_results
+            )
         title, intro = _report_shell(report_type)
         return {
             "title": title,
             "intro": intro,
-            "sections": [section for batch in results for section in batch],
+            "sections": results,
             "disclaimer": (
                 "Материал носит символический и развлекательный характер и "
                 "предназначен для саморефлексии."

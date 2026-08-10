@@ -1,0 +1,138 @@
+{
+  "schema_version": "section-hint.v1",
+  "section_id": "compatibility.02",
+  "report_type": "compatibility",
+  "title_ru": "Эмоциональная совместимость",
+  "brief": "чувства, поддержка и отклик",
+  "prompt_requirements": {
+    "min_words": 150,
+    "max_words": 250,
+    "style_notes": [
+      "Тема раздела: чувства, поддержка и отклик.",
+      "Минимум воды. Только наблюдения, связанные с фактами карты."
+    ],
+    "avoid_repeating_sections": []
+  },
+  "hint_cards": [
+    {
+      "id": "moon_cancer",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "cancer"
+      },
+      "text_ru": "Луна в Рак: эмоции и чувство безопасности через эмоциональную близость и безопасность.",
+      "priority": 100
+    },
+    {
+      "id": "moon_scorpio",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "scorpio"
+      },
+      "text_ru": "Луна в Скорпион: эмоции и чувство безопасности через глубину и собранность.",
+      "priority": 90
+    },
+    {
+      "id": "moon_aries",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "aries"
+      },
+      "text_ru": "Луна в Овен: эмоции и чувство безопасности через инициативу и прямое действие.",
+      "priority": 50
+    },
+    {
+      "id": "moon_taurus",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "taurus"
+      },
+      "text_ru": "Луна в Телец: эмоции и чувство безопасности через устойчивость и практичность.",
+      "priority": 0
+    },
+    {
+      "id": "moon_gemini",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "gemini"
+      },
+      "text_ru": "Луна в Близнецы: эмоции и чувство безопасности через гибкость и обмен информацией.",
+      "priority": 0
+    },
+    {
+      "id": "moon_leo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "leo"
+      },
+      "text_ru": "Луна в Лев: эмоции и чувство безопасности через самовыражение и признание.",
+      "priority": 0
+    },
+    {
+      "id": "moon_virgo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "virgo"
+      },
+      "text_ru": "Луна в Дева: эмоции и чувство безопасности через анализ и внимание к деталям.",
+      "priority": 0
+    },
+    {
+      "id": "moon_libra",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "libra"
+      },
+      "text_ru": "Луна в Весы: эмоции и чувство безопасности через гармонию и взаимодействие.",
+      "priority": 0
+    },
+    {
+      "id": "moon_sagittarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "sagittarius"
+      },
+      "text_ru": "Луна в Стрелец: эмоции и чувство безопасности через расширение горизонтов и поиск смысла.",
+      "priority": 0
+    },
+    {
+      "id": "moon_capricorn",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "capricorn"
+      },
+      "text_ru": "Луна в Козерог: эмоции и чувство безопасности через дисциплину и долгосрочную цель.",
+      "priority": 0
+    },
+    {
+      "id": "moon_aquarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "aquarius"
+      },
+      "text_ru": "Луна в Водолей: эмоции и чувство безопасности через самостоятельность и нестандартный взгляд.",
+      "priority": 0
+    },
+    {
+      "id": "moon_pisces",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "pisces"
+      },
+      "text_ru": "Луна в Рыбы: эмоции и чувство безопасности через чуткость и образное восприятие.",
+      "priority": 0
+    }
+  ]
+}

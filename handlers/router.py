@@ -36,26 +36,26 @@ from database.repository import (
 from services.reports import generate_report
 
 router = Router()
-PRICES = {"personality": 349, "compatibility": 449, "money": 399}
+PRICES = {"personality": 349, "love": 399, "compatibility": 449, "money": 399}
 NAMES = {
     "personality": "Разбор личности",
+    "love": "Любовь и отношения",
     "compatibility": "Совместимость",
     "money": "Деньги и реализация",
-}
-STUB_SCENARIOS = {
-    "love": "❤️ Любовь и отношения",
-    "full": "✨ Полный разбор",
 }
 PENDING_REPORTS: dict[int, tuple[dict, dict | None]] = {}
 REPORT_PROGRESS_TEXT = "🔮 Формирую ваш персональный результат"
 SCENARIO_INTROS = {
     "personality": (
         "🧠 РАЗБОР ЛИЧНОСТИ\n\n"
-        "Здесь вы узнаете не только свой знак зодиака. Мы разберём ваши особенности, "
-        "сильные стороны, внутренние противоречия, мотивацию и то, что может мешать "
-        "вам реализовываться.\n\n"
-        "Сначала покажу небольшой ознакомительный фрагмент, чтобы вы почувствовали "
-        "точность персонального подхода. Затем можно будет открыть полный разбор."
+        "Сначала подготовлю бесплатный мини-разбор по вашим данным — чтобы вы "
+        "почувствовали персональный подход. Затем можно открыть полный разбор "
+        "личности, отношений, денег и точек роста."
+    ),
+    "love": (
+        "❤️ ЛЮБОВЬ И ОТНОШЕНИЯ\n\n"
+        "Разберём, как вы влюбляетесь, что важно в близости, как вы реагируете "
+        "на конфликт и какой стиль партнёра может вам подходить."
     ),
     "compatibility": (
         "💑 СОВМЕСТИМОСТЬ\n\n"
@@ -70,27 +70,15 @@ SCENARIO_INTROS = {
     ),
 }
 TEASER_TEXTS = {
-    "personality": (
-        "✨ ТВОЙ ПЕРСОНАЛЬНЫЙ ПРОФИЛЬ\n\n"
-        "🧠 КАКОЙ ТЫ ЧЕЛОВЕК\n"
-        "Ты можешь производить впечатление более спокойного и уверенного человека, "
-        "чем ощущаешь себя внутри. Тебе важно самостоятельно принимать решения, "
-        "но мнение действительно близких людей может влиять на тебя сильнее, чем ты показываешь.\n\n"
-        "✨ ТВОЯ СИЛЬНАЯ СТОРОНА\n"
-        "Ты умеешь адаптироваться к новым обстоятельствам и искать решение, "
-        "когда другие начинают теряться.\n\n"
-        "⚠️ ЧТО МОЖЕТ ТЕБЕ МЕШАТЬ\n"
-        "Иногда ты слишком долго пытаешься разобраться со всем самостоятельно "
-        "и откладываешь момент, когда можно попросить о помощи.\n\n"
-        "👀 КАК ТЕБЯ ВИДЯТ ЛЮДИ\n"
-        "Со стороны ты можешь казаться более независимым и невозмутимым, "
-        "чем являешься на самом деле.\n\n"
-        "❤️ ТЫ В ОТНОШЕНИЯХ\n"
-        "Тебе важно чувствовать эмоциональную безопасность и понимать, "
-        "что человек действительно выбирает тебя.\n\n"
-        "💰 ТЫ И ДЕНЬГИ\n"
-        "Твой потенциал сильнее раскрывается там, где ты можешь влиять на результат, "
-        "а не только выполнять чужие инструкции."
+    "love": (
+        "✨ ТВОЙ ЛЮБОВНЫЙ ПРОФИЛЬ\n\n"
+        "❤️ КАК ТЫ ВЛЮБЛЯЕШЬСЯ\n"
+        "Тебе важно чувствовать эмоциональный отклик и понимать, что тебя выбирают "
+        "осознанно, а не по инерции.\n\n"
+        "🔥 ПРИТЯЖЕНИЕ\n"
+        "Сильнее цепляет сочетание тепла и самостоятельности в другом человеке.\n\n"
+        "⚠️ ЗОНА ВНИМАНИЯ\n"
+        "Иногда ты можешь дольше молчать о важном, чем хотелось бы партнёру."
     ),
     "money": (
         "✨ ТВОЙ ДЕНЕЖНЫЙ ПРОФИЛЬ\n\n"
@@ -143,10 +131,9 @@ async def menu(user_id: int):
     has_profile = await get_profile(user_id) is not None
     builder = InlineKeyboardBuilder()
     builder.button(text="🧠 Личность", callback_data="scenario:personality")
-    builder.button(text="❤️ Любовь и отношения", callback_data="stub:love")
+    builder.button(text="❤️ Любовь и отношения", callback_data="scenario:love")
     builder.button(text="💰 Деньги и реализация", callback_data="scenario:money")
     builder.button(text="💑 Совместимость", callback_data="scenario:compatibility")
-    builder.button(text="✨ Полный разбор", callback_data="stub:full")
     builder.button(text="📤 Поделиться", switch_inline_query=share_text)
     if has_profile:
         builder.button(text="✏️ Изменить данные", callback_data="edit_profile")
@@ -165,8 +152,7 @@ async def get_main_menu_text() -> str:
         "🧠 какой вы человек на самом деле\n"
         "❤️ как вы любите и кого выбираете\n"
         "💰 где раскрывается ваш потенциал реализации\n"
-        "💑 что происходит между вами и конкретным человеком\n"
-        "✨ или получить полный разбор личности\n\n"
+        "💑 что происходит между вами и конкретным человеком\n\n"
         "Выберите, что вам интересно 👇"
     )
 
@@ -634,21 +620,11 @@ async def ask_own_data(message: Message, state: FSMContext, scenario: str, user_
 @router.callback_query(F.data.startswith("scenario:"))
 async def scenario(callback: CallbackQuery, state: FSMContext):
     scenario_name = callback.data.split(":", 1)[1]
+    if scenario_name not in PRICES:
+        await callback.answer("Этот сценарий пока недоступен.", show_alert=True)
+        return
     await callback.answer()
     await ask_own_data(callback.message, state, scenario_name, callback.from_user.id)
-
-
-@router.callback_query(F.data.startswith("stub:"))
-async def scenario_stub(callback: CallbackQuery):
-    scenario_name = callback.data.split(":", 1)[1]
-    title = STUB_SCENARIOS.get(scenario_name, "Этот раздел")
-    await callback.answer()
-    await callback.message.answer(
-        f"{title}\n\n"
-        "Этот формат уже в планах и скоро появится в боте. "
-        "Пока можно выбрать один из доступных персональных разборов 👇",
-        reply_markup=await menu(callback.from_user.id),
-    )
 
 
 @router.message(BirthStates.own_date)
@@ -866,20 +842,51 @@ async def show_teaser(
 ):
     PENDING_REPORTS[user_id] = (chart, second_chart)
     builder = InlineKeyboardBuilder()
-    builder.button(text=f"🔓 Получить полный PDF · {PRICES[scenario_name]}⭐",
-                   callback_data=f"buy:{scenario_name}")
+    builder.button(
+        text=f"🔓 Получить полный PDF · {PRICES[scenario_name]}⭐",
+        callback_data=f"buy:{scenario_name}",
+    )
     builder.button(text="⬅️ Назад", callback_data="back:menu")
     builder.adjust(1)
+
+    if scenario_name == "personality":
+        await message.answer("Готовлю ваш бесплатный персональный мини-разбор…")
+        free_content = None
+        async with report_status_animation(message) as mark_completed:
+            free_content = await generate_report_content("personality_free", chart, None)
+            if free_content:
+                mark_completed()
+        if free_content:
+            await message.answer(
+                f"<b>{free_content['title']}</b>\n{free_content['intro']}",
+                parse_mode=ParseMode.HTML,
+            )
+            for section in free_content["sections"]:
+                text = (
+                    f"<b>{section['title']}</b>\n\n"
+                    f"{section['content']}"
+                )
+                if len(text) > 4000:
+                    text = text[:3990] + "…"
+                await message.answer(text, parse_mode=ParseMode.HTML)
+            await message.answer(
+                "Это бесплатный мини-разбор. Полный PDF раскрывает любовь, деньги, "
+                "сценарии, блоки и практические рекомендации глубже.",
+                reply_markup=builder.as_markup(),
+            )
+            return
+        await message.answer(
+            "Не удалось сформировать бесплатный разбор прямо сейчас. "
+            "Можно сразу открыть полный PDF — он строится индивидуально по вашим данным.",
+            reply_markup=builder.as_markup(),
+        )
+        return
+
     await message.answer(
         f"{TEASER_TEXTS[scenario_name]}\n\n"
         "🔐 ЭТО ТОЛЬКО ВЕРХНИЙ СЛОЙ ПРОФИЛЯ\n"
-        "В полном разборе можно посмотреть:\n"
-        "❤️ сценарии отношений и тип подходящего партнёра\n"
-        "🧠 скрытые качества и внутренние противоречия\n"
-        "💰 денежный профиль и рабочие направления\n"
-        "🎯 точки роста и практические рекомендации\n"
-        "✨ подробный итоговый профиль\n\n"
-        "Твой персональный результат будет сформирован по твоим данным рождения.",
+        "В полном разборе можно посмотреть более глубокий персональный анализ "
+        "по вашим данным рождения.",
         reply_markup=builder.as_markup(),
     )
 
@@ -966,6 +973,15 @@ async def deliver_report(
     charts = await get_report_context(order_id) or PENDING_REPORTS.pop(user_id, None)
     if charts:
         chart, second_chart = charts
+    elif scenario_name == "compatibility":
+        # The partner chart cannot be restored from the profile: never fall back to one chart.
+        await set_order_status(order_id, "report_pending")
+        await message.answer(
+            "Данные партнёра не сохранились, а разбор совместимости без них сделать нельзя. "
+            "Оплата сохранена — выберите сценарий заново и введите данные партнёра.",
+            reply_markup=back_to_menu(),
+        )
+        return
     else:
         profile = await get_profile(user_id)
         if not profile:

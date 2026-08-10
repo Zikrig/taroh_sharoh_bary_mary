@@ -1,0 +1,3680 @@
+{
+  "schema_version": "section-hint.v1",
+  "section_id": "personality.20",
+  "report_type": "personality",
+  "title_ru": "Итоговый профиль",
+  "brief": "единый портрет и ключевая фраза",
+  "prompt_requirements": {
+    "min_words": 150,
+    "max_words": 250,
+    "style_notes": [
+      "Тема раздела: единый портрет и ключевая фраза.",
+      "Минимум воды. Только наблюдения, связанные с фактами карты."
+    ],
+    "avoid_repeating_sections": []
+  },
+  "hint_cards": [
+    {
+      "id": "sun_aries",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "sun",
+        "sign": "aries"
+      },
+      "text_ru": "Солнце в Овен: воля и самовыражение через инициативу и прямое действие.",
+      "priority": 100
+    },
+    {
+      "id": "sun_leo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "sun",
+        "sign": "leo"
+      },
+      "text_ru": "Солнце в Лев: воля и самовыражение через самовыражение и признание.",
+      "priority": 90
+    },
+    {
+      "id": "moon_cancer",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "cancer"
+      },
+      "text_ru": "Луна в Рак: эмоции и чувство безопасности через эмоциональную близость и безопасность.",
+      "priority": 80
+    },
+    {
+      "id": "sun_taurus",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "sun",
+        "sign": "taurus"
+      },
+      "text_ru": "Солнце в Телец: воля и самовыражение через устойчивость и практичность.",
+      "priority": 0
+    },
+    {
+      "id": "sun_gemini",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "sun",
+        "sign": "gemini"
+      },
+      "text_ru": "Солнце в Близнецы: воля и самовыражение через гибкость и обмен информацией.",
+      "priority": 0
+    },
+    {
+      "id": "sun_cancer",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "sun",
+        "sign": "cancer"
+      },
+      "text_ru": "Солнце в Рак: воля и самовыражение через эмоциональную близость и безопасность.",
+      "priority": 0
+    },
+    {
+      "id": "sun_virgo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "sun",
+        "sign": "virgo"
+      },
+      "text_ru": "Солнце в Дева: воля и самовыражение через анализ и внимание к деталям.",
+      "priority": 0
+    },
+    {
+      "id": "sun_libra",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "sun",
+        "sign": "libra"
+      },
+      "text_ru": "Солнце в Весы: воля и самовыражение через гармонию и взаимодействие.",
+      "priority": 0
+    },
+    {
+      "id": "sun_scorpio",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "sun",
+        "sign": "scorpio"
+      },
+      "text_ru": "Солнце в Скорпион: воля и самовыражение через глубину и собранность.",
+      "priority": 0
+    },
+    {
+      "id": "sun_sagittarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "sun",
+        "sign": "sagittarius"
+      },
+      "text_ru": "Солнце в Стрелец: воля и самовыражение через расширение горизонтов и поиск смысла.",
+      "priority": 0
+    },
+    {
+      "id": "sun_capricorn",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "sun",
+        "sign": "capricorn"
+      },
+      "text_ru": "Солнце в Козерог: воля и самовыражение через дисциплину и долгосрочную цель.",
+      "priority": 0
+    },
+    {
+      "id": "sun_aquarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "sun",
+        "sign": "aquarius"
+      },
+      "text_ru": "Солнце в Водолей: воля и самовыражение через самостоятельность и нестандартный взгляд.",
+      "priority": 0
+    },
+    {
+      "id": "sun_pisces",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "sun",
+        "sign": "pisces"
+      },
+      "text_ru": "Солнце в Рыбы: воля и самовыражение через чуткость и образное восприятие.",
+      "priority": 0
+    },
+    {
+      "id": "moon_aries",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "aries"
+      },
+      "text_ru": "Луна в Овен: эмоции и чувство безопасности через инициативу и прямое действие.",
+      "priority": 0
+    },
+    {
+      "id": "moon_taurus",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "taurus"
+      },
+      "text_ru": "Луна в Телец: эмоции и чувство безопасности через устойчивость и практичность.",
+      "priority": 0
+    },
+    {
+      "id": "moon_gemini",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "gemini"
+      },
+      "text_ru": "Луна в Близнецы: эмоции и чувство безопасности через гибкость и обмен информацией.",
+      "priority": 0
+    },
+    {
+      "id": "moon_leo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "leo"
+      },
+      "text_ru": "Луна в Лев: эмоции и чувство безопасности через самовыражение и признание.",
+      "priority": 0
+    },
+    {
+      "id": "moon_virgo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "virgo"
+      },
+      "text_ru": "Луна в Дева: эмоции и чувство безопасности через анализ и внимание к деталям.",
+      "priority": 0
+    },
+    {
+      "id": "moon_libra",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "libra"
+      },
+      "text_ru": "Луна в Весы: эмоции и чувство безопасности через гармонию и взаимодействие.",
+      "priority": 0
+    },
+    {
+      "id": "moon_scorpio",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "scorpio"
+      },
+      "text_ru": "Луна в Скорпион: эмоции и чувство безопасности через глубину и собранность.",
+      "priority": 0
+    },
+    {
+      "id": "moon_sagittarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "sagittarius"
+      },
+      "text_ru": "Луна в Стрелец: эмоции и чувство безопасности через расширение горизонтов и поиск смысла.",
+      "priority": 0
+    },
+    {
+      "id": "moon_capricorn",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "capricorn"
+      },
+      "text_ru": "Луна в Козерог: эмоции и чувство безопасности через дисциплину и долгосрочную цель.",
+      "priority": 0
+    },
+    {
+      "id": "moon_aquarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "aquarius"
+      },
+      "text_ru": "Луна в Водолей: эмоции и чувство безопасности через самостоятельность и нестандартный взгляд.",
+      "priority": 0
+    },
+    {
+      "id": "moon_pisces",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "pisces"
+      },
+      "text_ru": "Луна в Рыбы: эмоции и чувство безопасности через чуткость и образное восприятие.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_aries",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "aries"
+      },
+      "text_ru": "Меркурий в Овен: мышление и общение через инициативу и прямое действие.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_taurus",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "taurus"
+      },
+      "text_ru": "Меркурий в Телец: мышление и общение через устойчивость и практичность.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_gemini",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "gemini"
+      },
+      "text_ru": "Меркурий в Близнецы: мышление и общение через гибкость и обмен информацией.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_cancer",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "cancer"
+      },
+      "text_ru": "Меркурий в Рак: мышление и общение через эмоциональную близость и безопасность.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_leo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "leo"
+      },
+      "text_ru": "Меркурий в Лев: мышление и общение через самовыражение и признание.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_virgo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "virgo"
+      },
+      "text_ru": "Меркурий в Дева: мышление и общение через анализ и внимание к деталям.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_libra",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "libra"
+      },
+      "text_ru": "Меркурий в Весы: мышление и общение через гармонию и взаимодействие.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_scorpio",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "scorpio"
+      },
+      "text_ru": "Меркурий в Скорпион: мышление и общение через глубину и собранность.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_sagittarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "sagittarius"
+      },
+      "text_ru": "Меркурий в Стрелец: мышление и общение через расширение горизонтов и поиск смысла.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_capricorn",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "capricorn"
+      },
+      "text_ru": "Меркурий в Козерог: мышление и общение через дисциплину и долгосрочную цель.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_aquarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "aquarius"
+      },
+      "text_ru": "Меркурий в Водолей: мышление и общение через самостоятельность и нестандартный взгляд.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_pisces",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "pisces"
+      },
+      "text_ru": "Меркурий в Рыбы: мышление и общение через чуткость и образное восприятие.",
+      "priority": 0
+    },
+    {
+      "id": "venus_aries",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "venus",
+        "sign": "aries"
+      },
+      "text_ru": "Венера в Овен: ценности и близость через инициативу и прямое действие.",
+      "priority": 0
+    },
+    {
+      "id": "venus_taurus",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "venus",
+        "sign": "taurus"
+      },
+      "text_ru": "Венера в Телец: ценности и близость через устойчивость и практичность.",
+      "priority": 0
+    },
+    {
+      "id": "venus_gemini",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "venus",
+        "sign": "gemini"
+      },
+      "text_ru": "Венера в Близнецы: ценности и близость через гибкость и обмен информацией.",
+      "priority": 0
+    },
+    {
+      "id": "venus_cancer",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "venus",
+        "sign": "cancer"
+      },
+      "text_ru": "Венера в Рак: ценности и близость через эмоциональную близость и безопасность.",
+      "priority": 0
+    },
+    {
+      "id": "venus_leo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "venus",
+        "sign": "leo"
+      },
+      "text_ru": "Венера в Лев: ценности и близость через самовыражение и признание.",
+      "priority": 0
+    },
+    {
+      "id": "venus_virgo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "venus",
+        "sign": "virgo"
+      },
+      "text_ru": "Венера в Дева: ценности и близость через анализ и внимание к деталям.",
+      "priority": 0
+    },
+    {
+      "id": "venus_libra",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "venus",
+        "sign": "libra"
+      },
+      "text_ru": "Венера в Весы: ценности и близость через гармонию и взаимодействие.",
+      "priority": 0
+    },
+    {
+      "id": "venus_scorpio",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "venus",
+        "sign": "scorpio"
+      },
+      "text_ru": "Венера в Скорпион: ценности и близость через глубину и собранность.",
+      "priority": 0
+    },
+    {
+      "id": "venus_sagittarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "venus",
+        "sign": "sagittarius"
+      },
+      "text_ru": "Венера в Стрелец: ценности и близость через расширение горизонтов и поиск смысла.",
+      "priority": 0
+    },
+    {
+      "id": "venus_capricorn",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "venus",
+        "sign": "capricorn"
+      },
+      "text_ru": "Венера в Козерог: ценности и близость через дисциплину и долгосрочную цель.",
+      "priority": 0
+    },
+    {
+      "id": "venus_aquarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "venus",
+        "sign": "aquarius"
+      },
+      "text_ru": "Венера в Водолей: ценности и близость через самостоятельность и нестандартный взгляд.",
+      "priority": 0
+    },
+    {
+      "id": "venus_pisces",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "venus",
+        "sign": "pisces"
+      },
+      "text_ru": "Венера в Рыбы: ценности и близость через чуткость и образное восприятие.",
+      "priority": 0
+    },
+    {
+      "id": "mars_aries",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "aries"
+      },
+      "text_ru": "Марс в Овен: действие и энергия через инициативу и прямое действие.",
+      "priority": 0
+    },
+    {
+      "id": "mars_taurus",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "taurus"
+      },
+      "text_ru": "Марс в Телец: действие и энергия через устойчивость и практичность.",
+      "priority": 0
+    },
+    {
+      "id": "mars_gemini",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "gemini"
+      },
+      "text_ru": "Марс в Близнецы: действие и энергия через гибкость и обмен информацией.",
+      "priority": 0
+    },
+    {
+      "id": "mars_cancer",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "cancer"
+      },
+      "text_ru": "Марс в Рак: действие и энергия через эмоциональную близость и безопасность.",
+      "priority": 0
+    },
+    {
+      "id": "mars_leo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "leo"
+      },
+      "text_ru": "Марс в Лев: действие и энергия через самовыражение и признание.",
+      "priority": 0
+    },
+    {
+      "id": "mars_virgo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "virgo"
+      },
+      "text_ru": "Марс в Дева: действие и энергия через анализ и внимание к деталям.",
+      "priority": 0
+    },
+    {
+      "id": "mars_libra",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "libra"
+      },
+      "text_ru": "Марс в Весы: действие и энергия через гармонию и взаимодействие.",
+      "priority": 0
+    },
+    {
+      "id": "mars_scorpio",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "scorpio"
+      },
+      "text_ru": "Марс в Скорпион: действие и энергия через глубину и собранность.",
+      "priority": 0
+    },
+    {
+      "id": "mars_sagittarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "sagittarius"
+      },
+      "text_ru": "Марс в Стрелец: действие и энергия через расширение горизонтов и поиск смысла.",
+      "priority": 0
+    },
+    {
+      "id": "mars_capricorn",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "capricorn"
+      },
+      "text_ru": "Марс в Козерог: действие и энергия через дисциплину и долгосрочную цель.",
+      "priority": 0
+    },
+    {
+      "id": "mars_aquarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "aquarius"
+      },
+      "text_ru": "Марс в Водолей: действие и энергия через самостоятельность и нестандартный взгляд.",
+      "priority": 0
+    },
+    {
+      "id": "mars_pisces",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "pisces"
+      },
+      "text_ru": "Марс в Рыбы: действие и энергия через чуткость и образное восприятие.",
+      "priority": 0
+    },
+    {
+      "id": "jupiter_aries",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "jupiter",
+        "sign": "aries"
+      },
+      "text_ru": "Юпитер в Овен: рост и убеждения через инициативу и прямое действие.",
+      "priority": 0
+    },
+    {
+      "id": "jupiter_taurus",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "jupiter",
+        "sign": "taurus"
+      },
+      "text_ru": "Юпитер в Телец: рост и убеждения через устойчивость и практичность.",
+      "priority": 0
+    },
+    {
+      "id": "jupiter_gemini",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "jupiter",
+        "sign": "gemini"
+      },
+      "text_ru": "Юпитер в Близнецы: рост и убеждения через гибкость и обмен информацией.",
+      "priority": 0
+    },
+    {
+      "id": "jupiter_cancer",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "jupiter",
+        "sign": "cancer"
+      },
+      "text_ru": "Юпитер в Рак: рост и убеждения через эмоциональную близость и безопасность.",
+      "priority": 0
+    },
+    {
+      "id": "jupiter_leo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "jupiter",
+        "sign": "leo"
+      },
+      "text_ru": "Юпитер в Лев: рост и убеждения через самовыражение и признание.",
+      "priority": 0
+    },
+    {
+      "id": "jupiter_virgo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "jupiter",
+        "sign": "virgo"
+      },
+      "text_ru": "Юпитер в Дева: рост и убеждения через анализ и внимание к деталям.",
+      "priority": 0
+    },
+    {
+      "id": "jupiter_libra",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "jupiter",
+        "sign": "libra"
+      },
+      "text_ru": "Юпитер в Весы: рост и убеждения через гармонию и взаимодействие.",
+      "priority": 0
+    },
+    {
+      "id": "jupiter_scorpio",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "jupiter",
+        "sign": "scorpio"
+      },
+      "text_ru": "Юпитер в Скорпион: рост и убеждения через глубину и собранность.",
+      "priority": 0
+    },
+    {
+      "id": "jupiter_sagittarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "jupiter",
+        "sign": "sagittarius"
+      },
+      "text_ru": "Юпитер в Стрелец: рост и убеждения через расширение горизонтов и поиск смысла.",
+      "priority": 0
+    },
+    {
+      "id": "jupiter_capricorn",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "jupiter",
+        "sign": "capricorn"
+      },
+      "text_ru": "Юпитер в Козерог: рост и убеждения через дисциплину и долгосрочную цель.",
+      "priority": 0
+    },
+    {
+      "id": "jupiter_aquarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "jupiter",
+        "sign": "aquarius"
+      },
+      "text_ru": "Юпитер в Водолей: рост и убеждения через самостоятельность и нестандартный взгляд.",
+      "priority": 0
+    },
+    {
+      "id": "jupiter_pisces",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "jupiter",
+        "sign": "pisces"
+      },
+      "text_ru": "Юпитер в Рыбы: рост и убеждения через чуткость и образное восприятие.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_aries",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "aries"
+      },
+      "text_ru": "Сатурн в Овен: границы и ответственность через инициативу и прямое действие.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_taurus",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "taurus"
+      },
+      "text_ru": "Сатурн в Телец: границы и ответственность через устойчивость и практичность.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_gemini",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "gemini"
+      },
+      "text_ru": "Сатурн в Близнецы: границы и ответственность через гибкость и обмен информацией.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_cancer",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "cancer"
+      },
+      "text_ru": "Сатурн в Рак: границы и ответственность через эмоциональную близость и безопасность.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_leo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "leo"
+      },
+      "text_ru": "Сатурн в Лев: границы и ответственность через самовыражение и признание.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_virgo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "virgo"
+      },
+      "text_ru": "Сатурн в Дева: границы и ответственность через анализ и внимание к деталям.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_libra",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "libra"
+      },
+      "text_ru": "Сатурн в Весы: границы и ответственность через гармонию и взаимодействие.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_scorpio",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "scorpio"
+      },
+      "text_ru": "Сатурн в Скорпион: границы и ответственность через глубину и собранность.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_sagittarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "sagittarius"
+      },
+      "text_ru": "Сатурн в Стрелец: границы и ответственность через расширение горизонтов и поиск смысла.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_capricorn",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "capricorn"
+      },
+      "text_ru": "Сатурн в Козерог: границы и ответственность через дисциплину и долгосрочную цель.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_aquarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "aquarius"
+      },
+      "text_ru": "Сатурн в Водолей: границы и ответственность через самостоятельность и нестандартный взгляд.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_pisces",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "pisces"
+      },
+      "text_ru": "Сатурн в Рыбы: границы и ответственность через чуткость и образное восприятие.",
+      "priority": 0
+    },
+    {
+      "id": "uranus_aries",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "uranus",
+        "sign": "aries"
+      },
+      "text_ru": "Уран в Овен: свобода и обновление через инициативу и прямое действие.",
+      "priority": 0
+    },
+    {
+      "id": "uranus_taurus",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "uranus",
+        "sign": "taurus"
+      },
+      "text_ru": "Уран в Телец: свобода и обновление через устойчивость и практичность.",
+      "priority": 0
+    },
+    {
+      "id": "uranus_gemini",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "uranus",
+        "sign": "gemini"
+      },
+      "text_ru": "Уран в Близнецы: свобода и обновление через гибкость и обмен информацией.",
+      "priority": 0
+    },
+    {
+      "id": "uranus_cancer",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "uranus",
+        "sign": "cancer"
+      },
+      "text_ru": "Уран в Рак: свобода и обновление через эмоциональную близость и безопасность.",
+      "priority": 0
+    },
+    {
+      "id": "uranus_leo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "uranus",
+        "sign": "leo"
+      },
+      "text_ru": "Уран в Лев: свобода и обновление через самовыражение и признание.",
+      "priority": 0
+    },
+    {
+      "id": "uranus_virgo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "uranus",
+        "sign": "virgo"
+      },
+      "text_ru": "Уран в Дева: свобода и обновление через анализ и внимание к деталям.",
+      "priority": 0
+    },
+    {
+      "id": "uranus_libra",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "uranus",
+        "sign": "libra"
+      },
+      "text_ru": "Уран в Весы: свобода и обновление через гармонию и взаимодействие.",
+      "priority": 0
+    },
+    {
+      "id": "uranus_scorpio",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "uranus",
+        "sign": "scorpio"
+      },
+      "text_ru": "Уран в Скорпион: свобода и обновление через глубину и собранность.",
+      "priority": 0
+    },
+    {
+      "id": "uranus_sagittarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "uranus",
+        "sign": "sagittarius"
+      },
+      "text_ru": "Уран в Стрелец: свобода и обновление через расширение горизонтов и поиск смысла.",
+      "priority": 0
+    },
+    {
+      "id": "uranus_capricorn",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "uranus",
+        "sign": "capricorn"
+      },
+      "text_ru": "Уран в Козерог: свобода и обновление через дисциплину и долгосрочную цель.",
+      "priority": 0
+    },
+    {
+      "id": "uranus_aquarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "uranus",
+        "sign": "aquarius"
+      },
+      "text_ru": "Уран в Водолей: свобода и обновление через самостоятельность и нестандартный взгляд.",
+      "priority": 0
+    },
+    {
+      "id": "uranus_pisces",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "uranus",
+        "sign": "pisces"
+      },
+      "text_ru": "Уран в Рыбы: свобода и обновление через чуткость и образное восприятие.",
+      "priority": 0
+    },
+    {
+      "id": "neptune_aries",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "neptune",
+        "sign": "aries"
+      },
+      "text_ru": "Нептун в Овен: воображение и эмпатия через инициативу и прямое действие.",
+      "priority": 0
+    },
+    {
+      "id": "neptune_taurus",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "neptune",
+        "sign": "taurus"
+      },
+      "text_ru": "Нептун в Телец: воображение и эмпатия через устойчивость и практичность.",
+      "priority": 0
+    },
+    {
+      "id": "neptune_gemini",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "neptune",
+        "sign": "gemini"
+      },
+      "text_ru": "Нептун в Близнецы: воображение и эмпатия через гибкость и обмен информацией.",
+      "priority": 0
+    },
+    {
+      "id": "neptune_cancer",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "neptune",
+        "sign": "cancer"
+      },
+      "text_ru": "Нептун в Рак: воображение и эмпатия через эмоциональную близость и безопасность.",
+      "priority": 0
+    },
+    {
+      "id": "neptune_leo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "neptune",
+        "sign": "leo"
+      },
+      "text_ru": "Нептун в Лев: воображение и эмпатия через самовыражение и признание.",
+      "priority": 0
+    },
+    {
+      "id": "neptune_virgo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "neptune",
+        "sign": "virgo"
+      },
+      "text_ru": "Нептун в Дева: воображение и эмпатия через анализ и внимание к деталям.",
+      "priority": 0
+    },
+    {
+      "id": "neptune_libra",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "neptune",
+        "sign": "libra"
+      },
+      "text_ru": "Нептун в Весы: воображение и эмпатия через гармонию и взаимодействие.",
+      "priority": 0
+    },
+    {
+      "id": "neptune_scorpio",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "neptune",
+        "sign": "scorpio"
+      },
+      "text_ru": "Нептун в Скорпион: воображение и эмпатия через глубину и собранность.",
+      "priority": 0
+    },
+    {
+      "id": "neptune_sagittarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "neptune",
+        "sign": "sagittarius"
+      },
+      "text_ru": "Нептун в Стрелец: воображение и эмпатия через расширение горизонтов и поиск смысла.",
+      "priority": 0
+    },
+    {
+      "id": "neptune_capricorn",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "neptune",
+        "sign": "capricorn"
+      },
+      "text_ru": "Нептун в Козерог: воображение и эмпатия через дисциплину и долгосрочную цель.",
+      "priority": 0
+    },
+    {
+      "id": "neptune_aquarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "neptune",
+        "sign": "aquarius"
+      },
+      "text_ru": "Нептун в Водолей: воображение и эмпатия через самостоятельность и нестандартный взгляд.",
+      "priority": 0
+    },
+    {
+      "id": "neptune_pisces",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "neptune",
+        "sign": "pisces"
+      },
+      "text_ru": "Нептун в Рыбы: воображение и эмпатия через чуткость и образное восприятие.",
+      "priority": 0
+    },
+    {
+      "id": "pluto_aries",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "pluto",
+        "sign": "aries"
+      },
+      "text_ru": "Плутон в Овен: интенсивность и изменения через инициативу и прямое действие.",
+      "priority": 0
+    },
+    {
+      "id": "pluto_taurus",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "pluto",
+        "sign": "taurus"
+      },
+      "text_ru": "Плутон в Телец: интенсивность и изменения через устойчивость и практичность.",
+      "priority": 0
+    },
+    {
+      "id": "pluto_gemini",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "pluto",
+        "sign": "gemini"
+      },
+      "text_ru": "Плутон в Близнецы: интенсивность и изменения через гибкость и обмен информацией.",
+      "priority": 0
+    },
+    {
+      "id": "pluto_cancer",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "pluto",
+        "sign": "cancer"
+      },
+      "text_ru": "Плутон в Рак: интенсивность и изменения через эмоциональную близость и безопасность.",
+      "priority": 0
+    },
+    {
+      "id": "pluto_leo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "pluto",
+        "sign": "leo"
+      },
+      "text_ru": "Плутон в Лев: интенсивность и изменения через самовыражение и признание.",
+      "priority": 0
+    },
+    {
+      "id": "pluto_virgo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "pluto",
+        "sign": "virgo"
+      },
+      "text_ru": "Плутон в Дева: интенсивность и изменения через анализ и внимание к деталям.",
+      "priority": 0
+    },
+    {
+      "id": "pluto_libra",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "pluto",
+        "sign": "libra"
+      },
+      "text_ru": "Плутон в Весы: интенсивность и изменения через гармонию и взаимодействие.",
+      "priority": 0
+    },
+    {
+      "id": "pluto_scorpio",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "pluto",
+        "sign": "scorpio"
+      },
+      "text_ru": "Плутон в Скорпион: интенсивность и изменения через глубину и собранность.",
+      "priority": 0
+    },
+    {
+      "id": "pluto_sagittarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "pluto",
+        "sign": "sagittarius"
+      },
+      "text_ru": "Плутон в Стрелец: интенсивность и изменения через расширение горизонтов и поиск смысла.",
+      "priority": 0
+    },
+    {
+      "id": "pluto_capricorn",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "pluto",
+        "sign": "capricorn"
+      },
+      "text_ru": "Плутон в Козерог: интенсивность и изменения через дисциплину и долгосрочную цель.",
+      "priority": 0
+    },
+    {
+      "id": "pluto_aquarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "pluto",
+        "sign": "aquarius"
+      },
+      "text_ru": "Плутон в Водолей: интенсивность и изменения через самостоятельность и нестандартный взгляд.",
+      "priority": 0
+    },
+    {
+      "id": "pluto_pisces",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "pluto",
+        "sign": "pisces"
+      },
+      "text_ru": "Плутон в Рыбы: интенсивность и изменения через чуткость и образное восприятие.",
+      "priority": 0
+    },
+    {
+      "id": "ascendant_aries",
+      "when": {
+        "kind": "ascendant",
+        "sign": "aries"
+      },
+      "text_ru": "Асцендент в Овен: первое впечатление через инициативу и прямое действие.",
+      "priority": 0
+    },
+    {
+      "id": "ascendant_taurus",
+      "when": {
+        "kind": "ascendant",
+        "sign": "taurus"
+      },
+      "text_ru": "Асцендент в Телец: первое впечатление через устойчивость и практичность.",
+      "priority": 0
+    },
+    {
+      "id": "ascendant_gemini",
+      "when": {
+        "kind": "ascendant",
+        "sign": "gemini"
+      },
+      "text_ru": "Асцендент в Близнецы: первое впечатление через гибкость и обмен информацией.",
+      "priority": 0
+    },
+    {
+      "id": "ascendant_cancer",
+      "when": {
+        "kind": "ascendant",
+        "sign": "cancer"
+      },
+      "text_ru": "Асцендент в Рак: первое впечатление через эмоциональную близость и безопасность.",
+      "priority": 0
+    },
+    {
+      "id": "ascendant_leo",
+      "when": {
+        "kind": "ascendant",
+        "sign": "leo"
+      },
+      "text_ru": "Асцендент в Лев: первое впечатление через самовыражение и признание.",
+      "priority": 0
+    },
+    {
+      "id": "ascendant_virgo",
+      "when": {
+        "kind": "ascendant",
+        "sign": "virgo"
+      },
+      "text_ru": "Асцендент в Дева: первое впечатление через анализ и внимание к деталям.",
+      "priority": 0
+    },
+    {
+      "id": "ascendant_libra",
+      "when": {
+        "kind": "ascendant",
+        "sign": "libra"
+      },
+      "text_ru": "Асцендент в Весы: первое впечатление через гармонию и взаимодействие.",
+      "priority": 0
+    },
+    {
+      "id": "ascendant_scorpio",
+      "when": {
+        "kind": "ascendant",
+        "sign": "scorpio"
+      },
+      "text_ru": "Асцендент в Скорпион: первое впечатление через глубину и собранность.",
+      "priority": 0
+    },
+    {
+      "id": "ascendant_sagittarius",
+      "when": {
+        "kind": "ascendant",
+        "sign": "sagittarius"
+      },
+      "text_ru": "Асцендент в Стрелец: первое впечатление через расширение горизонтов и поиск смысла.",
+      "priority": 0
+    },
+    {
+      "id": "ascendant_capricorn",
+      "when": {
+        "kind": "ascendant",
+        "sign": "capricorn"
+      },
+      "text_ru": "Асцендент в Козерог: первое впечатление через дисциплину и долгосрочную цель.",
+      "priority": 0
+    },
+    {
+      "id": "ascendant_aquarius",
+      "when": {
+        "kind": "ascendant",
+        "sign": "aquarius"
+      },
+      "text_ru": "Асцендент в Водолей: первое впечатление через самостоятельность и нестандартный взгляд.",
+      "priority": 0
+    },
+    {
+      "id": "ascendant_pisces",
+      "when": {
+        "kind": "ascendant",
+        "sign": "pisces"
+      },
+      "text_ru": "Асцендент в Рыбы: первое впечатление через чуткость и образное восприятие.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_conjunction_moon",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "moon",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Солнце — Луна: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_sextile_moon",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "moon",
+        "aspect": "sextile"
+      },
+      "text_ru": "Солнце — Луна: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_square_moon",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "moon",
+        "aspect": "square"
+      },
+      "text_ru": "Солнце — Луна: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_trine_moon",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "moon",
+        "aspect": "trine"
+      },
+      "text_ru": "Солнце — Луна: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_opposition_moon",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "moon",
+        "aspect": "opposition"
+      },
+      "text_ru": "Солнце — Луна: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_conjunction_mercury",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "mercury",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Солнце — Меркурий: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_conjunction_venus",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "venus",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Солнце — Венера: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_conjunction_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "mars",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Солнце — Марс: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_sextile_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "mars",
+        "aspect": "sextile"
+      },
+      "text_ru": "Солнце — Марс: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_square_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "mars",
+        "aspect": "square"
+      },
+      "text_ru": "Солнце — Марс: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_trine_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "mars",
+        "aspect": "trine"
+      },
+      "text_ru": "Солнце — Марс: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_opposition_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "mars",
+        "aspect": "opposition"
+      },
+      "text_ru": "Солнце — Марс: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_conjunction_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "jupiter",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Солнце — Юпитер: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_sextile_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "jupiter",
+        "aspect": "sextile"
+      },
+      "text_ru": "Солнце — Юпитер: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_square_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "jupiter",
+        "aspect": "square"
+      },
+      "text_ru": "Солнце — Юпитер: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_trine_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "jupiter",
+        "aspect": "trine"
+      },
+      "text_ru": "Солнце — Юпитер: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_opposition_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "jupiter",
+        "aspect": "opposition"
+      },
+      "text_ru": "Солнце — Юпитер: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_conjunction_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "saturn",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Солнце — Сатурн: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_sextile_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "saturn",
+        "aspect": "sextile"
+      },
+      "text_ru": "Солнце — Сатурн: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_square_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "saturn",
+        "aspect": "square"
+      },
+      "text_ru": "Солнце — Сатурн: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_trine_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "saturn",
+        "aspect": "trine"
+      },
+      "text_ru": "Солнце — Сатурн: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_opposition_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "saturn",
+        "aspect": "opposition"
+      },
+      "text_ru": "Солнце — Сатурн: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_conjunction_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "uranus",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Солнце — Уран: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_sextile_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "uranus",
+        "aspect": "sextile"
+      },
+      "text_ru": "Солнце — Уран: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_square_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "uranus",
+        "aspect": "square"
+      },
+      "text_ru": "Солнце — Уран: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_trine_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "uranus",
+        "aspect": "trine"
+      },
+      "text_ru": "Солнце — Уран: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_opposition_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "uranus",
+        "aspect": "opposition"
+      },
+      "text_ru": "Солнце — Уран: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_conjunction_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "neptune",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Солнце — Нептун: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_sextile_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "neptune",
+        "aspect": "sextile"
+      },
+      "text_ru": "Солнце — Нептун: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_square_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "neptune",
+        "aspect": "square"
+      },
+      "text_ru": "Солнце — Нептун: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_trine_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "neptune",
+        "aspect": "trine"
+      },
+      "text_ru": "Солнце — Нептун: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_opposition_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "neptune",
+        "aspect": "opposition"
+      },
+      "text_ru": "Солнце — Нептун: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_conjunction_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "pluto",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Солнце — Плутон: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_sextile_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "pluto",
+        "aspect": "sextile"
+      },
+      "text_ru": "Солнце — Плутон: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_square_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "pluto",
+        "aspect": "square"
+      },
+      "text_ru": "Солнце — Плутон: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_trine_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "pluto",
+        "aspect": "trine"
+      },
+      "text_ru": "Солнце — Плутон: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_sun_opposition_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "sun",
+        "second": "pluto",
+        "aspect": "opposition"
+      },
+      "text_ru": "Солнце — Плутон: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_conjunction_mercury",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "mercury",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Луна — Меркурий: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_sextile_mercury",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "mercury",
+        "aspect": "sextile"
+      },
+      "text_ru": "Луна — Меркурий: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_square_mercury",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "mercury",
+        "aspect": "square"
+      },
+      "text_ru": "Луна — Меркурий: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_trine_mercury",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "mercury",
+        "aspect": "trine"
+      },
+      "text_ru": "Луна — Меркурий: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_opposition_mercury",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "mercury",
+        "aspect": "opposition"
+      },
+      "text_ru": "Луна — Меркурий: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_conjunction_venus",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "venus",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Луна — Венера: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_sextile_venus",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "venus",
+        "aspect": "sextile"
+      },
+      "text_ru": "Луна — Венера: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_square_venus",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "venus",
+        "aspect": "square"
+      },
+      "text_ru": "Луна — Венера: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_trine_venus",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "venus",
+        "aspect": "trine"
+      },
+      "text_ru": "Луна — Венера: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_opposition_venus",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "venus",
+        "aspect": "opposition"
+      },
+      "text_ru": "Луна — Венера: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_conjunction_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "mars",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Луна — Марс: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_sextile_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "mars",
+        "aspect": "sextile"
+      },
+      "text_ru": "Луна — Марс: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_square_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "mars",
+        "aspect": "square"
+      },
+      "text_ru": "Луна — Марс: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_trine_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "mars",
+        "aspect": "trine"
+      },
+      "text_ru": "Луна — Марс: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_opposition_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "mars",
+        "aspect": "opposition"
+      },
+      "text_ru": "Луна — Марс: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_conjunction_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "jupiter",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Луна — Юпитер: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_sextile_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "jupiter",
+        "aspect": "sextile"
+      },
+      "text_ru": "Луна — Юпитер: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_square_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "jupiter",
+        "aspect": "square"
+      },
+      "text_ru": "Луна — Юпитер: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_trine_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "jupiter",
+        "aspect": "trine"
+      },
+      "text_ru": "Луна — Юпитер: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_opposition_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "jupiter",
+        "aspect": "opposition"
+      },
+      "text_ru": "Луна — Юпитер: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_conjunction_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "saturn",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Луна — Сатурн: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_sextile_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "saturn",
+        "aspect": "sextile"
+      },
+      "text_ru": "Луна — Сатурн: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_square_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "saturn",
+        "aspect": "square"
+      },
+      "text_ru": "Луна — Сатурн: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_trine_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "saturn",
+        "aspect": "trine"
+      },
+      "text_ru": "Луна — Сатурн: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_opposition_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "saturn",
+        "aspect": "opposition"
+      },
+      "text_ru": "Луна — Сатурн: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_conjunction_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "uranus",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Луна — Уран: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_sextile_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "uranus",
+        "aspect": "sextile"
+      },
+      "text_ru": "Луна — Уран: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_square_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "uranus",
+        "aspect": "square"
+      },
+      "text_ru": "Луна — Уран: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_trine_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "uranus",
+        "aspect": "trine"
+      },
+      "text_ru": "Луна — Уран: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_opposition_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "uranus",
+        "aspect": "opposition"
+      },
+      "text_ru": "Луна — Уран: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_conjunction_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "neptune",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Луна — Нептун: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_sextile_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "neptune",
+        "aspect": "sextile"
+      },
+      "text_ru": "Луна — Нептун: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_square_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "neptune",
+        "aspect": "square"
+      },
+      "text_ru": "Луна — Нептун: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_trine_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "neptune",
+        "aspect": "trine"
+      },
+      "text_ru": "Луна — Нептун: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_opposition_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "neptune",
+        "aspect": "opposition"
+      },
+      "text_ru": "Луна — Нептун: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_conjunction_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "pluto",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Луна — Плутон: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_sextile_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "pluto",
+        "aspect": "sextile"
+      },
+      "text_ru": "Луна — Плутон: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_square_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "pluto",
+        "aspect": "square"
+      },
+      "text_ru": "Луна — Плутон: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_trine_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "pluto",
+        "aspect": "trine"
+      },
+      "text_ru": "Луна — Плутон: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_opposition_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "pluto",
+        "aspect": "opposition"
+      },
+      "text_ru": "Луна — Плутон: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_conjunction_venus",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "venus",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Меркурий — Венера: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_sextile_venus",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "venus",
+        "aspect": "sextile"
+      },
+      "text_ru": "Меркурий — Венера: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_conjunction_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "mars",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Меркурий — Марс: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_sextile_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "mars",
+        "aspect": "sextile"
+      },
+      "text_ru": "Меркурий — Марс: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_square_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "mars",
+        "aspect": "square"
+      },
+      "text_ru": "Меркурий — Марс: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_trine_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "mars",
+        "aspect": "trine"
+      },
+      "text_ru": "Меркурий — Марс: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_opposition_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "mars",
+        "aspect": "opposition"
+      },
+      "text_ru": "Меркурий — Марс: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_conjunction_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "jupiter",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Меркурий — Юпитер: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_sextile_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "jupiter",
+        "aspect": "sextile"
+      },
+      "text_ru": "Меркурий — Юпитер: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_square_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "jupiter",
+        "aspect": "square"
+      },
+      "text_ru": "Меркурий — Юпитер: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_trine_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "jupiter",
+        "aspect": "trine"
+      },
+      "text_ru": "Меркурий — Юпитер: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_opposition_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "jupiter",
+        "aspect": "opposition"
+      },
+      "text_ru": "Меркурий — Юпитер: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_conjunction_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "saturn",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Меркурий — Сатурн: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_sextile_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "saturn",
+        "aspect": "sextile"
+      },
+      "text_ru": "Меркурий — Сатурн: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_square_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "saturn",
+        "aspect": "square"
+      },
+      "text_ru": "Меркурий — Сатурн: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_trine_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "saturn",
+        "aspect": "trine"
+      },
+      "text_ru": "Меркурий — Сатурн: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_opposition_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "saturn",
+        "aspect": "opposition"
+      },
+      "text_ru": "Меркурий — Сатурн: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_conjunction_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "uranus",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Меркурий — Уран: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_sextile_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "uranus",
+        "aspect": "sextile"
+      },
+      "text_ru": "Меркурий — Уран: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_square_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "uranus",
+        "aspect": "square"
+      },
+      "text_ru": "Меркурий — Уран: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_trine_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "uranus",
+        "aspect": "trine"
+      },
+      "text_ru": "Меркурий — Уран: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_opposition_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "uranus",
+        "aspect": "opposition"
+      },
+      "text_ru": "Меркурий — Уран: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_conjunction_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "neptune",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Меркурий — Нептун: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_sextile_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "neptune",
+        "aspect": "sextile"
+      },
+      "text_ru": "Меркурий — Нептун: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_square_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "neptune",
+        "aspect": "square"
+      },
+      "text_ru": "Меркурий — Нептун: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_trine_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "neptune",
+        "aspect": "trine"
+      },
+      "text_ru": "Меркурий — Нептун: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_opposition_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "neptune",
+        "aspect": "opposition"
+      },
+      "text_ru": "Меркурий — Нептун: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_conjunction_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "pluto",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Меркурий — Плутон: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_sextile_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "pluto",
+        "aspect": "sextile"
+      },
+      "text_ru": "Меркурий — Плутон: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_square_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "pluto",
+        "aspect": "square"
+      },
+      "text_ru": "Меркурий — Плутон: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_trine_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "pluto",
+        "aspect": "trine"
+      },
+      "text_ru": "Меркурий — Плутон: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mercury_opposition_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "mercury",
+        "second": "pluto",
+        "aspect": "opposition"
+      },
+      "text_ru": "Меркурий — Плутон: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_conjunction_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "mars",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Венера — Марс: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_sextile_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "mars",
+        "aspect": "sextile"
+      },
+      "text_ru": "Венера — Марс: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_square_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "mars",
+        "aspect": "square"
+      },
+      "text_ru": "Венера — Марс: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_trine_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "mars",
+        "aspect": "trine"
+      },
+      "text_ru": "Венера — Марс: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_opposition_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "mars",
+        "aspect": "opposition"
+      },
+      "text_ru": "Венера — Марс: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_conjunction_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "jupiter",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Венера — Юпитер: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_sextile_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "jupiter",
+        "aspect": "sextile"
+      },
+      "text_ru": "Венера — Юпитер: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_square_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "jupiter",
+        "aspect": "square"
+      },
+      "text_ru": "Венера — Юпитер: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_trine_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "jupiter",
+        "aspect": "trine"
+      },
+      "text_ru": "Венера — Юпитер: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_opposition_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "jupiter",
+        "aspect": "opposition"
+      },
+      "text_ru": "Венера — Юпитер: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_conjunction_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "saturn",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Венера — Сатурн: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_sextile_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "saturn",
+        "aspect": "sextile"
+      },
+      "text_ru": "Венера — Сатурн: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_square_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "saturn",
+        "aspect": "square"
+      },
+      "text_ru": "Венера — Сатурн: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_trine_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "saturn",
+        "aspect": "trine"
+      },
+      "text_ru": "Венера — Сатурн: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_opposition_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "saturn",
+        "aspect": "opposition"
+      },
+      "text_ru": "Венера — Сатурн: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_conjunction_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "uranus",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Венера — Уран: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_sextile_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "uranus",
+        "aspect": "sextile"
+      },
+      "text_ru": "Венера — Уран: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_square_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "uranus",
+        "aspect": "square"
+      },
+      "text_ru": "Венера — Уран: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_trine_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "uranus",
+        "aspect": "trine"
+      },
+      "text_ru": "Венера — Уран: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_opposition_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "uranus",
+        "aspect": "opposition"
+      },
+      "text_ru": "Венера — Уран: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_conjunction_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "neptune",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Венера — Нептун: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_sextile_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "neptune",
+        "aspect": "sextile"
+      },
+      "text_ru": "Венера — Нептун: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_square_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "neptune",
+        "aspect": "square"
+      },
+      "text_ru": "Венера — Нептун: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_trine_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "neptune",
+        "aspect": "trine"
+      },
+      "text_ru": "Венера — Нептун: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_opposition_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "neptune",
+        "aspect": "opposition"
+      },
+      "text_ru": "Венера — Нептун: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_conjunction_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "pluto",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Венера — Плутон: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_sextile_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "pluto",
+        "aspect": "sextile"
+      },
+      "text_ru": "Венера — Плутон: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_square_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "pluto",
+        "aspect": "square"
+      },
+      "text_ru": "Венера — Плутон: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_trine_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "pluto",
+        "aspect": "trine"
+      },
+      "text_ru": "Венера — Плутон: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_venus_opposition_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "venus",
+        "second": "pluto",
+        "aspect": "opposition"
+      },
+      "text_ru": "Венера — Плутон: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_conjunction_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "jupiter",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Марс — Юпитер: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_sextile_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "jupiter",
+        "aspect": "sextile"
+      },
+      "text_ru": "Марс — Юпитер: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_square_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "jupiter",
+        "aspect": "square"
+      },
+      "text_ru": "Марс — Юпитер: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_trine_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "jupiter",
+        "aspect": "trine"
+      },
+      "text_ru": "Марс — Юпитер: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_opposition_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "jupiter",
+        "aspect": "opposition"
+      },
+      "text_ru": "Марс — Юпитер: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_conjunction_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "saturn",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Марс — Сатурн: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_sextile_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "saturn",
+        "aspect": "sextile"
+      },
+      "text_ru": "Марс — Сатурн: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_square_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "saturn",
+        "aspect": "square"
+      },
+      "text_ru": "Марс — Сатурн: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_trine_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "saturn",
+        "aspect": "trine"
+      },
+      "text_ru": "Марс — Сатурн: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_opposition_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "saturn",
+        "aspect": "opposition"
+      },
+      "text_ru": "Марс — Сатурн: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_conjunction_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "uranus",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Марс — Уран: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_sextile_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "uranus",
+        "aspect": "sextile"
+      },
+      "text_ru": "Марс — Уран: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_square_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "uranus",
+        "aspect": "square"
+      },
+      "text_ru": "Марс — Уран: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_trine_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "uranus",
+        "aspect": "trine"
+      },
+      "text_ru": "Марс — Уран: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_opposition_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "uranus",
+        "aspect": "opposition"
+      },
+      "text_ru": "Марс — Уран: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_conjunction_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "neptune",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Марс — Нептун: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_sextile_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "neptune",
+        "aspect": "sextile"
+      },
+      "text_ru": "Марс — Нептун: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_square_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "neptune",
+        "aspect": "square"
+      },
+      "text_ru": "Марс — Нептун: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_trine_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "neptune",
+        "aspect": "trine"
+      },
+      "text_ru": "Марс — Нептун: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_opposition_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "neptune",
+        "aspect": "opposition"
+      },
+      "text_ru": "Марс — Нептун: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_conjunction_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "pluto",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Марс — Плутон: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_sextile_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "pluto",
+        "aspect": "sextile"
+      },
+      "text_ru": "Марс — Плутон: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_square_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "pluto",
+        "aspect": "square"
+      },
+      "text_ru": "Марс — Плутон: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_trine_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "pluto",
+        "aspect": "trine"
+      },
+      "text_ru": "Марс — Плутон: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_opposition_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "pluto",
+        "aspect": "opposition"
+      },
+      "text_ru": "Марс — Плутон: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_conjunction_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "saturn",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Юпитер — Сатурн: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_sextile_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "saturn",
+        "aspect": "sextile"
+      },
+      "text_ru": "Юпитер — Сатурн: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_square_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "saturn",
+        "aspect": "square"
+      },
+      "text_ru": "Юпитер — Сатурн: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_trine_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "saturn",
+        "aspect": "trine"
+      },
+      "text_ru": "Юпитер — Сатурн: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_opposition_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "saturn",
+        "aspect": "opposition"
+      },
+      "text_ru": "Юпитер — Сатурн: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_conjunction_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "uranus",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Юпитер — Уран: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_sextile_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "uranus",
+        "aspect": "sextile"
+      },
+      "text_ru": "Юпитер — Уран: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_square_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "uranus",
+        "aspect": "square"
+      },
+      "text_ru": "Юпитер — Уран: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_trine_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "uranus",
+        "aspect": "trine"
+      },
+      "text_ru": "Юпитер — Уран: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_opposition_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "uranus",
+        "aspect": "opposition"
+      },
+      "text_ru": "Юпитер — Уран: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_conjunction_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "neptune",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Юпитер — Нептун: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_sextile_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "neptune",
+        "aspect": "sextile"
+      },
+      "text_ru": "Юпитер — Нептун: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_square_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "neptune",
+        "aspect": "square"
+      },
+      "text_ru": "Юпитер — Нептун: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_trine_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "neptune",
+        "aspect": "trine"
+      },
+      "text_ru": "Юпитер — Нептун: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_opposition_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "neptune",
+        "aspect": "opposition"
+      },
+      "text_ru": "Юпитер — Нептун: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_conjunction_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "pluto",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Юпитер — Плутон: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_sextile_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "pluto",
+        "aspect": "sextile"
+      },
+      "text_ru": "Юпитер — Плутон: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_square_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "pluto",
+        "aspect": "square"
+      },
+      "text_ru": "Юпитер — Плутон: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_trine_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "pluto",
+        "aspect": "trine"
+      },
+      "text_ru": "Юпитер — Плутон: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_opposition_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "pluto",
+        "aspect": "opposition"
+      },
+      "text_ru": "Юпитер — Плутон: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_conjunction_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "uranus",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Сатурн — Уран: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_sextile_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "uranus",
+        "aspect": "sextile"
+      },
+      "text_ru": "Сатурн — Уран: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_square_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "uranus",
+        "aspect": "square"
+      },
+      "text_ru": "Сатурн — Уран: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_trine_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "uranus",
+        "aspect": "trine"
+      },
+      "text_ru": "Сатурн — Уран: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_opposition_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "uranus",
+        "aspect": "opposition"
+      },
+      "text_ru": "Сатурн — Уран: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_conjunction_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "neptune",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Сатурн — Нептун: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_sextile_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "neptune",
+        "aspect": "sextile"
+      },
+      "text_ru": "Сатурн — Нептун: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_square_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "neptune",
+        "aspect": "square"
+      },
+      "text_ru": "Сатурн — Нептун: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_trine_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "neptune",
+        "aspect": "trine"
+      },
+      "text_ru": "Сатурн — Нептун: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_opposition_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "neptune",
+        "aspect": "opposition"
+      },
+      "text_ru": "Сатурн — Нептун: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_conjunction_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "pluto",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Сатурн — Плутон: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_sextile_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "pluto",
+        "aspect": "sextile"
+      },
+      "text_ru": "Сатурн — Плутон: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_square_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "pluto",
+        "aspect": "square"
+      },
+      "text_ru": "Сатурн — Плутон: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_trine_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "pluto",
+        "aspect": "trine"
+      },
+      "text_ru": "Сатурн — Плутон: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_opposition_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "pluto",
+        "aspect": "opposition"
+      },
+      "text_ru": "Сатурн — Плутон: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_uranus_conjunction_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "uranus",
+        "second": "neptune",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Уран — Нептун: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_uranus_sextile_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "uranus",
+        "second": "neptune",
+        "aspect": "sextile"
+      },
+      "text_ru": "Уран — Нептун: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_uranus_square_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "uranus",
+        "second": "neptune",
+        "aspect": "square"
+      },
+      "text_ru": "Уран — Нептун: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_uranus_trine_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "uranus",
+        "second": "neptune",
+        "aspect": "trine"
+      },
+      "text_ru": "Уран — Нептун: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_uranus_opposition_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "uranus",
+        "second": "neptune",
+        "aspect": "opposition"
+      },
+      "text_ru": "Уран — Нептун: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_uranus_conjunction_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "uranus",
+        "second": "pluto",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Уран — Плутон: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_uranus_sextile_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "uranus",
+        "second": "pluto",
+        "aspect": "sextile"
+      },
+      "text_ru": "Уран — Плутон: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_uranus_square_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "uranus",
+        "second": "pluto",
+        "aspect": "square"
+      },
+      "text_ru": "Уран — Плутон: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_uranus_trine_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "uranus",
+        "second": "pluto",
+        "aspect": "trine"
+      },
+      "text_ru": "Уран — Плутон: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_uranus_opposition_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "uranus",
+        "second": "pluto",
+        "aspect": "opposition"
+      },
+      "text_ru": "Уран — Плутон: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_neptune_conjunction_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "neptune",
+        "second": "pluto",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Нептун — Плутон: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_neptune_sextile_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "neptune",
+        "second": "pluto",
+        "aspect": "sextile"
+      },
+      "text_ru": "Нептун — Плутон: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_neptune_square_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "neptune",
+        "second": "pluto",
+        "aspect": "square"
+      },
+      "text_ru": "Нептун — Плутон: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_neptune_trine_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "neptune",
+        "second": "pluto",
+        "aspect": "trine"
+      },
+      "text_ru": "Нептун — Плутон: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_neptune_opposition_pluto",
+      "when": {
+        "kind": "aspect",
+        "first": "neptune",
+        "second": "pluto",
+        "aspect": "opposition"
+      },
+      "text_ru": "Нептун — Плутон: оппозиция требует баланса между темами.",
+      "priority": 0
+    }
+  ]
+}

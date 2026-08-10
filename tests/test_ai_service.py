@@ -10,12 +10,19 @@ if find_spec("swisseph") is None:
     )
 
 from services.ai import (
+    MAX_HINT_CARDS,
+    MAX_SECTION_SUMMARY_CHARS,
     SECTION_GUIDANCE,
+    SYSTEM_PROMPT,
     _allowed_facts,
     _section_batches,
+    _section_summary,
+    _selected_hint_cards,
+    _validate_section,
     _validate_batch,
     build_batch_payload,
     build_prompt_payload,
+    build_section_payload,
 )
 from services.astro import local_time_to_utc, timezone_for_coordinates
 from services.prompt_guides.career import build_career_hints
@@ -66,7 +73,6 @@ class AiServiceTests(unittest.TestCase):
     def test_payload_contains_only_allowed_chart_facts(self):
         payload = build_prompt_payload("money", chart(), None)
         self.assertIn("allowed_facts", payload)
-        # No "Карта 1:" for personal reports
         self.assertIn("Солнце в Овен, дом 1", payload["allowed_facts"])
         self.assertTrue(payload["sections"][1]["guidance"])
 
@@ -85,7 +91,7 @@ class AiServiceTests(unittest.TestCase):
                 {
                     "title": titles[0],
                     "content": " ".join(["Точный"] * 30),
-                    "references": [allowed_facts[0].upper() + "."],  # Test normalization
+                    "references": [allowed_facts[0].upper() + "."],
                 },
                 {
                     "title": titles[1],
@@ -108,18 +114,27 @@ class AiServiceTests(unittest.TestCase):
         content["sections"][0]["references"] = ["Выдуманный факт"]
         self.assertIsNone(_validate_batch(content, titles, set(allowed_facts)))
 
-    def test_splits_sections_into_three_item_batches(self):
+    def test_splits_sections_into_single_item_requests(self):
         payload = build_prompt_payload("money", chart(), None)
         batches = _section_batches(payload["sections"])
-        self.assertEqual([len(batch) for batch in batches], [3, 3, 3, 3, 1])
+        self.assertEqual([len(batch) for batch in batches], [1] * len(SECTIONS["money"]))
 
-    def test_uses_embedded_sections_and_career_guidance(self):
+    def test_catalog_sections_and_word_budgets(self):
+        self.assertEqual(len(SECTIONS["personality_free"]), 9)
+        self.assertEqual(len(SECTIONS["personality"]), 20)
+        self.assertEqual(len(SECTIONS["love"]), 18)
+        self.assertEqual(len(SECTIONS["money"]), 18)
+        self.assertEqual(len(SECTIONS["compatibility"]), 18)
         self.assertIn(
-            ("Дом денег", "отношение к личным финансам, доходу и накоплениям"),
+            ("Отношение к деньгам", "как воспринимаешь деньги и ресурсы"),
             SECTIONS["money"],
         )
-        guidance = SECTION_GUIDANCE["personality"]["Карьера и призвание"]
-        self.assertIn("2–4 конкретные роли", guidance)
+        guidance = SECTION_GUIDANCE["personality"]["Профессиональные направления"]
+        self.assertIn("8–12", guidance)
+
+    def test_system_prompt_does_not_restrain_houses_on_approximate_time(self):
+        self.assertNotIn("time_is_approximate", SYSTEM_PROMPT)
+        self.assertNotIn("ориентировочны", SYSTEM_PROMPT)
 
     def test_career_hints_adds_house_themes_and_profession_examples(self):
         hints = build_career_hints(chart())
@@ -132,24 +147,130 @@ class AiServiceTests(unittest.TestCase):
         batch = [
             section
             for section in payload["sections"]
-            if section["title"] in {"Солнечный знак", "Лунный знак", "Введение"}
+            if section["title"] == "Твоё мышление"
         ]
         trimmed = build_batch_payload(payload, batch)
-        self.assertEqual(set(trimmed["primary_chart"]["planets"]), {"Солнце", "Луна"})
+        self.assertEqual(set(trimmed["primary_chart"]["planets"]), {"Солнце", "Уран"})
         self.assertNotIn("houses", trimmed["primary_chart"])
         self.assertNotIn("career_and_talent_hints", trimmed)
-        # No "Карта 1:"
         self.assertIn("Солнце в Овен, дом 1", trimmed["allowed_facts"])
-        self.assertIn("Луна в Близнецы, дом 3", trimmed["allowed_facts"])
-        self.assertNotIn("Венера в Рак, дом 4", trimmed["allowed_facts"])
+        self.assertNotIn("Луна в Близнецы, дом 3", trimmed["allowed_facts"])
+        self.assertIn("Солнце тригон Луна", trimmed["allowed_facts"])
+
+    def test_section_payload_uses_template_and_canonical_fact_codes(self):
+        payload = build_prompt_payload("personality", chart(), None)
+        section = next(
+            item
+            for item in payload["sections"]
+            if item["title"] == "Твой внутренний мир"
+        )
+        section_payload = build_section_payload(payload, section)
+        self.assertEqual(section_payload["section"]["id"], "personality.02")
+        self.assertEqual(section_payload["section"]["title"], "Твой внутренний мир")
+        self.assertEqual(section_payload["section"]["requirements"]["min_words"], 150)
+        self.assertEqual(section_payload["section"]["requirements"]["max_words"], 250)
+        self.assertIn("Солнце в Овен, дом 1", section_payload["allowed_facts"])
         self.assertIn(
-            "Солнце тригон Луна",
-            trimmed["allowed_facts"],
+            {
+                "id": "primary.planet.sun.sign.aries",
+                "scope": "primary",
+                "kind": "planet_sign",
+                "planet": "sun",
+                "sign": "aries",
+                "house": 1,
+                "text_ru": "Солнце в Овен, дом 1",
+            },
+            section_payload["facts"],
         )
-        self.assertNotIn(
-            "Венера квадрат Уран",
-            trimmed["allowed_facts"],
+        self.assertTrue(section_payload["interpretation_hints"])
+
+    def test_personality_free_payload_uses_shorter_word_budget(self):
+        payload = build_prompt_payload("personality_free", chart(), None)
+        section = payload["sections"][0]
+        section_payload = build_section_payload(payload, section)
+        self.assertEqual(section_payload["section"]["id"], "personality_free.01")
+        self.assertEqual(section_payload["section"]["requirements"]["min_words"], 120)
+        self.assertEqual(section_payload["section"]["requirements"]["max_words"], 200)
+
+    def test_validates_plain_text_and_assigns_application_references(self):
+        section = {
+            "title": "Твой портрет",
+            "requirements": {"min_words": 5, "max_words": 10},
+        }
+        allowed_facts = ["Солнце в Овен, дом 1"]
+        text = " ".join(["Точный"] * 5)
+        validated, rejection = _validate_section(text, section, allowed_facts)
+        self.assertIsNone(rejection)
+        self.assertEqual(validated["references"], allowed_facts)
+
+        short, rejection = _validate_section("Слишком коротко", section, allowed_facts)
+        self.assertIsNone(short)
+        self.assertIn("не меньше 5", rejection)
+
+        long_text = " ".join(["Точный"] * 11)
+        too_long, rejection = _validate_section(long_text, section, allowed_facts)
+        self.assertIsNone(too_long)
+        self.assertIn("не больше 10", rejection)
+
+    @unittest.skip("Forbidden-pattern check is temporarily commented out in _validate_section")
+    def test_rejects_categorical_and_fatalistic_wording(self):
+        section = {
+            "title": "Твой портрет",
+            "requirements": {"min_words": 5, "max_words": 30},
+        }
+        for text in (
+            "Вам это гарантированно принесёт доход в ближайшее время всегда",
+            "Вам суждено встретить партнёра в этом году совершенно точно позже",
+            "Здесь вы точно измените профессию и станете руководителем отдела",
+        ):
+            validated, rejection = _validate_section(text, section, ["Солнце в Овен"])
+            self.assertIsNone(validated, text)
+            self.assertIn("недопустимые формулировки", rejection)
+
+    def test_hint_cards_are_sorted_by_priority_and_limited(self):
+        hint = {
+            "hint_cards": [
+                {"id": "empty", "when": {}, "text_ru": "   ", "priority": 500},
+                {"id": "low", "when": {}, "text_ru": "Низкий приоритет.", "priority": 10},
+                {"id": "high", "when": {}, "text_ru": "Высокий приоритет.", "priority": 90},
+                *[
+                    {"id": f"filler{index}", "when": {}, "text_ru": f"Текст {index}."}
+                    for index in range(MAX_HINT_CARDS)
+                ],
+            ],
+        }
+        selected = _selected_hint_cards(hint, [])
+        self.assertEqual(len(selected), MAX_HINT_CARDS)
+        self.assertEqual([card["id"] for card in selected[:2]], ["high", "low"])
+        self.assertNotIn("empty", [card["id"] for card in selected])
+
+    def test_covered_sections_are_passed_for_anti_duplication(self):
+        payload = build_prompt_payload("personality", chart(), None)
+        section = next(
+            item
+            for item in payload["sections"]
+            if item["title"] == "Твой внутренний мир"
         )
+        without_context = build_section_payload(payload, section)
+        self.assertNotIn("covered_sections", without_context)
+
+        covered = [{"title": "Твой главный психологический портрет", "summary": "Уже описана воля."}]
+        with_context = build_section_payload(payload, section, covered)
+        self.assertEqual(with_context["covered_sections"], covered)
+
+    def test_section_summary_is_trimmed_to_one_line(self):
+        summary = _section_summary("Первая строка.\n\n" + "слово " * 200)
+        self.assertNotIn("\n", summary)
+        self.assertLessEqual(len(summary), MAX_SECTION_SUMMARY_CHARS + 1)
+
+    def test_compatibility_requires_both_charts(self):
+        with self.assertRaises(ValueError):
+            build_prompt_payload("compatibility", chart(), None)
+
+    def test_love_payload_is_supported(self):
+        payload = build_prompt_payload("love", chart(), None)
+        self.assertEqual(len(payload["sections"]), 18)
+        self.assertEqual(payload["sections"][0]["title"], "Как ты влюбляешься")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,138 @@
+{
+  "schema_version": "section-hint.v1",
+  "section_id": "compatibility.05",
+  "report_type": "compatibility",
+  "title_ru": "Интеллектуальная совместимость",
+  "brief": "общие темы и стиль мышления",
+  "prompt_requirements": {
+    "min_words": 150,
+    "max_words": 250,
+    "style_notes": [
+      "Тема раздела: общие темы и стиль мышления.",
+      "Минимум воды. Только наблюдения, связанные с фактами карты."
+    ],
+    "avoid_repeating_sections": []
+  },
+  "hint_cards": [
+    {
+      "id": "mercury_virgo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "virgo"
+      },
+      "text_ru": "Меркурий в Дева: мышление и общение через анализ и внимание к деталям.",
+      "priority": 100
+    },
+    {
+      "id": "mercury_aries",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "aries"
+      },
+      "text_ru": "Меркурий в Овен: мышление и общение через инициативу и прямое действие.",
+      "priority": 50
+    },
+    {
+      "id": "mercury_taurus",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "taurus"
+      },
+      "text_ru": "Меркурий в Телец: мышление и общение через устойчивость и практичность.",
+      "priority": 50
+    },
+    {
+      "id": "mercury_gemini",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "gemini"
+      },
+      "text_ru": "Меркурий в Близнецы: мышление и общение через гибкость и обмен информацией.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_cancer",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "cancer"
+      },
+      "text_ru": "Меркурий в Рак: мышление и общение через эмоциональную близость и безопасность.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_leo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "leo"
+      },
+      "text_ru": "Меркурий в Лев: мышление и общение через самовыражение и признание.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_libra",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "libra"
+      },
+      "text_ru": "Меркурий в Весы: мышление и общение через гармонию и взаимодействие.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_scorpio",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "scorpio"
+      },
+      "text_ru": "Меркурий в Скорпион: мышление и общение через глубину и собранность.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_sagittarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "sagittarius"
+      },
+      "text_ru": "Меркурий в Стрелец: мышление и общение через расширение горизонтов и поиск смысла.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_capricorn",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "capricorn"
+      },
+      "text_ru": "Меркурий в Козерог: мышление и общение через дисциплину и долгосрочную цель.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_aquarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "aquarius"
+      },
+      "text_ru": "Меркурий в Водолей: мышление и общение через самостоятельность и нестандартный взгляд.",
+      "priority": 0
+    },
+    {
+      "id": "mercury_pisces",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mercury",
+        "sign": "pisces"
+      },
+      "text_ru": "Меркурий в Рыбы: мышление и общение через чуткость и образное восприятие.",
+      "priority": 0
+    }
+  ]
+}

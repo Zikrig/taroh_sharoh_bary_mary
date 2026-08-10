@@ -1,0 +1,828 @@
+{
+  "schema_version": "section-hint.v1",
+  "section_id": "personality.08",
+  "report_type": "personality",
+  "title_ru": "Эмоции и стресс",
+  "brief": "триггеры, давление, восстановление",
+  "prompt_requirements": {
+    "min_words": 150,
+    "max_words": 250,
+    "style_notes": [
+      "Тема раздела: триггеры, давление, восстановление.",
+      "Минимум воды. Только наблюдения, связанные с фактами карты."
+    ],
+    "avoid_repeating_sections": []
+  },
+  "hint_cards": [
+    {
+      "id": "moon_cancer",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "cancer"
+      },
+      "text_ru": "Луна в Рак: эмоции и чувство безопасности через эмоциональную близость и безопасность.",
+      "priority": 100
+    },
+    {
+      "id": "moon_scorpio",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "scorpio"
+      },
+      "text_ru": "Луна в Скорпион: эмоции и чувство безопасности через глубину и собранность.",
+      "priority": 90
+    },
+    {
+      "id": "mars_aries",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "aries"
+      },
+      "text_ru": "Марс в Овен: действие и энергия через инициативу и прямое действие.",
+      "priority": 80
+    },
+    {
+      "id": "moon_aries",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "aries"
+      },
+      "text_ru": "Луна в Овен: эмоции и чувство безопасности через инициативу и прямое действие.",
+      "priority": 0
+    },
+    {
+      "id": "moon_taurus",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "taurus"
+      },
+      "text_ru": "Луна в Телец: эмоции и чувство безопасности через устойчивость и практичность.",
+      "priority": 0
+    },
+    {
+      "id": "moon_gemini",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "gemini"
+      },
+      "text_ru": "Луна в Близнецы: эмоции и чувство безопасности через гибкость и обмен информацией.",
+      "priority": 0
+    },
+    {
+      "id": "moon_leo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "leo"
+      },
+      "text_ru": "Луна в Лев: эмоции и чувство безопасности через самовыражение и признание.",
+      "priority": 0
+    },
+    {
+      "id": "moon_virgo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "virgo"
+      },
+      "text_ru": "Луна в Дева: эмоции и чувство безопасности через анализ и внимание к деталям.",
+      "priority": 0
+    },
+    {
+      "id": "moon_libra",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "libra"
+      },
+      "text_ru": "Луна в Весы: эмоции и чувство безопасности через гармонию и взаимодействие.",
+      "priority": 0
+    },
+    {
+      "id": "moon_sagittarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "sagittarius"
+      },
+      "text_ru": "Луна в Стрелец: эмоции и чувство безопасности через расширение горизонтов и поиск смысла.",
+      "priority": 0
+    },
+    {
+      "id": "moon_capricorn",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "capricorn"
+      },
+      "text_ru": "Луна в Козерог: эмоции и чувство безопасности через дисциплину и долгосрочную цель.",
+      "priority": 0
+    },
+    {
+      "id": "moon_aquarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "aquarius"
+      },
+      "text_ru": "Луна в Водолей: эмоции и чувство безопасности через самостоятельность и нестандартный взгляд.",
+      "priority": 0
+    },
+    {
+      "id": "moon_pisces",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "moon",
+        "sign": "pisces"
+      },
+      "text_ru": "Луна в Рыбы: эмоции и чувство безопасности через чуткость и образное восприятие.",
+      "priority": 0
+    },
+    {
+      "id": "mars_taurus",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "taurus"
+      },
+      "text_ru": "Марс в Телец: действие и энергия через устойчивость и практичность.",
+      "priority": 0
+    },
+    {
+      "id": "mars_gemini",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "gemini"
+      },
+      "text_ru": "Марс в Близнецы: действие и энергия через гибкость и обмен информацией.",
+      "priority": 0
+    },
+    {
+      "id": "mars_cancer",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "cancer"
+      },
+      "text_ru": "Марс в Рак: действие и энергия через эмоциональную близость и безопасность.",
+      "priority": 0
+    },
+    {
+      "id": "mars_leo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "leo"
+      },
+      "text_ru": "Марс в Лев: действие и энергия через самовыражение и признание.",
+      "priority": 0
+    },
+    {
+      "id": "mars_virgo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "virgo"
+      },
+      "text_ru": "Марс в Дева: действие и энергия через анализ и внимание к деталям.",
+      "priority": 0
+    },
+    {
+      "id": "mars_libra",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "libra"
+      },
+      "text_ru": "Марс в Весы: действие и энергия через гармонию и взаимодействие.",
+      "priority": 0
+    },
+    {
+      "id": "mars_scorpio",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "scorpio"
+      },
+      "text_ru": "Марс в Скорпион: действие и энергия через глубину и собранность.",
+      "priority": 0
+    },
+    {
+      "id": "mars_sagittarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "sagittarius"
+      },
+      "text_ru": "Марс в Стрелец: действие и энергия через расширение горизонтов и поиск смысла.",
+      "priority": 0
+    },
+    {
+      "id": "mars_capricorn",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "capricorn"
+      },
+      "text_ru": "Марс в Козерог: действие и энергия через дисциплину и долгосрочную цель.",
+      "priority": 0
+    },
+    {
+      "id": "mars_aquarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "aquarius"
+      },
+      "text_ru": "Марс в Водолей: действие и энергия через самостоятельность и нестандартный взгляд.",
+      "priority": 0
+    },
+    {
+      "id": "mars_pisces",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "pisces"
+      },
+      "text_ru": "Марс в Рыбы: действие и энергия через чуткость и образное восприятие.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_aries",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "aries"
+      },
+      "text_ru": "Сатурн в Овен: границы и ответственность через инициативу и прямое действие.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_taurus",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "taurus"
+      },
+      "text_ru": "Сатурн в Телец: границы и ответственность через устойчивость и практичность.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_gemini",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "gemini"
+      },
+      "text_ru": "Сатурн в Близнецы: границы и ответственность через гибкость и обмен информацией.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_cancer",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "cancer"
+      },
+      "text_ru": "Сатурн в Рак: границы и ответственность через эмоциональную близость и безопасность.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_leo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "leo"
+      },
+      "text_ru": "Сатурн в Лев: границы и ответственность через самовыражение и признание.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_virgo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "virgo"
+      },
+      "text_ru": "Сатурн в Дева: границы и ответственность через анализ и внимание к деталям.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_libra",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "libra"
+      },
+      "text_ru": "Сатурн в Весы: границы и ответственность через гармонию и взаимодействие.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_scorpio",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "scorpio"
+      },
+      "text_ru": "Сатурн в Скорпион: границы и ответственность через глубину и собранность.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_sagittarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "sagittarius"
+      },
+      "text_ru": "Сатурн в Стрелец: границы и ответственность через расширение горизонтов и поиск смысла.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_capricorn",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "capricorn"
+      },
+      "text_ru": "Сатурн в Козерог: границы и ответственность через дисциплину и долгосрочную цель.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_aquarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "aquarius"
+      },
+      "text_ru": "Сатурн в Водолей: границы и ответственность через самостоятельность и нестандартный взгляд.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_pisces",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "pisces"
+      },
+      "text_ru": "Сатурн в Рыбы: границы и ответственность через чуткость и образное восприятие.",
+      "priority": 0
+    },
+    {
+      "id": "neptune_aries",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "neptune",
+        "sign": "aries"
+      },
+      "text_ru": "Нептун в Овен: воображение и эмпатия через инициативу и прямое действие.",
+      "priority": 0
+    },
+    {
+      "id": "neptune_taurus",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "neptune",
+        "sign": "taurus"
+      },
+      "text_ru": "Нептун в Телец: воображение и эмпатия через устойчивость и практичность.",
+      "priority": 0
+    },
+    {
+      "id": "neptune_gemini",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "neptune",
+        "sign": "gemini"
+      },
+      "text_ru": "Нептун в Близнецы: воображение и эмпатия через гибкость и обмен информацией.",
+      "priority": 0
+    },
+    {
+      "id": "neptune_cancer",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "neptune",
+        "sign": "cancer"
+      },
+      "text_ru": "Нептун в Рак: воображение и эмпатия через эмоциональную близость и безопасность.",
+      "priority": 0
+    },
+    {
+      "id": "neptune_leo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "neptune",
+        "sign": "leo"
+      },
+      "text_ru": "Нептун в Лев: воображение и эмпатия через самовыражение и признание.",
+      "priority": 0
+    },
+    {
+      "id": "neptune_virgo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "neptune",
+        "sign": "virgo"
+      },
+      "text_ru": "Нептун в Дева: воображение и эмпатия через анализ и внимание к деталям.",
+      "priority": 0
+    },
+    {
+      "id": "neptune_libra",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "neptune",
+        "sign": "libra"
+      },
+      "text_ru": "Нептун в Весы: воображение и эмпатия через гармонию и взаимодействие.",
+      "priority": 0
+    },
+    {
+      "id": "neptune_scorpio",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "neptune",
+        "sign": "scorpio"
+      },
+      "text_ru": "Нептун в Скорпион: воображение и эмпатия через глубину и собранность.",
+      "priority": 0
+    },
+    {
+      "id": "neptune_sagittarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "neptune",
+        "sign": "sagittarius"
+      },
+      "text_ru": "Нептун в Стрелец: воображение и эмпатия через расширение горизонтов и поиск смысла.",
+      "priority": 0
+    },
+    {
+      "id": "neptune_capricorn",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "neptune",
+        "sign": "capricorn"
+      },
+      "text_ru": "Нептун в Козерог: воображение и эмпатия через дисциплину и долгосрочную цель.",
+      "priority": 0
+    },
+    {
+      "id": "neptune_aquarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "neptune",
+        "sign": "aquarius"
+      },
+      "text_ru": "Нептун в Водолей: воображение и эмпатия через самостоятельность и нестандартный взгляд.",
+      "priority": 0
+    },
+    {
+      "id": "neptune_pisces",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "neptune",
+        "sign": "pisces"
+      },
+      "text_ru": "Нептун в Рыбы: воображение и эмпатия через чуткость и образное восприятие.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_conjunction_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "mars",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Луна — Марс: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_sextile_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "mars",
+        "aspect": "sextile"
+      },
+      "text_ru": "Луна — Марс: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_square_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "mars",
+        "aspect": "square"
+      },
+      "text_ru": "Луна — Марс: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_trine_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "mars",
+        "aspect": "trine"
+      },
+      "text_ru": "Луна — Марс: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_opposition_mars",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "mars",
+        "aspect": "opposition"
+      },
+      "text_ru": "Луна — Марс: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_conjunction_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "saturn",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Луна — Сатурн: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_sextile_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "saturn",
+        "aspect": "sextile"
+      },
+      "text_ru": "Луна — Сатурн: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_square_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "saturn",
+        "aspect": "square"
+      },
+      "text_ru": "Луна — Сатурн: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_trine_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "saturn",
+        "aspect": "trine"
+      },
+      "text_ru": "Луна — Сатурн: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_opposition_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "saturn",
+        "aspect": "opposition"
+      },
+      "text_ru": "Луна — Сатурн: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_conjunction_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "neptune",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Луна — Нептун: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_sextile_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "neptune",
+        "aspect": "sextile"
+      },
+      "text_ru": "Луна — Нептун: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_square_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "neptune",
+        "aspect": "square"
+      },
+      "text_ru": "Луна — Нептун: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_trine_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "neptune",
+        "aspect": "trine"
+      },
+      "text_ru": "Луна — Нептун: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_moon_opposition_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "moon",
+        "second": "neptune",
+        "aspect": "opposition"
+      },
+      "text_ru": "Луна — Нептун: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_conjunction_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "saturn",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Марс — Сатурн: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_sextile_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "saturn",
+        "aspect": "sextile"
+      },
+      "text_ru": "Марс — Сатурн: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_square_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "saturn",
+        "aspect": "square"
+      },
+      "text_ru": "Марс — Сатурн: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_trine_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "saturn",
+        "aspect": "trine"
+      },
+      "text_ru": "Марс — Сатурн: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_opposition_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "saturn",
+        "aspect": "opposition"
+      },
+      "text_ru": "Марс — Сатурн: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_conjunction_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "neptune",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Марс — Нептун: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_sextile_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "neptune",
+        "aspect": "sextile"
+      },
+      "text_ru": "Марс — Нептун: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_square_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "neptune",
+        "aspect": "square"
+      },
+      "text_ru": "Марс — Нептун: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_trine_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "neptune",
+        "aspect": "trine"
+      },
+      "text_ru": "Марс — Нептун: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_opposition_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "neptune",
+        "aspect": "opposition"
+      },
+      "text_ru": "Марс — Нептун: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_conjunction_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "neptune",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Сатурн — Нептун: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_sextile_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "neptune",
+        "aspect": "sextile"
+      },
+      "text_ru": "Сатурн — Нептун: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_square_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "neptune",
+        "aspect": "square"
+      },
+      "text_ru": "Сатурн — Нептун: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_trine_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "neptune",
+        "aspect": "trine"
+      },
+      "text_ru": "Сатурн — Нептун: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_opposition_neptune",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "neptune",
+        "aspect": "opposition"
+      },
+      "text_ru": "Сатурн — Нептун: оппозиция требует баланса между темами.",
+      "priority": 0
+    }
+  ]
+}

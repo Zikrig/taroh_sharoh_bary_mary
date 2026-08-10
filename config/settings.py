@@ -19,6 +19,12 @@ class Settings:
     ai_base_url: str = os.getenv("AITUNNEL_BASE_URL", "https://api.aitunnel.ru/v1/")
     ai_model: str = os.getenv("AITUNNEL_MODEL", "deepseek-v4-flash-0731")
     database_path: Path = Path(os.getenv("DATABASE_PATH", "data/bot.db"))
+    save_payload_samples: bool = os.getenv("SAVE_PAYLOAD_SAMPLES", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
     admin_ids: tuple[int, ...] = tuple(
         int(value.strip())
         for value in os.getenv("ADMINS_ID", "").split(",")
