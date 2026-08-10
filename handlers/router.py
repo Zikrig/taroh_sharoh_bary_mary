@@ -37,24 +37,88 @@ from services.reports import generate_report
 
 router = Router()
 PRICES = {"personality": 349, "compatibility": 449, "money": 399}
-NAMES = {"personality": "Разбор личности", "compatibility": "Совместимость", "money": "Денежный код"}
+NAMES = {
+    "personality": "Разбор личности",
+    "compatibility": "Совместимость",
+    "money": "Деньги и реализация",
+}
+STUB_SCENARIOS = {
+    "love": "❤️ Любовь и отношения",
+    "full": "✨ Полный разбор",
+}
 PENDING_REPORTS: dict[int, tuple[dict, dict | None]] = {}
-REPORT_PROGRESS_TEXT = "Готовлю ваш персональный прогноз"
+REPORT_PROGRESS_TEXT = "🔮 Формирую ваш персональный результат"
 SCENARIO_INTROS = {
     "personality": (
-        "✨ Разбор личности\n\n"
-        "Ваша натальная карта — это персональный код характера, талантов, отношений "
-        "и предназначения. Узнайте, в чём ваша сила и какие возможности раскрыть дальше."
+        "🧠 РАЗБОР ЛИЧНОСТИ\n\n"
+        "Здесь вы узнаете не только свой знак зодиака. Мы разберём ваши особенности, "
+        "сильные стороны, внутренние противоречия, мотивацию и то, что может мешать "
+        "вам реализовываться.\n\n"
+        "Сначала покажу небольшой ознакомительный фрагмент, чтобы вы почувствовали "
+        "точность персонального подхода. Затем можно будет открыть полный разбор."
     ),
     "compatibility": (
-        "💞 Совместимость\n\n"
-        "Разберём притяжение, эмоциональную близость, общение и возможные точки "
-        "напряжения в вашей паре. Для анализа понадобятся данные вас и партнёра."
+        "💑 СОВМЕСТИМОСТЬ\n\n"
+        "Посмотрим, что притягивает вас друг к другу, как вы проживаете эмоции, "
+        "общаетесь и где могут возникать точки напряжения.\n\n"
+        "Для анализа понадобятся данные вас и партнёра."
     ),
     "money": (
-        "💰 Денежный код\n\n"
-        "Карта поможет посмотреть ваши привычные финансовые сценарии, сильные стороны "
-        "и направления, где легче раскрывать потенциал дохода."
+        "💰 ДЕНЬГИ И РЕАЛИЗАЦИЯ\n\n"
+        "Разберём ваш стиль взаимодействия с деньгами, рабочие сильные стороны, "
+        "мотивацию и направления, в которых может раскрыться потенциал реализации."
+    ),
+}
+TEASER_TEXTS = {
+    "personality": (
+        "✨ ТВОЙ ПЕРСОНАЛЬНЫЙ ПРОФИЛЬ\n\n"
+        "🧠 КАКОЙ ТЫ ЧЕЛОВЕК\n"
+        "Ты можешь производить впечатление более спокойного и уверенного человека, "
+        "чем ощущаешь себя внутри. Тебе важно самостоятельно принимать решения, "
+        "но мнение действительно близких людей может влиять на тебя сильнее, чем ты показываешь.\n\n"
+        "✨ ТВОЯ СИЛЬНАЯ СТОРОНА\n"
+        "Ты умеешь адаптироваться к новым обстоятельствам и искать решение, "
+        "когда другие начинают теряться.\n\n"
+        "⚠️ ЧТО МОЖЕТ ТЕБЕ МЕШАТЬ\n"
+        "Иногда ты слишком долго пытаешься разобраться со всем самостоятельно "
+        "и откладываешь момент, когда можно попросить о помощи.\n\n"
+        "👀 КАК ТЕБЯ ВИДЯТ ЛЮДИ\n"
+        "Со стороны ты можешь казаться более независимым и невозмутимым, "
+        "чем являешься на самом деле.\n\n"
+        "❤️ ТЫ В ОТНОШЕНИЯХ\n"
+        "Тебе важно чувствовать эмоциональную безопасность и понимать, "
+        "что человек действительно выбирает тебя.\n\n"
+        "💰 ТЫ И ДЕНЬГИ\n"
+        "Твой потенциал сильнее раскрывается там, где ты можешь влиять на результат, "
+        "а не только выполнять чужие инструкции."
+    ),
+    "money": (
+        "✨ ТВОЙ ДЕНЕЖНЫЙ ПРОФИЛЬ\n\n"
+        "💰 ТВОЙ СТИЛЬ РЕАЛИЗАЦИИ\n"
+        "Тебе может быть легче включаться в работу, когда понятен личный вклад "
+        "и виден результат. Однообразные задачи без ощущения развития способны "
+        "быстро снижать мотивацию.\n\n"
+        "💪 ТВОЯ СИЛЬНАЯ СТОРОНА\n"
+        "Ты умеешь замечать практичные решения и соединять идею с конкретным действием.\n\n"
+        "⚠️ ЧТО МОЖЕТ МЕШАТЬ\n"
+        "Временная потеря интереса может заставлять тебя бросать перспективное дело "
+        "раньше, чем оно успевает принести результат.\n\n"
+        "🎯 ТОЧКА РОСТА\n"
+        "Последовательность и понятная система действий могут стать важнее "
+        "краткого всплеска вдохновения."
+    ),
+    "compatibility": (
+        "✨ ПЕРВЫЙ ВЗГЛЯД НА ВАШУ ПАРУ\n\n"
+        "❤️ ЭМОЦИОНАЛЬНАЯ СОВМЕСТИМОСТЬ\n"
+        "Между вами может быть сильное притяжение, но эмоциональные потребности "
+        "могут отличаться. Одному может требоваться больше ясности и подтверждения, "
+        "а второму — больше пространства.\n\n"
+        "🔥 ПРИТЯЖЕНИЕ\n"
+        "В этой паре может быть заметная химия: вас способен привлекать "
+        "контраст характеров и то, как каждый проявляет себя по-разному.\n\n"
+        "⚠️ ГЛАВНАЯ СЛОЖНОСТЬ\n"
+        "Разные способы выражать чувства могут приводить к недопониманию, "
+        "если важные ожидания остаются невысказанными."
     ),
 }
 
@@ -78,9 +142,11 @@ async def menu(user_id: int):
     share_text = await get_app_setting("share_text") or "Узнай себя по звёздам →"
     has_profile = await get_profile(user_id) is not None
     builder = InlineKeyboardBuilder()
-    builder.button(text="✨ Разбор личности", callback_data="scenario:personality")
-    builder.button(text="💞 Совместимость", callback_data="scenario:compatibility")
-    builder.button(text="💰 Денежный код", callback_data="scenario:money")
+    builder.button(text="🧠 Личность", callback_data="scenario:personality")
+    builder.button(text="❤️ Любовь и отношения", callback_data="stub:love")
+    builder.button(text="💰 Деньги и реализация", callback_data="scenario:money")
+    builder.button(text="💑 Совместимость", callback_data="scenario:compatibility")
+    builder.button(text="✨ Полный разбор", callback_data="stub:full")
     builder.button(text="📤 Поделиться", switch_inline_query=share_text)
     if has_profile:
         builder.button(text="✏️ Изменить данные", callback_data="edit_profile")
@@ -92,9 +158,16 @@ async def menu(user_id: int):
 
 async def get_main_menu_text() -> str:
     return await get_app_setting("main_menu_text") or (
-        "Добро пожаловать в <b>ASTRO MARY</b> ✨\n\n"
-        "Выберите сценарий — я построю карту по вашим данным, покажу короткий "
-        "персональный тизер и предложу полный PDF."
+        "🔮 <b>Узнай о себе больше, чем может рассказать обычный гороскоп</b>\n\n"
+        "Этот разбор создаётся индивидуально по вашим данным рождения — "
+        "дате, времени и месту.\n\n"
+        "Здесь вы можете узнать:\n"
+        "🧠 какой вы человек на самом деле\n"
+        "❤️ как вы любите и кого выбираете\n"
+        "💰 где раскрывается ваш потенциал реализации\n"
+        "💑 что происходит между вами и конкретным человеком\n"
+        "✨ или получить полный разбор личности\n\n"
+        "Выберите, что вам интересно 👇"
     )
 
 
@@ -124,7 +197,7 @@ def edit_profile_menu():
 
 def unknown_time_keyboard(back_destination: str):
     builder = InlineKeyboardBuilder()
-    builder.button(text="Не знаю", callback_data="time_unknown")
+    builder.button(text="🕐 Не знаю точное время", callback_data="time_unknown")
     builder.button(text="⬅️ Назад", callback_data=f"back:{back_destination}")
     builder.adjust(1)
     return builder.as_markup()
@@ -393,13 +466,12 @@ async def help_command(message: Message):
 
 async def send_help(message: Message):
     await message.answer(
-        "Выберите то, что хочется узнать о себе прямо сейчас ✨\n\n"
-        "✨ Разбор личности — раскройте свои сильные стороны, таланты и внутренние "
-        "ресурсы через вашу натальную карту.\n\n"
-        "💞 Совместимость — узнайте, что объединяет вас с партнёром, где живёт "
-        "притяжение и как сделать отношения гармоничнее.\n\n"
-        "💰 Денежный код — найдите свои финансовые опоры, привычки и точки роста, "
-        "чтобы увереннее двигаться к изобилию.\n\n"
+        "Выберите, что хочется узнать о себе прямо сейчас ✨\n\n"
+        "🧠 Личность — ваши сильные стороны, внутренние противоречия и точки роста.\n\n"
+        "❤️ Любовь и отношения — как вы проявляете чувства и кого выбираете.\n\n"
+        "💰 Деньги и реализация — ваши рабочие опоры и направления развития.\n\n"
+        "💑 Совместимость — что объединяет вас с партнёром и где нужны договорённости.\n\n"
+        "✨ Полный разбор — все ключевые темы в одном персональном профиле.\n\n"
         "📤 Поделиться — отправьте бота близкому человеку и вместе откройте "
         "подсказки звёзд.\n\n"
         "✏️ Изменить данные — обновите дату, время или место рождения для "
@@ -531,7 +603,10 @@ async def ask_own_data(message: Message, state: FSMContext, scenario: str, user_
         await state.update_data(own_chart=own_chart, next_scenario=scenario)
         await state.set_state(BirthStates.partner_date)
         await message.answer(
-            "Профиль найден ✅\nВведите дату рождения партнёра ДД.ММ.ГГГГ:",
+            "Ваши данные уже сохранены ✅\n\n"
+            "Теперь нужны данные второго человека.\n\n"
+            "📅 Дата рождения партнёра\n"
+            "Например: 24.07.1998",
             reply_markup=back_to_menu(),
         )
         return
@@ -549,7 +624,9 @@ async def ask_own_data(message: Message, state: FSMContext, scenario: str, user_
     await state.set_state(BirthStates.own_date)
     await state.update_data(next_scenario=scenario)
     await message.answer(
-        "Сколько вам лет?\nУкажите дату рождения в формате ДД.ММ.ГГГГ:",
+        "📅 ШАГ 1 ИЗ 3\n\n"
+        "Напишите дату своего рождения.\n"
+        "Например: 24.07.1998",
         reply_markup=back_to_menu(),
     )
 
@@ -559,6 +636,19 @@ async def scenario(callback: CallbackQuery, state: FSMContext):
     scenario_name = callback.data.split(":", 1)[1]
     await callback.answer()
     await ask_own_data(callback.message, state, scenario_name, callback.from_user.id)
+
+
+@router.callback_query(F.data.startswith("stub:"))
+async def scenario_stub(callback: CallbackQuery):
+    scenario_name = callback.data.split(":", 1)[1]
+    title = STUB_SCENARIOS.get(scenario_name, "Этот раздел")
+    await callback.answer()
+    await callback.message.answer(
+        f"{title}\n\n"
+        "Этот формат уже в планах и скоро появится в боте. "
+        "Пока можно выбрать один из доступных персональных разборов 👇",
+        reply_markup=await menu(callback.from_user.id),
+    )
 
 
 @router.message(BirthStates.own_date)
@@ -576,7 +666,10 @@ async def own_date(message: Message, state: FSMContext):
     await state.update_data(own_date=value)
     await state.set_state(BirthStates.own_time)
     await message.answer(
-        "Введите время рождения ЧЧ:ММ или выберите вариант ниже:",
+        "🕐 ШАГ 2 ИЗ 3\n\n"
+        "Теперь напишите время рождения.\n"
+        "Например: 14:35\n\n"
+        "Чем точнее время, тем персональнее получится разбор.",
         reply_markup=unknown_time_keyboard("menu"),
     )
 
@@ -615,7 +708,22 @@ async def own_time(
         ),
     )
     await state.set_state(BirthStates.own_place)
-    await message.answer("Напишите город и страну рождения:", reply_markup=back_to_menu())
+    if is_approximate_time(time_text if time_text is not None else message.text):
+        prompt = (
+            "Ничего страшного ❤️\n"
+            "Разбор всё равно можно сделать. Некоторые выводы, связанные с домами "
+            "и Асцендентом, будут менее точными.\n\n"
+            "📍 ШАГ 3 ИЗ 3\n\n"
+            "Напишите город и страну, где вы родились.\n"
+            "Например: Москва, Россия"
+        )
+    else:
+        prompt = (
+            "📍 ШАГ 3 ИЗ 3\n\n"
+            "Напишите город и страну, где вы родились.\n"
+            "Например: Москва, Россия"
+        )
+    await message.answer(prompt, reply_markup=back_to_menu())
 
 
 @router.message(BirthStates.own_place)
@@ -665,7 +773,11 @@ async def own_place(message: Message, state: FSMContext):
     elif scenario_name == "compatibility":
         await state.update_data(own_chart=own_chart)
         await state.set_state(BirthStates.partner_date)
-        await message.answer("Теперь введите дату рождения партнёра ДД.ММ.ГГГГ:")
+        await message.answer(
+            "📅 Дата рождения партнёра\n\n"
+            "Напишите дату в формате ДД.ММ.ГГГГ.\n"
+            "Например: 24.07.1998"
+        )
     else:
         await state.clear()
         await show_teaser(message, scenario_name, own_chart, user_id=message.from_user.id)
@@ -681,7 +793,9 @@ async def partner_date(message: Message, state: FSMContext):
     await state.update_data(partner_date=value)
     await state.set_state(BirthStates.partner_time)
     await message.answer(
-        "Время рождения партнёра ЧЧ:ММ или выберите вариант ниже:",
+        "🕐 Время рождения партнёра\n"
+        "Например: 14:35\n\n"
+        "Если время неизвестно, нажмите кнопку ниже.",
         reply_markup=unknown_time_keyboard("menu"),
     )
 
@@ -700,7 +814,11 @@ async def partner_time(message: Message, state: FSMContext, time_text: str | Non
         ),
     )
     await state.set_state(BirthStates.partner_place)
-    await message.answer("Город и страна рождения партнёра:", reply_markup=back_to_menu())
+    await message.answer(
+        "📍 Место рождения партнёра\n"
+        "Например: Москва, Россия",
+        reply_markup=back_to_menu(),
+    )
 
 
 @router.callback_query(F.data == "time_unknown")
@@ -753,7 +871,15 @@ async def show_teaser(
     builder.button(text="⬅️ Назад", callback_data="back:menu")
     builder.adjust(1)
     await message.answer(
-        "Выберите действие:",
+        f"{TEASER_TEXTS[scenario_name]}\n\n"
+        "🔐 ЭТО ТОЛЬКО ВЕРХНИЙ СЛОЙ ПРОФИЛЯ\n"
+        "В полном разборе можно посмотреть:\n"
+        "❤️ сценарии отношений и тип подходящего партнёра\n"
+        "🧠 скрытые качества и внутренние противоречия\n"
+        "💰 денежный профиль и рабочие направления\n"
+        "🎯 точки роста и практические рекомендации\n"
+        "✨ подробный итоговый профиль\n\n"
+        "Твой персональный результат будет сформирован по твоим данным рождения.",
         reply_markup=builder.as_markup(),
     )
 
@@ -789,6 +915,12 @@ async def buy(callback: CallbackQuery):
         return
     payload = f"report:{scenario_name}:{order_id}"
     await callback.answer()
+    await callback.message.answer(
+        f"Ваш «{NAMES[scenario_name]}» будет сформирован индивидуально по вашим данным.\n\n"
+        "Это не готовый текст для вашего знака — содержание зависит от даты, "
+        "времени и места рождения.\n"
+        "После оплаты вы получите полный персональный результат прямо здесь, в Telegram."
+    )
     await callback.message.answer_invoice(
         title=NAMES[scenario_name], description="Персональный PDF-отчёт ASTRO MARY",
         payload=payload, currency="XTR",
@@ -850,6 +982,10 @@ async def deliver_report(
             time_is_approximate=bool(profile["time_is_approximate"]),
         )
         second_chart = None
+    await message.answer(
+        "✅ Оплата получена.\n"
+        "Начинаю формировать ваш персональный разбор. Это займёт несколько секунд."
+    )
     async with report_status_animation(message) as mark_completed:
         content = await generate_report_content(scenario_name, chart, second_chart)
         if content is None:

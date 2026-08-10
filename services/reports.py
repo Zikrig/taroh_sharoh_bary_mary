@@ -539,7 +539,7 @@ def generate_report(
     type_titles = {
         "personality": "РАЗБОР ЛИЧНОСТИ",
         "compatibility": "СОВМЕСТИМОСТЬ",
-        "money": "ДЕНЕЖНЫЙ КОД",
+        "money": "ДЕНЬГИ И РЕАЛИЗАЦИЯ",
     }
 
     story = [
