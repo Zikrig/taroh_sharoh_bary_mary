@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import random
 import re
 from datetime import datetime, timezone
 from hashlib import sha1
@@ -20,6 +21,7 @@ FAILED_BATCH_RETRIES = 2
 PAYLOAD_SAMPLES_DIR = Path("data/payload_samples")
 SECTION_HINTS_DIR = Path(__file__).resolve().parent.parent / "section_hints"
 MAX_HINT_CARDS = 6
+MAX_SELECTED_ASPECTS = 6
 MAX_SECTION_SUMMARY_CHARS = 220
 MAX_CACHED_SECTIONS = 512
 
@@ -40,6 +42,32 @@ SOCIAL_PLANETS = frozenset({"Юпитер", "Сатурн"})
 OUTER_PLANETS = frozenset({"Уран", "Нептун", "Плутон"})
 ALL_PLANETS = PERSONAL_PLANETS | SOCIAL_PLANETS | OUTER_PLANETS
 HARD_ASPECTS = frozenset({"квадрат", "оппозиция"})
+ASPECT_ORBS = {
+    "соединение": 8.0,
+    "секстиль": 5.0,
+    "квадрат": 6.0,
+    "тригон": 6.0,
+    "оппозиция": 8.0,
+}
+ASPECT_TYPE_WEIGHTS = {
+    "соединение": 1.0,
+    "оппозиция": 0.95,
+    "квадрат": 0.9,
+    "тригон": 0.75,
+    "секстиль": 0.55,
+}
+PLANET_SIGNIFICANCE = {
+    "Солнце": 1.0,
+    "Луна": 1.0,
+    "Меркурий": 0.8,
+    "Венера": 0.85,
+    "Марс": 0.85,
+    "Юпитер": 0.65,
+    "Сатурн": 0.8,
+    "Уран": 0.5,
+    "Нептун": 0.5,
+    "Плутон": 0.55,
+}
 
 # Per-section focus: which facts/chart pieces a batch actually needs.
 # "aspects": "involving" | "all" | "hard" | "none"
@@ -252,6 +280,8 @@ SYSTEM_PROMPT = """
 детали ради полноты;
 — если передан covered_sections, не повторяй мысли, примеры и формулировки уже написанных
 разделов: раскрывай тему этого раздела с новой стороны;
+— interpretation_hints — это смысловые опоры, а не готовые фразы. Используй только 1–3
+релевантные подсказки, переформулируй их своими словами и не копируй дословно;
 — сначала объясняй важный паттерн карты, затем связывай его со сферой раздела и давай
 мягкий практический ориентир. Не выдавай интерпретацию за факт;
 — в разделах о карьере, профессиях, доходе, талантах и способностях называй 2–4 конкретных
@@ -561,18 +591,35 @@ def _filter_aspects(
     aspects: list[dict[str, Any]],
     focus: dict[str, Any],
 ) -> list[dict[str, Any]]:
+    """Keep only the strongest thematic aspects for one report section."""
     mode = focus["aspects"]
     planets = focus["planets"]
     if mode == "none":
         return []
-    result = []
+    scored: list[tuple[float, dict[str, Any]]] = []
     for aspect in aspects:
         if mode == "hard" and aspect.get("type") not in HARD_ASPECTS:
             continue
         if mode != "all" and aspect.get("first") not in planets and aspect.get("second") not in planets:
             continue
-        result.append(aspect)
-    return result
+        aspect_type = aspect.get("type")
+        max_orb = ASPECT_ORBS.get(aspect_type)
+        orb = aspect.get("orb")
+        if max_orb is None or not isinstance(orb, (int, float)) or orb > max_orb:
+            continue
+        exactness = 1 - (orb / max_orb)
+        planet_weight = (
+            PLANET_SIGNIFICANCE.get(aspect.get("first"), 0.4)
+            + PLANET_SIGNIFICANCE.get(aspect.get("second"), 0.4)
+        ) / 2
+        score = (
+            exactness * 0.65
+            + ASPECT_TYPE_WEIGHTS.get(aspect_type, 0.4) * 0.2
+            + planet_weight * 0.15
+        )
+        scored.append((score, aspect))
+    scored.sort(key=lambda item: item[0], reverse=True)
+    return [aspect for _, aspect in scored[:MAX_SELECTED_ASPECTS]]
 
 
 def _filter_chart_for_batch(
@@ -782,7 +829,14 @@ def _selected_hint_cards(hint: dict[str, Any], facts: list[dict[str, Any]]) -> l
         ):
             selected.append(card)
     selected.sort(key=_card_priority, reverse=True)
-    return selected[:MAX_HINT_CARDS]
+    # Always keep explicit high-priority cards, but vary generic cards so
+    # different reports do not receive an identical set of wordings.
+    fixed = [card for card in selected if _card_priority(card) > 0]
+    candidates = [card for card in selected if _card_priority(card) <= 0]
+    remaining = max(0, MAX_HINT_CARDS - len(fixed))
+    if len(candidates) > remaining:
+        candidates = random.sample(candidates, remaining)
+    return fixed[:MAX_HINT_CARDS] + candidates
 
 
 def build_section_payload(
@@ -897,12 +951,9 @@ def _validate_section(
     normalized = content.strip()
     requirements = section.get("requirements") or {}
     min_words = requirements.get("min_words", 30)
-    max_words = requirements.get("max_words")
     word_count = len(normalized.split())
     if word_count < min_words:
         return None, f"в тексте {word_count} слов, нужно не меньше {min_words}"
-    if isinstance(max_words, int) and word_count > max_words:
-        return None, f"в тексте {word_count} слов, нужно не больше {max_words}"
     # forbidden = _forbidden_phrases(normalized)
     # if forbidden:
     #     return None, "недопустимые формулировки: " + ", ".join(forbidden)

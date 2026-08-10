@@ -15,6 +15,7 @@ from services.ai import (
     SECTION_GUIDANCE,
     SYSTEM_PROMPT,
     _allowed_facts,
+    _filter_aspects,
     _section_batches,
     _section_summary,
     _selected_hint_cards,
@@ -208,9 +209,9 @@ class AiServiceTests(unittest.TestCase):
         self.assertIn("не меньше 5", rejection)
 
         long_text = " ".join(["Точный"] * 11)
-        too_long, rejection = _validate_section(long_text, section, allowed_facts)
-        self.assertIsNone(too_long)
-        self.assertIn("не больше 10", rejection)
+        accepted, rejection = _validate_section(long_text, section, allowed_facts)
+        self.assertIsNone(rejection)
+        self.assertEqual(accepted["content"], long_text)
 
     @unittest.skip("Forbidden-pattern check is temporarily commented out in _validate_section")
     def test_rejects_categorical_and_fatalistic_wording(self):
@@ -271,6 +272,25 @@ class AiServiceTests(unittest.TestCase):
         payload = build_prompt_payload("love", chart(), None)
         self.assertEqual(len(payload["sections"]), 18)
         self.assertEqual(payload["sections"][0]["title"], "Как ты влюбляешься")
+
+    def test_filters_aspects_by_significance_and_exactness(self):
+        aspects = [
+            {"first": "Солнце", "second": "Луна", "type": "тригон", "orb": 0.2},
+            {"first": "Уран", "second": "Нептун", "type": "секстиль", "orb": 0.1},
+            {"first": "Венера", "second": "Марс", "type": "квадрат", "orb": 5.9},
+            {"first": "Меркурий", "second": "Юпитер", "type": "секстиль", "orb": 5.1},
+        ]
+        focus = {
+            "planets": frozenset({"Солнце", "Луна", "Уран", "Нептун", "Венера", "Марс"}),
+            "aspects": "all",
+        }
+        selected = _filter_aspects(aspects, focus)
+        self.assertEqual(selected[0]["first"], "Солнце")
+        self.assertNotIn(aspects[3], selected)
+        self.assertLessEqual(len(selected), 6)
+
+    def test_prompt_requires_hints_to_be_rephrased(self):
+        self.assertIn("не копируй дословно", SYSTEM_PROMPT)
 
 
 if __name__ == "__main__":
