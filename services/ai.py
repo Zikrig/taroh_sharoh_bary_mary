@@ -291,6 +291,179 @@ DEFAULT_SECTION_FOCUS = {
     "aspects": "involving",
 }
 
+# These are prompt-facing priorities, not additional astrology calculations.
+# They tell the model which already-calculated facts may lead a section and
+# which facts should only add nuance. Codes match canonical facts below.
+TOPIC_PROFILES: dict[str, dict[str, Any]] = {
+    "portrait": {
+        "label": "личный портрет",
+        "primary": frozenset({"sun", "moon"}),
+        "weights": {"sun": 110, "moon": 105},
+        "secondary": frozenset({"mercury", "venus", "mars"}),
+        "ascendant": True,
+        "houses": frozenset(),
+        "hard_aspects": False,
+    },
+    "public_image": {
+        "label": "впечатление на окружающих",
+        "primary": frozenset({"sun", "mercury", "venus"}),
+        "weights": {"mercury": 110, "venus": 105, "sun": 100},
+        "secondary": frozenset({"moon", "mars"}),
+        "ascendant": True,
+        "houses": frozenset(),
+        "hard_aspects": False,
+    },
+    "strengths": {
+        "label": "сильные стороны",
+        "primary": frozenset({"sun", "mercury", "venus", "mars", "jupiter"}),
+        "weights": {"jupiter": 110, "mercury": 105, "venus": 103, "mars": 101, "sun": 100},
+        "secondary": frozenset({"moon", "saturn"}),
+        "ascendant": False,
+        "houses": frozenset(),
+        "hard_aspects": False,
+    },
+    "tensions": {
+        "label": "внутренние сложности и противоречия",
+        "primary": frozenset({"moon", "mars", "saturn", "pluto", "neptune"}),
+        "weights": {"saturn": 110, "moon": 108, "mars": 106, "pluto": 104, "neptune": 102},
+        "secondary": frozenset({"sun", "mercury", "venus", "uranus"}),
+        "ascendant": False,
+        "houses": frozenset(),
+        "hard_aspects": True,
+    },
+    "love": {
+        "label": "любовь и близость",
+        "primary": frozenset({"venus", "moon", "mars"}),
+        "weights": {"venus": 110, "moon": 106, "mars": 103},
+        "secondary": frozenset({"sun", "mercury"}),
+        "ascendant": False,
+        "houses": frozenset({5, 7}),
+        "hard_aspects": False,
+    },
+    "money": {
+        "label": "деньги, работа и реализация",
+        "primary": frozenset({"venus", "saturn", "jupiter"}),
+        "weights": {"saturn": 110, "jupiter": 107, "venus": 104},
+        "secondary": frozenset({"mercury", "mars", "sun"}),
+        "ascendant": False,
+        "houses": frozenset({2, 6, 8, 10}),
+        "hard_aspects": False,
+    },
+    "risk": {
+        "label": "отношение к риску и неопределённости",
+        "primary": frozenset({"mars", "jupiter", "uranus", "saturn"}),
+        "weights": {"uranus": 110, "jupiter": 107, "mars": 104, "saturn": 101},
+        "secondary": frozenset({"sun", "mercury"}),
+        "ascendant": False,
+        "houses": frozenset({2, 8, 10}),
+        "hard_aspects": False,
+    },
+    "communication": {
+        "label": "общение и мышление",
+        "primary": frozenset({"mercury", "moon"}),
+        "weights": {"mercury": 110, "moon": 104},
+        "secondary": frozenset({"venus", "sun", "uranus"}),
+        "ascendant": False,
+        "houses": frozenset({3, 6, 11}),
+        "hard_aspects": False,
+    },
+    "compatibility_emotions": {
+        "label": "эмоциональная динамика пары",
+        "primary": frozenset({"moon", "venus"}),
+        "weights": {"moon": 110, "venus": 105},
+        "secondary": frozenset({"mars", "saturn"}),
+        "ascendant": False,
+        "houses": frozenset(),
+        "hard_aspects": False,
+    },
+    "compatibility_attraction": {
+        "label": "притяжение в паре",
+        "primary": frozenset({"venus", "mars"}),
+        "weights": {"venus": 110, "mars": 105},
+        "secondary": frozenset({"sun", "moon"}),
+        "ascendant": False,
+        "houses": frozenset(),
+        "hard_aspects": False,
+    },
+}
+
+SECTION_TOPIC_KEYS = {
+    "Твой портрет": "portrait",
+    "Какой ты человек": "portrait",
+    "Твой главный психологический портрет": "portrait",
+    "Твой внутренний мир": "portrait",
+    "Как тебя видят другие": "public_image",
+    "Как тебя видят люди": "public_image",
+    "Твои сильные стороны": "strengths",
+    "Твои скрытые качества": "strengths",
+    "Что может тебе мешать": "tensions",
+    "Твои сложные стороны": "tensions",
+    "Скрытая сторона": "tensions",
+    "Главные блоки": "tensions",
+    "Твои повторяющиеся сценарии": "tensions",
+    "Любовь": "love",
+    "Ты в любви": "love",
+    "Как ты влюбляешься": "love",
+    "Что вызывает притяжение": "love",
+    "Что важно чувствовать в отношениях": "love",
+    "Как ты проявляешь любовь": "love",
+    "Как ты хочешь получать любовь": "love",
+    "Что вызывает недоверие": "tensions",
+    "Как проявляется ревность": "tensions",
+    "Реакция на дистанцию": "love",
+    "Ты в конфликтах": "tensions",
+    "Что трудно сказать партнёру": "communication",
+    "Как ты переживаешь расставание": "tensions",
+    "Возвращение к прошлому": "tensions",
+    "Повторяющиеся сценарии отношений": "tensions",
+    "Какой партнёр тебе подходит": "love",
+    "С кем тебе может быть сложно": "tensions",
+    "Что усиливает отношения": "love",
+    "Что может разрушать отношения": "tensions",
+    "Итоговый любовный портрет": "love",
+    "Деньги и работа": "money",
+    "Денежный профиль": "money",
+    "Отношение к деньгам": "money",
+    "Что мотивирует зарабатывать": "money",
+    "Отношение к стабильности": "money",
+    "Отношение к риску": "risk",
+    "Отношение к ответственности": "money",
+    "Работа в команде": "communication",
+    "Предпринимательский потенциал": "money",
+    "Что может мешать финансовому росту": "tensions",
+    "Качества, которые можно монетизировать": "money",
+    "Подходящий рабочий формат": "money",
+    "Подходящая рабочая среда": "money",
+    "Риск выгорания": "tensions",
+    "Навыки для развития": "money",
+    "Подходящие направления": "money",
+    "Почему эти направления подходят": "money",
+    "Что может мешать реализации": "tensions",
+    "Итоговый денежный профиль": "money",
+    "Эмоциональная совместимость": "compatibility_emotions",
+    "Притяжение": "compatibility_attraction",
+    "Общение": "communication",
+    "Интеллектуальная совместимость": "communication",
+    "Доверие": "compatibility_emotions",
+    "Ревность": "tensions",
+    "Личные границы": "tensions",
+    "Конфликты": "tensions",
+    "Что одного притягивает в другом": "compatibility_attraction",
+    "Что может раздражать": "tensions",
+    "Что каждому нужно от другого": "compatibility_emotions",
+    "Сильные стороны пары": "compatibility_emotions",
+    "Сложные стороны": "tensions",
+    "Повторяющиеся сценарии": "tensions",
+    "Как вам лучше общаться": "communication",
+    "Как улучшить отношения": "compatibility_emotions",
+    "Итоговый портрет пары": "compatibility_emotions",
+}
+
+
+def _topic_profile(title: str) -> dict[str, Any]:
+    return TOPIC_PROFILES[SECTION_TOPIC_KEYS.get(title, "portrait")]
+
+
 SYSTEM_PROMPT = """
 Ты — автор одного раздела персонального отчёта. Пиши строго на русском языке,
 на «вы», живо, бережно и конкретно.
@@ -312,6 +485,9 @@ SYSTEM_PROMPT = """
 — переводите их в наблюдаемые черты, привычки, реакции и жизненные ситуации;
 — interpretation_hints — это смысловые опоры, а не готовые фразы: используйте 1–3
 релевантные подсказки, переформулируйте их и не копируйте дословно;
+— topic_priorities — внутренняя тематическая таблица: сначала опирайтесь на факты
+с пометкой primary, а secondary используйте только как оттенок; не заменяйте тему
+раздела общим портретом человека;
 — если передан covered_sections, не повторяйте мысли, примеры и формулировки уже написанных
 разделов: раскрывайте тему с новой стороны;
 — сначала покажите паттерн, затем его возможное проявление в жизни;
@@ -826,6 +1002,94 @@ def _canonical_facts(section_payload: dict[str, Any]) -> list[dict[str, Any]]:
     return facts
 
 
+def _fact_priority(fact: dict[str, Any], profile: dict[str, Any]) -> tuple[int, int]:
+    """Rank calculated facts by their relevance to a report topic."""
+    primary = profile["primary"]
+    secondary = profile["secondary"]
+    houses = profile["houses"]
+    hard_only = profile["hard_aspects"]
+    kind = fact.get("kind")
+    score = 0
+    is_primary = 0
+
+    if kind == "ascendant":
+        score = 90 if profile["ascendant"] else 5
+        is_primary = int(profile["ascendant"])
+    elif kind == "planet_sign":
+        planet = fact.get("planet")
+        if planet in primary:
+            score = profile.get("weights", {}).get(planet, 100)
+            is_primary = 1
+        elif planet in secondary:
+            score = 55
+        else:
+            score = 10
+        if fact.get("house") in houses:
+            score += 40
+            is_primary = 1
+    elif kind in {"aspect", "synastry_aspect"}:
+        endpoints = {fact.get("first"), fact.get("second")}
+        primary_count = len(endpoints & primary)
+        secondary_count = len(endpoints & secondary)
+        is_hard = fact.get("aspect") in {"square", "opposition"}
+        if hard_only and not is_hard:
+            score = 5
+        else:
+            score = primary_count * 65 + secondary_count * 25
+            if is_hard:
+                score += 25
+        is_primary = int(primary_count > 0)
+    return score, is_primary
+
+
+def _select_thematic_facts(
+    facts: list[dict[str, Any]],
+    profile: dict[str, Any],
+    *,
+    limit: int = 4,
+) -> list[dict[str, Any]]:
+    """Keep a compact fact table led by the topic's primary indicators."""
+    ranked = sorted(
+        facts,
+        key=lambda fact: _fact_priority(fact, profile),
+        reverse=True,
+    )
+    primary = [fact for fact in ranked if _fact_priority(fact, profile)[1]]
+    secondary = [fact for fact in ranked if not _fact_priority(fact, profile)[1]]
+    selected = primary[:3]
+    if len(selected) < 2:
+        selected.extend(secondary[: 2 - len(selected)])
+    selected.extend(
+        fact
+        for fact in secondary
+        if fact not in selected
+    )
+    return selected[:limit]
+
+
+def _prompt_topic_priorities(profile: dict[str, Any]) -> dict[str, Any]:
+    """Render the topic weighting table as compact, model-facing context."""
+    return {
+        "theme": profile["label"],
+        "primary": {
+            "planets": sorted(profile["primary"]),
+            "planet_weights": profile.get("weights", {}),
+            "houses": sorted(profile["houses"]),
+            "ascendant": profile["ascendant"],
+        },
+        "secondary_planets": sorted(profile["secondary"]),
+        "aspect_rule": (
+            "предпочитайте напряжённые аспекты с первичными показателями"
+            if profile["hard_aspects"]
+            else "аспекты используют только если они связаны с первичными показателями"
+        ),
+        "selection_rule": (
+            "Раскройте минимум два primary-факта. Secondary-факт допустим "
+            "только как уточнение, а не как главная мысль."
+        ),
+    }
+
+
 def _card_priority(card: dict[str, Any]) -> int:
     priority = card.get("priority")
     return priority if isinstance(priority, int) else 0
@@ -862,7 +1126,8 @@ def build_section_payload(
     """Build the full prompt context for exactly one report section."""
     section_payload = build_batch_payload(payload, [section])
     hint = _load_section_hint(payload["report_type"], section["title"])
-    facts = _canonical_facts(section_payload)
+    profile = _topic_profile(section["title"])
+    facts = _select_thematic_facts(_canonical_facts(section_payload), profile)
     selected_cards = _selected_hint_cards(hint, facts)
     requirements = hint.get("prompt_requirements") or {}
     built = {
@@ -875,6 +1140,7 @@ def build_section_payload(
             "requirements": requirements,
         },
         "facts": facts,
+        "topic_priorities": _prompt_topic_priorities(profile),
         "allowed_facts": section_payload["allowed_facts"],
         "interpretation_hints": [card["text_ru"] for card in selected_cards],
         "career_and_talent_hints": section_payload.get("career_and_talent_hints"),

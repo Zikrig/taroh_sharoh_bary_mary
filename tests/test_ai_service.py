@@ -203,6 +203,26 @@ class AiServiceTests(unittest.TestCase):
         self.assertEqual(section_payload["section"]["id"], "love_free.01")
         self.assertEqual(section_payload["section"]["requirements"]["min_words"], 60)
 
+    def test_topic_priorities_lead_love_and_money_with_thematic_facts(self):
+        love_payload = build_prompt_payload("personality_free", chart(), None)
+        love_section = next(
+            section for section in love_payload["sections"] if section["title"] == "Любовь"
+        )
+        love = build_section_payload(love_payload, love_section)
+        self.assertEqual(love["topic_priorities"]["theme"], "любовь и близость")
+        self.assertIn("venus", love["topic_priorities"]["primary"]["planets"])
+        self.assertEqual(love["facts"][0]["planet"], "venus")
+
+        money_section = next(
+            section
+            for section in love_payload["sections"]
+            if section["title"] == "Деньги и работа"
+        )
+        money = build_section_payload(love_payload, money_section)
+        self.assertEqual(money["topic_priorities"]["theme"], "деньги, работа и реализация")
+        self.assertIn("venus", money["topic_priorities"]["primary"]["planets"])
+        self.assertEqual(money["facts"][0]["planet"], "venus")
+
     def test_compatibility_free_requires_both_charts(self):
         with self.assertRaises(ValueError):
             build_prompt_payload("compatibility_free", chart(), None)
