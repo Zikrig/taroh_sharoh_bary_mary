@@ -514,6 +514,162 @@ def _topic_profile(title: str) -> dict[str, Any]:
         raise ValueError(f"Не задан тематический профиль для раздела «{title}».") from error
 
 
+def _section_rule(
+    profile_name: str,
+    focus_title: str,
+    role: str,
+    *,
+    primary: tuple[str, ...] | None = None,
+    secondary: tuple[str, ...] | None = None,
+    houses: tuple[int, ...] | None = None,
+    hard_aspects: bool | None = None,
+) -> dict[str, Any]:
+    """Create one explicit section rule from a thematic base profile."""
+    profile = dict(TOPIC_PROFILES[profile_name])
+    focus = {
+        "planets": frozenset({"Солнце", "Луна"}),
+        "houses": frozenset(),
+        "aspects": "involving",
+        "ascendant": False,
+        "career": False,
+        "synastry": False,
+        "keep_houses": False,
+        **SECTION_CONTEXT_FOCUS[focus_title],
+    }
+    if primary is not None:
+        profile["primary"] = frozenset(primary)
+        profile["weights"] = {
+            planet: 110 - index * 3 for index, planet in enumerate(primary)
+        }
+    if secondary is not None:
+        profile["secondary"] = frozenset(secondary)
+    if houses is not None:
+        profile["houses"] = frozenset(houses)
+    if hard_aspects is not None:
+        profile["hard_aspects"] = hard_aspects
+    return {
+        "profile": profile,
+        "focus": focus,
+        "role": role,
+    }
+
+
+SECTION_RULES: dict[str, dict[str, Any]] = {
+    # Free personality: every neighbouring section has a different job.
+    "personality_free.01": _section_rule("portrait", "Твой портрет", "ядро личности: воля, эмоциональная потребность и общий ритм"),
+    "personality_free.02": _section_rule("communication", "Какой ты человек", "повседневное поведение: как думает, реагирует и принимает решения", primary=("moon", "mercury", "mars"), secondary=("sun", "venus")),
+    "personality_free.03": _section_rule("public_image", "Как тебя видят другие", "первое впечатление, стиль контакта, речь и заметная окружающим манера"),
+    "personality_free.04": _section_rule("strengths", "Твои сильные стороны", "наблюдаемые ресурсы и то, где они помогают"),
+    "personality_free.05": _section_rule("tensions", "Что может тебе мешать", "повторяющиеся препятствия и уязвимые реакции без советов"),
+    "personality_free.06": _section_rule("tensions", "Скрытая сторона", "неочевидные внутренние противоречия и то, что редко видно сразу", primary=("moon", "pluto", "neptune", "saturn"), secondary=("venus", "mars", "sun")),
+    "personality_free.07": _section_rule("love", "Любовь", "как возникает близость, что притягивает и отталкивает", primary=("venus", "moon", "mars"), secondary=("mercury", "sun")),
+    "personality_free.08": _section_rule("money", "Деньги и работа", "мотивация, рабочий темп и отношение к устойчивости", primary=("saturn", "jupiter", "venus"), secondary=("mercury", "mars", "sun")),
+    "personality_free.09": _section_rule("growth", "Главная точка роста", "главный повторяющийся паттерн развития как наблюдение", primary=("saturn", "mars", "pluto"), secondary=("moon", "sun")),
+    # Full personality.
+    "personality.01": _section_rule("portrait", "Твой главный психологический портрет", "целостное психологическое ядро и главное противоречие"),
+    "personality.02": _section_rule("emotions", "Твой внутренний мир", "личные переживания, чувство безопасности и скрытые потребности", primary=("moon", "neptune", "venus"), secondary=("sun", "saturn")),
+    "personality.03": _section_rule("public_image", "Как тебя видят люди", "образ со стороны, стиль присутствия и первое впечатление"),
+    "personality.04": _section_rule("strengths", "Твои сильные стороны", "устойчивые ресурсы, заметные в действии"),
+    "personality.05": _section_rule("tensions", "Твои сложные стороны", "сложные реакции и их оборотная сторона"),
+    "personality.06": _section_rule("strengths", "Твои скрытые качества", "сильные качества, которые человек недооценивает или проявляет не сразу", primary=("uranus", "neptune", "pluto", "mercury"), secondary=("sun", "moon")),
+    "personality.07": _section_rule("communication", "Твоё мышление", "способ замечать, анализировать, формулировать и принимать решения"),
+    "personality.08": _section_rule("emotions", "Эмоции и стресс", "триггеры, реакция под нагрузкой и эмоциональный темп"),
+    "personality.09": _section_rule("love", "Ты в любви", "личный стиль близости, инициативы и эмоционального отклика"),
+    "personality.10": _section_rule("tensions", "Твои повторяющиеся сценарии", "циклы поведения, которые воспроизводятся в значимых ситуациях"),
+    "personality.11": _section_rule("love", "Какой партнёр тебе подходит", "какая динамика и стиль близости ощущаются естественно", primary=("venus", "moon", "sun"), secondary=("mars", "saturn")),
+    "personality.12": _section_rule("tensions", "С кем тебе может быть сложно", "модели контакта, которые создают трение", primary=("mars", "saturn", "uranus"), secondary=("moon", "venus")),
+    "personality.13": _section_rule("money", "Денежный профиль", "отношение к ресурсам, стабильности и ценности труда"),
+    "personality.14": _section_rule("career", "Карьера и реализация", "рабочая мотивация, роль и способ проявлять компетентность"),
+    "personality.15": _section_rule("career", "Профессиональные направления", "типы задач, сфер и рабочих ролей", primary=("mercury", "saturn", "jupiter", "sun"), secondary=("mars", "venus")),
+    "personality.16": _section_rule("tensions", "Главные блоки", "внутренние тормоза реализации и типичные точки застревания"),
+    "personality.17": _section_rule("growth", "Точки роста", "несколько разных зон развития без инструкций"),
+    "personality.18": _section_rule("growth", "Что ты можешь не замечать в себе", "слепые зоны и незаметные паттерны", primary=("pluto", "neptune", "uranus", "moon"), secondary=("sun", "mercury")),
+    "personality.19": _section_rule("growth", "Практические рекомендации", "мягкие ориентиры, вытекающие из повторяющихся паттернов"),
+    "personality.20": _section_rule("portrait", "Итоговый профиль", "синтез без повторного перечисления всех качеств", primary=("sun", "moon", "saturn"), secondary=("venus", "mercury")),
+    # Free and full love.
+    "love_free.01": _section_rule("love", "Как ты влюбляешься", "пусковой механизм влюблённости", primary=("venus", "mercury", "mars"), secondary=("moon", "sun")),
+    "love_free.02": _section_rule("love", "Что вызывает притяжение", "что создаёт интерес и химию", primary=("venus", "mars"), secondary=("sun", "moon")),
+    "love_free.03": _section_rule("love", "Что важно чувствовать в отношениях", "эмоциональная безопасность и потребности в близости", primary=("moon", "venus"), secondary=("saturn", "sun")),
+    "love_free.04": _section_rule("tensions", "Ты в конфликтах", "способ спорить, защищаться и возвращаться к контакту", primary=("mars", "mercury", "moon"), secondary=("saturn", "venus")),
+    "love_free.05": _section_rule("love", "Какой партнёр тебе подходит", "подходящий характер и динамика отношений", primary=("venus", "moon", "sun"), secondary=("mars", "saturn")),
+    "love_free.06": _section_rule("tensions", "Что может разрушать отношения", "риски отношений и повторяющиеся точки напряжения", primary=("mars", "saturn", "pluto"), secondary=("venus", "moon")),
+    "love_free.07": _section_rule("love", "Итоговый любовный портрет", "сводка любовного стиля без повторения отдельных разделов", primary=("venus", "moon", "mars"), secondary=("sun", "mercury")),
+    "love.01": _section_rule("love", "Как ты влюбляешься", "пусковой механизм влюблённости", primary=("venus", "mercury", "mars"), secondary=("moon", "sun")),
+    "love.02": _section_rule("love", "Что вызывает притяжение", "что создаёт интерес и химию", primary=("venus", "mars"), secondary=("sun", "moon")),
+    "love.03": _section_rule("love", "Что важно чувствовать в отношениях", "эмоциональная безопасность и потребности в близости", primary=("moon", "venus"), secondary=("saturn", "sun")),
+    "love.04": _section_rule("love", "Как ты проявляешь любовь", "как человек выражает симпатию, заботу и инициативу", primary=("venus", "mars", "moon"), secondary=("sun", "mercury")),
+    "love.05": _section_rule("love", "Как ты хочешь получать любовь", "какие знаки внимания и формы близости считываются как любовь", primary=("moon", "venus"), secondary=("mercury", "saturn")),
+    "love.06": _section_rule("tensions", "Что вызывает недоверие", "что запускает сомнения, закрытость и настороженность", primary=("moon", "saturn", "pluto"), secondary=("venus", "mercury")),
+    "love.07": _section_rule("tensions", "Как проявляется ревность", "реакция на угрозу связи и конкуренцию", primary=("mars", "venus", "pluto"), secondary=("moon", "saturn")),
+    "love.08": _section_rule("love", "Реакция на дистанцию", "переживание пауз, пространства и автономии", primary=("moon", "uranus", "saturn"), secondary=("venus", "mars")),
+    "love.09": _section_rule("tensions", "Ты в конфликтах", "способ спорить, защищаться и возвращаться к контакту", primary=("mars", "mercury", "moon"), secondary=("saturn", "venus")),
+    "love.10": _section_rule("communication", "Что трудно сказать партнёру", "темы, которые трудно озвучить, и стиль молчания", primary=("mercury", "moon", "saturn"), secondary=("venus", "neptune")),
+    "love.11": _section_rule("tensions", "Как ты переживаешь расставание", "переживание утраты связи и эмоциональная реакция", primary=("moon", "saturn", "pluto"), secondary=("venus", "neptune")),
+    "love.12": _section_rule("tensions", "Возвращение к прошлому", "склонность удерживать, отпускать или переосмысливать прежние связи", primary=("moon", "pluto", "neptune"), secondary=("venus", "saturn")),
+    "love.13": _section_rule("tensions", "Повторяющиеся сценарии отношений", "циклы выбора и взаимодействия в отношениях", primary=("venus", "mars", "saturn"), secondary=("moon", "pluto")),
+    "love.14": _section_rule("love", "Какой партнёр тебе подходит", "подходящий характер и динамика отношений", primary=("venus", "moon", "sun"), secondary=("mars", "saturn")),
+    "love.15": _section_rule("tensions", "С кем может быть сложно", "типы поведения партнёра, создающие напряжение", primary=("mars", "saturn", "uranus"), secondary=("moon", "venus")),
+    "love.16": _section_rule("love", "Что усиливает отношения", "что поддерживает тепло, контакт и устойчивость пары", primary=("venus", "moon", "mercury"), secondary=("saturn", "mars")),
+    "love.17": _section_rule("tensions", "Что может разрушать отношения", "риски отношений и повторяющиеся точки напряжения", primary=("mars", "saturn", "pluto"), secondary=("venus", "moon")),
+    "love.18": _section_rule("love", "Итоговый любовный портрет", "сводка любовного стиля без повторения отдельных разделов", primary=("venus", "moon", "mars"), secondary=("sun", "mercury")),
+    # Free and full money.
+    "money_free.01": _section_rule("money", "Отношение к деньгам", "восприятие ресурсов, ценности и материальной опоры"),
+    "money_free.02": _section_rule("money", "Что мотивирует зарабатывать", "внутренние мотивы работы и получения результата", primary=("sun", "jupiter", "venus"), secondary=("saturn", "mars")),
+    "money_free.03": _section_rule("risk", "Отношение к риску", "отношение к неопределённости, скорости и эксперименту"),
+    "money_free.04": _section_rule("career", "Подходящие направления", "подходящие роли и сферы деятельности", primary=("mercury", "saturn", "jupiter", "sun"), secondary=("mars", "venus")),
+    "money_free.05": _section_rule("tensions", "Что может мешать финансовому росту", "паттерны, тормозящие устойчивую реализацию", primary=("saturn", "mars", "neptune"), secondary=("venus", "jupiter")),
+    "money_free.06": _section_rule("growth", "Главная точка роста", "одна рабочая зона развития, не общий личностный портрет", primary=("saturn", "mars", "mercury"), secondary=("sun", "jupiter")),
+    "money.01": _section_rule("money", "Отношение к деньгам", "восприятие ресурсов, ценности и материальной опоры"),
+    "money.02": _section_rule("money", "Что мотивирует зарабатывать", "внутренние мотивы работы и получения результата", primary=("sun", "jupiter", "venus"), secondary=("saturn", "mars")),
+    "money.03": _section_rule("money", "Отношение к стабильности", "потребность в предсказуемости и устойчивом материальном ритме", primary=("saturn", "venus", "moon"), secondary=("jupiter", "sun")),
+    "money.04": _section_rule("risk", "Отношение к риску", "отношение к неопределённости, скорости и эксперименту"),
+    "money.05": _section_rule("money", "Отношение к ответственности", "отношение к обязательствам, срокам и последствиям решений", primary=("saturn", "sun", "mars"), secondary=("mercury", "jupiter")),
+    "money.06": _section_rule("communication", "Работа в команде", "роль в группе, коммуникация и распределение задач", primary=("mercury", "venus", "moon"), secondary=("sun", "saturn")),
+    "money.07": _section_rule("career", "Предпринимательский потенциал", "отношение к самостоятельным решениям, инициативе и проектам", primary=("sun", "mars", "jupiter", "saturn"), secondary=("mercury", "uranus")),
+    "money.08": _section_rule("tensions", "Что может мешать финансовому росту", "паттерны, тормозящие устойчивую реализацию", primary=("saturn", "mars", "neptune"), secondary=("venus", "jupiter")),
+    "money.09": _section_rule("career", "Качества, которые можно монетизировать", "навыки и способы приносить практическую ценность", primary=("mercury", "venus", "sun"), secondary=("saturn", "mars")),
+    "money.10": _section_rule("career", "Подходящий рабочий формат", "соотношение самостоятельности, структуры и темпа работы", primary=("saturn", "uranus", "mars"), secondary=("sun", "mercury")),
+    "money.11": _section_rule("career", "Подходящая рабочая среда", "условия, команда и атмосфера, в которых легче работать", primary=("moon", "venus", "mercury"), secondary=("saturn", "sun")),
+    "money.12": _section_rule("tensions", "Риск выгорания", "что истощает ресурс и как проявляется перегрузка", primary=("mars", "saturn", "moon", "neptune"), secondary=("sun", "pluto")),
+    "money.13": _section_rule("career", "Навыки для развития", "навыки, способные усилить профессиональную реализацию", primary=("mercury", "saturn", "jupiter"), secondary=("sun", "mars")),
+    "money.14": _section_rule("career", "Подходящие направления", "подходящие роли и сферы деятельности", primary=("mercury", "saturn", "jupiter", "sun"), secondary=("mars", "venus")),
+    "money.15": _section_rule("career", "Почему эти направления подходят", "связь профессиональных ролей с рабочим стилем", primary=("sun", "mercury", "saturn"), secondary=("jupiter", "mars")),
+    "money.16": _section_rule("tensions", "Что может мешать реализации", "что мешает переводить способности в устойчивый результат", primary=("saturn", "mars", "neptune", "pluto"), secondary=("sun", "mercury")),
+    "money.17": _section_rule("growth", "Главная точка роста", "одна рабочая зона развития, не общий личностный портрет", primary=("saturn", "mars", "mercury"), secondary=("sun", "jupiter")),
+    "money.18": _section_rule("money", "Итоговый денежный профиль", "синтез финансового и профессионального стиля", primary=("saturn", "venus", "jupiter"), secondary=("sun", "mercury")),
+    # Compatibility.
+    "compatibility_free.01": _section_rule("compatibility_emotions", "Эмоциональная совместимость", "как пара проживает чувства, поддержку и уязвимость"),
+    "compatibility_free.02": _section_rule("compatibility_attraction", "Притяжение", "откуда берутся взаимный интерес и химия"),
+    "compatibility_free.03": _section_rule("tensions", "Сложные стороны", "главные зоны трения пары", primary=("mars", "saturn", "pluto"), secondary=("moon", "mercury")),
+    "compatibility_free.04": _section_rule("compatibility_general", "Общая динамика пары", "общий сценарий взаимодействия и баланс пары"),
+    "compatibility.01": _section_rule("compatibility_general", "Общая динамика пары", "общий сценарий взаимодействия и баланс пары"),
+    "compatibility.02": _section_rule("compatibility_emotions", "Эмоциональная совместимость", "как пара проживает чувства, поддержку и уязвимость"),
+    "compatibility.03": _section_rule("compatibility_attraction", "Притяжение", "откуда берутся взаимный интерес и химия"),
+    "compatibility.04": _section_rule("communication", "Общение", "как пара формулирует мысли, слышит и отвечает друг другу", primary=("mercury", "moon"), secondary=("venus", "mars")),
+    "compatibility.05": _section_rule("communication", "Интеллектуальная совместимость", "совпадение тем, темпа мышления и способа обсуждать", primary=("mercury", "uranus"), secondary=("sun", "jupiter")),
+    "compatibility.06": _section_rule("compatibility_emotions", "Доверие", "как формируется чувство надёжности и открытости", primary=("moon", "saturn", "venus"), secondary=("pluto", "mercury")),
+    "compatibility.07": _section_rule("tensions", "Ревность", "реакция на угрозу связи, конкуренцию и неопределённость", primary=("mars", "venus", "pluto"), secondary=("moon", "saturn")),
+    "compatibility.08": _section_rule("tensions", "Личные границы", "баланс автономии, правил и близости", primary=("saturn", "uranus", "moon"), secondary=("venus", "mars")),
+    "compatibility.09": _section_rule("tensions", "Конфликты", "как возникает спор и что усиливает столкновение", primary=("mars", "mercury", "saturn"), secondary=("moon", "pluto")),
+    "compatibility.10": _section_rule("compatibility_attraction", "Что одного притягивает в другом", "какие различия и качества создают взаимный интерес", primary=("venus", "mars", "sun"), secondary=("moon", "mercury")),
+    "compatibility.11": _section_rule("tensions", "Что может раздражать", "мелкие и системные источники раздражения", primary=("mars", "mercury", "uranus"), secondary=("saturn", "moon")),
+    "compatibility.12": _section_rule("compatibility_emotions", "Что каждому нужно от другого", "разные эмоциональные и коммуникативные потребности партнёров", primary=("moon", "venus", "mercury"), secondary=("saturn", "sun")),
+    "compatibility.13": _section_rule("compatibility_emotions", "Сильные стороны пары", "ресурсы союза и то, что помогает держаться вместе", primary=("venus", "moon", "jupiter"), secondary=("sun", "mercury")),
+    "compatibility.14": _section_rule("tensions", "Сложные стороны", "главные зоны трения пары", primary=("mars", "saturn", "pluto"), secondary=("moon", "mercury")),
+    "compatibility.15": _section_rule("tensions", "Повторяющиеся сценарии", "циклы, которые пара воспроизводит в контакте", primary=("saturn", "mars", "pluto"), secondary=("moon", "venus")),
+    "compatibility.16": _section_rule("communication", "Как вам лучше общаться", "какой формат разговора снижает недопонимание", primary=("mercury", "moon", "venus"), secondary=("saturn", "mars")),
+    "compatibility.17": _section_rule("compatibility_emotions", "Как улучшить отношения", "какие качества взаимодействия поддерживают пару", primary=("venus", "mercury", "moon"), secondary=("saturn", "mars")),
+    "compatibility.18": _section_rule("compatibility_general", "Итоговый портрет пары", "синтез динамики без пересказа всех предыдущих тем", primary=("moon", "venus", "saturn"), secondary=("mars", "mercury")),
+}
+
+
+def _rule_for_section(section_id: str) -> dict[str, Any]:
+    try:
+        return SECTION_RULES[section_id]
+    except KeyError as error:
+        raise ValueError(f"Не задана тематическая матрица для раздела «{section_id}».") from error
+
+
 SYSTEM_PROMPT = """
 Ты — автор одного раздела персонального отчёта. Пиши строго на русском языке,
 на «вы», живо, бережно и конкретно.
@@ -535,6 +691,8 @@ SYSTEM_PROMPT = """
 — переводите их в наблюдаемые черты, привычки, реакции и жизненные ситуации;
 — interpretation_hints — это смысловые опоры, а не готовые фразы: используйте 1–3
 релевантные подсказки, переформулируйте их и не копируйте дословно;
+— section_role — точная задача текущего раздела. Раскрывайте только её; не пишите
+универсальный портрет и не подменяйте раздел соседней темой;
 — topic_priorities — внутренняя тематическая таблица: сначала опирайтесь на факты
 с пометкой primary, а secondary используйте только как оттенок; не заменяйте тему
 раздела общим портретом человека;
@@ -922,11 +1080,13 @@ def _filter_career_hints(
 def build_batch_payload(
     payload: dict[str, Any],
     batch: list[dict[str, str]],
+    *,
+    focus_override: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Shrink structured chart context for one section batch, then render fact strings."""
     titles = [section["title"] for section in batch]
     report_type = payload.get("report_type")
-    focus = _merge_focus(titles)
+    focus = focus_override or _merge_focus(titles)
     primary_chart = _filter_chart_for_batch(payload.get("primary_chart"), focus)
     partner_chart = _filter_chart_for_batch(payload.get("partner_chart"), focus)
     synastry_aspects = (
@@ -1174,9 +1334,14 @@ def build_section_payload(
     covered_sections: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Build the full prompt context for exactly one report section."""
-    section_payload = build_batch_payload(payload, [section])
     hint = _load_section_hint(payload["report_type"], section["title"])
-    profile = _topic_profile(section["title"])
+    rule = _rule_for_section(hint["section_id"])
+    section_payload = build_batch_payload(
+        payload,
+        [section],
+        focus_override=rule["focus"],
+    )
+    profile = rule["profile"]
     facts = _select_thematic_facts(_canonical_facts(section_payload), profile)
     selected_cards = _selected_hint_cards(hint, facts)
     requirements = hint.get("prompt_requirements") or {}
@@ -1191,6 +1356,7 @@ def build_section_payload(
         },
         "facts": facts,
         "topic_priorities": _prompt_topic_priorities(profile),
+        "section_role": rule["role"],
         "allowed_facts": section_payload["allowed_facts"],
         "interpretation_hints": [card["text_ru"] for card in selected_cards],
         "career_and_talent_hints": section_payload.get("career_and_talent_hints"),

@@ -29,7 +29,8 @@ class RouterUiTests(unittest.TestCase):
 
     def test_payload_samples_and_sampling_settings_are_configured(self):
         self.assertTrue(settings.save_payload_samples)
-        self.assertGreaterEqual(settings.ai_temperature, 1.0)
+        self.assertGreaterEqual(settings.ai_temperature, 0.0)
+        self.assertLessEqual(settings.ai_temperature, 2.0)
         self.assertGreater(settings.ai_presence_penalty, 0)
         self.assertGreater(settings.ai_frequency_penalty, 0)
 

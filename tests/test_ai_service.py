@@ -1,5 +1,7 @@
 import unittest
+import json
 from importlib.util import find_spec
+from pathlib import Path
 import sys
 from types import SimpleNamespace
 
@@ -12,6 +14,7 @@ if find_spec("swisseph") is None:
 from services.ai import (
     MAX_HINT_CARDS,
     MAX_SECTION_SUMMARY_CHARS,
+    SECTION_RULES,
     SECTION_GUIDANCE,
     SYSTEM_PROMPT,
     _allowed_facts,
@@ -21,6 +24,7 @@ from services.ai import (
     _section_summary,
     _selected_hint_cards,
     _topic_profile,
+    _rule_for_section,
     _validate_section,
     _validate_batch,
     build_batch_payload,
@@ -145,6 +149,17 @@ class AiServiceTests(unittest.TestCase):
                 self.assertTrue(profile["primary"], f"{report_type}: {title}")
                 self.assertIn("weights", profile, f"{report_type}: {title}")
 
+    def test_every_catalog_section_has_an_explicit_section_rule(self):
+        index_path = Path("section_hints/index.json")
+        index = json.loads(index_path.read_text(encoding="utf-8"))
+        section_ids = {item["section_id"] for item in index["sections"]}
+        self.assertEqual(set(SECTION_RULES), section_ids)
+        for section_id in section_ids:
+            rule = _rule_for_section(section_id)
+            self.assertTrue(rule["profile"]["primary"], section_id)
+            self.assertTrue(rule["role"], section_id)
+            self.assertIn("planets", rule["focus"], section_id)
+
     def test_system_prompt_does_not_restrain_houses_on_approximate_time(self):
         self.assertNotIn("time_is_approximate", SYSTEM_PROMPT)
         self.assertNotIn("ориентировочны", SYSTEM_PROMPT)
@@ -230,6 +245,20 @@ class AiServiceTests(unittest.TestCase):
         self.assertEqual(money["topic_priorities"]["theme"], "деньги, работа и реализация")
         self.assertIn("venus", money["topic_priorities"]["primary"]["planets"])
         self.assertEqual(money["facts"][0]["planet"], "venus")
+
+    def test_neighboring_sections_receive_distinct_roles_and_priorities(self):
+        payload = build_prompt_payload("personality_free", chart(), None)
+        portrait = build_section_payload(payload, payload["sections"][0])
+        behavior = build_section_payload(payload, payload["sections"][1])
+        public_image = build_section_payload(payload, payload["sections"][2])
+
+        self.assertNotEqual(portrait["section_role"], behavior["section_role"])
+        self.assertNotEqual(behavior["section_role"], public_image["section_role"])
+        self.assertEqual(
+            behavior["topic_priorities"]["primary"]["planets"],
+            ["mars", "mercury", "moon"],
+        )
+        self.assertTrue(public_image["topic_priorities"]["primary"]["ascendant"])
 
     def test_compatibility_free_requires_both_charts(self):
         with self.assertRaises(ValueError):

@@ -18,9 +18,8 @@ if "swisseph" not in sys.modules:
 
 from services.ai import (  # noqa: E402
     ASPECT_CODES,
-    DEFAULT_SECTION_FOCUS,
     PLANET_CODES,
-    SECTION_CONTEXT_FOCUS,
+    SECTION_RULES,
     SIGN_CODES,
 )
 from services.reports_new import SECTIONS  # noqa: E402
@@ -128,8 +127,12 @@ def requirements_for(report_type: str, brief: str) -> dict:
     }
 
 
-def focus_for(title: str) -> dict:
-    return SECTION_CONTEXT_FOCUS.get(title, DEFAULT_SECTION_FOCUS)
+def focus_for(section_id: str) -> dict:
+    """Use the explicit section_id matrix, not the user-facing title."""
+    rule = SECTION_RULES.get(section_id)
+    if rule is None:
+        raise ValueError(f"Не задана тематическая матрица для {section_id}.")
+    return rule["focus"]
 
 
 def sorted_planets(planets: set[str] | frozenset[str]) -> list[str]:
@@ -150,12 +153,12 @@ def filled_example(planet_ru: str, sign_ru: str, priority: int) -> dict | None:
     }
 
 
-def hint_cards_for(title: str) -> list[dict]:
+def hint_cards_for(section_id: str) -> list[dict]:
     """Build placeholders only for indicators this section actually uses."""
-    focus = focus_for(title)
+    focus = focus_for(section_id)
     planets = sorted_planets(set(focus.get("planets") or ()))
     if not planets:
-        planets = sorted_planets(set(DEFAULT_SECTION_FOCUS["planets"]))
+        planets = sorted_planets({"Солнце", "Луна"})
 
     cards: list[dict] = []
     seen: set[str] = set()
@@ -285,7 +288,7 @@ def hint_cards_for(title: str) -> list[dict]:
                     if card["id"] == card_id and not card["text_ru"]:
                         card["text_ru"] = (
                             f"{planet_ru} в {sign_ru} традиционно читают в контексте "
-                            f"темы «{title}»."
+                            f"темы «{section_id}»."
                         )
                         card["priority"] = 50
                         filled.append(card)
@@ -317,7 +320,7 @@ def main() -> None:
         for number, (title, brief) in enumerate(sections, start=1):
             section_id = f"{report_type}.{number:02d}"
             filename = f"{number:02d}.json"
-            cards = hint_cards_for(title)
+            cards = hint_cards_for(section_id)
             payload = {
                 "schema_version": "section-hint.v1",
                 "section_id": section_id,
