@@ -1,4 +1,4 @@
-"""Active PDF layout: text report plus one compact natal-data page.
+"""Active PDF layout: cover, natal data, then text sections.
 
 The former implementation remains in services.reports as an unused archive.
 """
@@ -183,31 +183,31 @@ def generate_report(
     filename = output_dir / f"astro_{report_type}_{datetime.now():%Y%m%d_%H%M%S}.pdf"
     styles = getSampleStyleSheet()
     title = ParagraphStyle(
-        "ReportTitle", parent=styles["Title"], fontName=FONT_BOLD, fontSize=26,
-        leading=32, alignment=TA_CENTER, textColor=NAVY, spaceAfter=7 * mm,
+        "ReportTitle", parent=styles["Title"], fontName=FONT_BOLD, fontSize=30,
+        leading=36, alignment=TA_CENTER, textColor=NAVY, spaceAfter=7 * mm,
     )
     heading = ParagraphStyle(
-        "ReportHeading", parent=styles["Heading2"], fontName=FONT_BOLD, fontSize=16,
-        leading=21, textColor=NAVY, spaceBefore=4 * mm, spaceAfter=3 * mm,
+        "ReportHeading", parent=styles["Heading2"], fontName=FONT_BOLD, fontSize=20,
+        leading=25, textColor=NAVY, spaceBefore=4 * mm, spaceAfter=3 * mm,
     )
     body = ParagraphStyle(
-        "ReportBody", parent=styles["BodyText"], fontName=FONT, fontSize=11,
-        leading=17, textColor=INK, alignment=4, firstLineIndent=6 * mm, spaceAfter=3 * mm,
+        "ReportBody", parent=styles["BodyText"], fontName=FONT, fontSize=15,
+        leading=21, textColor=INK, alignment=4, firstLineIndent=6 * mm, spaceAfter=3 * mm,
     )
     table_body = ParagraphStyle(
-        "TableBody", parent=body, fontSize=9, leading=11, firstLineIndent=0,
+        "TableBody", parent=body, fontSize=13, leading=15, firstLineIndent=0,
         alignment=TA_CENTER, spaceAfter=0,
     )
     caption = ParagraphStyle(
-        "ReportCaption", parent=body, fontSize=9, leading=12, textColor=MUTED,
+        "ReportCaption", parent=body, fontSize=13, leading=16, textColor=MUTED,
         alignment=TA_CENTER, firstLineIndent=0,
     )
     cover_label = ParagraphStyle(
-        "CoverLabel", parent=body, fontName=FONT_BOLD, fontSize=11, leading=17,
+        "CoverLabel", parent=body, fontName=FONT_BOLD, fontSize=15, leading=21,
         firstLineIndent=0, spaceAfter=0,
     )
     cover_value = ParagraphStyle(
-        "CoverValue", parent=body, fontName=FONT_BOLD, fontSize=13, leading=19,
+        "CoverValue", parent=body, fontName=FONT_BOLD, fontSize=17, leading=23,
         alignment=TA_CENTER, firstLineIndent=0, spaceAfter=0,
     )
     type_titles = {
@@ -232,9 +232,6 @@ def generate_report(
         story.extend([_paragraph(display_name, caption), Spacer(1, 2 * mm)])
     story.extend([
         _cover_summary(chart, cover_label, cover_value),
-        PageBreak(),
-        _paragraph(content["title"], title),
-        _paragraph(content["intro"], body),
         PageBreak(),
         _paragraph("НАТАЛЬНАЯ КАРТА", heading),
         _natal_table(chart, table_body),
