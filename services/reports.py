@@ -336,7 +336,7 @@ def _synastry_aspects(first_chart: dict, second_chart: dict) -> list[dict]:
 class NatalChartFlowable(Flowable):
     """Renders the natal wheel on canvas so PNG transparency works via mask='auto'."""
 
-    def __init__(self, chart: dict, size: float = 150 * mm):
+    def __init__(self, chart: dict, size: float = 100 * mm):
         super().__init__()
         self.chart = chart
         self.size = size

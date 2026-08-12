@@ -27,11 +27,11 @@ from services.reports_new import SECTIONS  # noqa: E402
 
 HINTS_DIR = PROJECT_ROOT / "section_hints"
 WORD_LIMITS = {
-    "personality_free": (60, 100),
-    "personality": (150, 250),
-    "love": (150, 250),
-    "money": (150, 250),
-    "compatibility": (150, 250),
+    "personality_free": (60, 67),
+    "personality": (100, 167),
+    "love": (100, 167),
+    "money": (100, 167),
+    "compatibility": (100, 167),
 }
 
 SIGN_ORDER = list(SIGN_CODES.keys())

@@ -15,7 +15,9 @@ from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader
 from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus.flowables import Flowable
 
 PAPER = colors.HexColor("#F3E9D8")
 INK = colors.HexColor("#17130F")
@@ -68,6 +70,53 @@ def _draw_background(canvas, doc) -> None:
     canvas.setFillColor(PAPER)
     canvas.rect(0, 0, width, height, fill=1, stroke=0)
     canvas.restoreState()
+
+
+class RoundedPhotoFlowable(Flowable):
+    """Photo block retained from the previous cover layout."""
+
+    def __init__(self, source: Any, size: float = 30 * mm, radius: float = 5 * mm):
+        super().__init__()
+        self.image = ImageReader(source)
+        self.width = size
+        self.height = size
+        self.radius = radius
+        self.hAlign = "CENTER"
+
+    def draw(self) -> None:
+        canvas = self.canv
+        canvas.saveState()
+        clip = canvas.beginPath()
+        clip.roundRect(0, 0, self.width, self.height, self.radius)
+        canvas.clipPath(clip, stroke=0, fill=0)
+        canvas.drawImage(
+            self.image, 0, 0, width=self.width, height=self.height,
+            preserveAspectRatio=True, anchor="c", mask="auto",
+        )
+        canvas.restoreState()
+
+
+def _cover_summary(chart: dict, label: ParagraphStyle, value: ParagraphStyle) -> Table:
+    """The former first-page data summary, retained in the active layout."""
+    planets = chart["planets"]
+    rows = [
+        [_paragraph("Дата рождения:", label), _paragraph(chart["date"], value)],
+        [_paragraph("Часовой пояс:", label), _paragraph(chart["timezone"], value)],
+        [_paragraph("Солнце:", label), _paragraph(planets["Солнце"]["sign"], value)],
+        [_paragraph("Луна:", label), _paragraph(planets["Луна"]["sign"], value)],
+        [_paragraph("Асцендент:", label), _paragraph(chart["ascendant"]["sign"], value)],
+    ]
+    if not chart.get("time_is_approximate"):
+        rows.insert(1, [_paragraph("Время рождения:", label), _paragraph(chart["time"], value)])
+    table = Table(rows, colWidths=[80 * mm, 75 * mm], hAlign="CENTER")
+    table.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4 * mm),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4 * mm),
+        ("TOPPADDING", (0, 0), (-1, -1), 3 * mm),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3 * mm),
+    ]))
+    return table
 
 
 def _table(rows: list[list[str]], col_widths: list[float], body: ParagraphStyle) -> Table:
@@ -153,6 +202,14 @@ def generate_report(
         "ReportCaption", parent=body, fontSize=9, leading=12, textColor=MUTED,
         alignment=TA_CENTER, firstLineIndent=0,
     )
+    cover_label = ParagraphStyle(
+        "CoverLabel", parent=body, fontName=FONT_BOLD, fontSize=11, leading=17,
+        firstLineIndent=0, spaceAfter=0,
+    )
+    cover_value = ParagraphStyle(
+        "CoverValue", parent=body, fontName=FONT_BOLD, fontSize=13, leading=19,
+        alignment=TA_CENTER, firstLineIndent=0, spaceAfter=0,
+    )
     type_titles = {
         "personality_free": "БЕСПЛАТНЫЙ РАЗБОР ЛИЧНОСТИ",
         "personality": "РАЗБОР ЛИЧНОСТИ",
@@ -161,14 +218,21 @@ def generate_report(
         "money": "ДЕНЬГИ И РЕАЛИЗАЦИЯ",
     }
 
-    display_name = recipient_name or "Персональный отчёт"
-    if recipient_username:
-        display_name = f"{display_name} · @{recipient_username}"
     story = [
-        Spacer(1, 28 * mm),
-        _paragraph(type_titles[report_type], title),
-        _paragraph(display_name, caption),
         Spacer(1, 18 * mm),
+        _paragraph(type_titles[report_type], title),
+        Spacer(1, 15 * mm),
+    ]
+    if recipient_photo:
+        story.extend([RoundedPhotoFlowable(recipient_photo), Spacer(1, 4 * mm)])
+    if recipient_name:
+        display_name = recipient_name
+        if recipient_username:
+            display_name = f"{display_name} · @{recipient_username}"
+        story.extend([_paragraph(display_name, caption), Spacer(1, 2 * mm)])
+    story.extend([
+        _cover_summary(chart, cover_label, cover_value),
+        PageBreak(),
         _paragraph(content["title"], title),
         _paragraph(content["intro"], body),
         PageBreak(),
@@ -177,7 +241,7 @@ def generate_report(
         Spacer(1, 5 * mm),
         _paragraph("ДОМА", heading),
         _houses_table(chart, table_body),
-    ]
+    ])
 
     generated_by_title = {section["title"]: section for section in content["sections"]}
     for title_text, _ in SECTIONS[report_type]:

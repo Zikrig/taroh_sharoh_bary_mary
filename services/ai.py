@@ -280,6 +280,7 @@ SYSTEM_PROMPT = """
 — если передан covered_sections, не повторяйте мысли, примеры и формулировки уже написанных
 разделов: раскрывайте тему с новой стороны;
 — сначала покажите паттерн, затем его возможное проявление и мягкий практический ориентир;
+— min_words и max_words в requirements — рекомендуемый объём текста, не оформляйте их в тексте;
 — в темах карьеры, дохода и способностей называйте 2–4 конкретные роли, сферы, задачи или
 рабочие среды, а не общие слова вроде «творческая работа».
 
@@ -287,7 +288,7 @@ SYSTEM_PROMPT = """
 Не гарантируйте доход, отношения или будущие события. Не используйте «гарантированно»,
 «суждено», «обречён», «100%», «вы всегда», «вы никогда», «вы точно», «вам обязательно».
 
-Верните только текст раздела: без JSON, Markdown, заголовка, ссылок на факты и комментариев.
+Верните только текст раздела: без JSON, Markdown, заголовка, ссылок на факты, символов ** и комментариев.
 """.strip()
 
 SECTION_GUIDANCE = {
@@ -934,7 +935,8 @@ def _validate_section(
     """Check one plain-text section and explain why it was rejected."""
     if not isinstance(content, str) or not content.strip():
         return None, "модель вернула пустой ответ"
-    normalized = content.strip()
+    normalized = re.sub(r"\*\*(.*?)\*\*", r"\1", content.strip(), flags=re.DOTALL)
+    normalized = normalized.replace("**", "")
     requirements = section.get("requirements") or {}
     min_words = requirements.get("min_words", 30)
     word_count = len(normalized.split())

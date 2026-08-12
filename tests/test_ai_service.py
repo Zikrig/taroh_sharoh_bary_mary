@@ -168,8 +168,8 @@ class AiServiceTests(unittest.TestCase):
         section_payload = build_section_payload(payload, section)
         self.assertEqual(section_payload["section"]["id"], "personality.02")
         self.assertEqual(section_payload["section"]["title"], "Твой внутренний мир")
-        self.assertEqual(section_payload["section"]["requirements"]["min_words"], 150)
-        self.assertEqual(section_payload["section"]["requirements"]["max_words"], 250)
+        self.assertEqual(section_payload["section"]["requirements"]["min_words"], 100)
+        self.assertEqual(section_payload["section"]["requirements"]["max_words"], 167)
         self.assertIn("Солнце в Овен, дом 1", section_payload["allowed_facts"])
         self.assertIn(
             {
@@ -191,7 +191,7 @@ class AiServiceTests(unittest.TestCase):
         section_payload = build_section_payload(payload, section)
         self.assertEqual(section_payload["section"]["id"], "personality_free.01")
         self.assertEqual(section_payload["section"]["requirements"]["min_words"], 60)
-        self.assertEqual(section_payload["section"]["requirements"]["max_words"], 100)
+        self.assertEqual(section_payload["section"]["requirements"]["max_words"], 67)
 
     def test_validates_plain_text_and_assigns_application_references(self):
         section = {
@@ -212,6 +212,19 @@ class AiServiceTests(unittest.TestCase):
         accepted, rejection = _validate_section(long_text, section, allowed_facts)
         self.assertIsNone(rejection)
         self.assertEqual(accepted["content"], long_text)
+
+    def test_removes_markdown_bold_markers_from_section_text(self):
+        section = {
+            "title": "Твой портрет",
+            "requirements": {"min_words": 3},
+        }
+        validated, rejection = _validate_section(
+            "Это **важный** личный вывод.",
+            section,
+            ["Солнце в Овен, дом 1"],
+        )
+        self.assertIsNone(rejection)
+        self.assertEqual(validated["content"], "Это важный личный вывод.")
 
     @unittest.skip("Forbidden-pattern check is temporarily commented out in _validate_section")
     def test_rejects_categorical_and_fatalistic_wording(self):
