@@ -322,6 +322,8 @@ class AiServiceTests(unittest.TestCase):
         self.assertIn("не копируйте дословно", SYSTEM_PROMPT)
         self.assertIn("не упоминай астрологию", SYSTEM_PROMPT)
         self.assertIn("живые, обычные формулировки", SYSTEM_PROMPT)
+        self.assertIn("Не давайте советов, рекомендаций", SYSTEM_PROMPT)
+        self.assertNotIn("практический ориентир", SYSTEM_PROMPT)
 
 
 if __name__ == "__main__":
