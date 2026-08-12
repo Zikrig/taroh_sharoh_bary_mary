@@ -20,6 +20,7 @@ from services.ai import (
     _section_batches,
     _section_summary,
     _selected_hint_cards,
+    _topic_profile,
     _validate_section,
     _validate_batch,
     build_batch_payload,
@@ -136,6 +137,13 @@ class AiServiceTests(unittest.TestCase):
         )
         guidance = SECTION_GUIDANCE["personality"]["Профессиональные направления"]
         self.assertIn("8–12", guidance)
+
+    def test_every_report_section_has_an_explicit_topic_profile(self):
+        for report_type, sections in SECTIONS.items():
+            for title, _ in sections:
+                profile = _topic_profile(title)
+                self.assertTrue(profile["primary"], f"{report_type}: {title}")
+                self.assertIn("weights", profile, f"{report_type}: {title}")
 
     def test_system_prompt_does_not_restrain_houses_on_approximate_time(self):
         self.assertNotIn("time_is_approximate", SYSTEM_PROMPT)

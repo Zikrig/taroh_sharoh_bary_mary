@@ -367,6 +367,42 @@ TOPIC_PROFILES: dict[str, dict[str, Any]] = {
         "houses": frozenset({3, 6, 11}),
         "hard_aspects": False,
     },
+    "emotions": {
+        "label": "эмоции и стресс",
+        "primary": frozenset({"moon", "mars", "saturn", "neptune"}),
+        "weights": {"moon": 110, "saturn": 107, "mars": 104, "neptune": 101},
+        "secondary": frozenset({"sun", "venus"}),
+        "ascendant": False,
+        "houses": frozenset({4, 8, 12}),
+        "hard_aspects": True,
+    },
+    "career": {
+        "label": "карьера и профессиональная реализация",
+        "primary": frozenset({"saturn", "sun", "jupiter", "mercury"}),
+        "weights": {"saturn": 110, "sun": 107, "jupiter": 104, "mercury": 101},
+        "secondary": frozenset({"mars", "venus"}),
+        "ascendant": False,
+        "houses": frozenset({2, 6, 10}),
+        "hard_aspects": False,
+    },
+    "growth": {
+        "label": "точка роста и незаметные паттерны",
+        "primary": frozenset({"saturn", "mars", "pluto", "uranus"}),
+        "weights": {"saturn": 110, "pluto": 106, "mars": 103, "uranus": 101},
+        "secondary": frozenset({"sun", "moon", "mercury"}),
+        "ascendant": False,
+        "houses": frozenset({6, 8, 10}),
+        "hard_aspects": True,
+    },
+    "compatibility_general": {
+        "label": "общая динамика пары",
+        "primary": frozenset({"sun", "moon", "venus", "mars"}),
+        "weights": {"moon": 110, "venus": 107, "mars": 104, "sun": 101},
+        "secondary": frozenset({"mercury", "saturn"}),
+        "ascendant": False,
+        "houses": frozenset(),
+        "hard_aspects": False,
+    },
     "compatibility_emotions": {
         "label": "эмоциональная динамика пары",
         "primary": frozenset({"moon", "venus"}),
@@ -396,10 +432,17 @@ SECTION_TOPIC_KEYS = {
     "Как тебя видят люди": "public_image",
     "Твои сильные стороны": "strengths",
     "Твои скрытые качества": "strengths",
+    "Твоё мышление": "communication",
+    "Эмоции и стресс": "emotions",
     "Что может тебе мешать": "tensions",
     "Твои сложные стороны": "tensions",
     "Скрытая сторона": "tensions",
     "Главные блоки": "tensions",
+    "Точки роста": "growth",
+    "Главная точка роста": "growth",
+    "Что ты можешь не замечать в себе": "growth",
+    "Практические рекомендации": "growth",
+    "Итоговый профиль": "portrait",
     "Твои повторяющиеся сценарии": "tensions",
     "Любовь": "love",
     "Ты в любви": "love",
@@ -418,9 +461,12 @@ SECTION_TOPIC_KEYS = {
     "Повторяющиеся сценарии отношений": "tensions",
     "Какой партнёр тебе подходит": "love",
     "С кем тебе может быть сложно": "tensions",
+    "С кем может быть сложно": "tensions",
     "Что усиливает отношения": "love",
     "Что может разрушать отношения": "tensions",
     "Итоговый любовный портрет": "love",
+    "Карьера и реализация": "career",
+    "Профессиональные направления": "career",
     "Деньги и работа": "money",
     "Денежный профиль": "money",
     "Отношение к деньгам": "money",
@@ -440,6 +486,7 @@ SECTION_TOPIC_KEYS = {
     "Почему эти направления подходят": "money",
     "Что может мешать реализации": "tensions",
     "Итоговый денежный профиль": "money",
+    "Общая динамика пары": "compatibility_general",
     "Эмоциональная совместимость": "compatibility_emotions",
     "Притяжение": "compatibility_attraction",
     "Общение": "communication",
@@ -461,7 +508,10 @@ SECTION_TOPIC_KEYS = {
 
 
 def _topic_profile(title: str) -> dict[str, Any]:
-    return TOPIC_PROFILES[SECTION_TOPIC_KEYS.get(title, "portrait")]
+    try:
+        return TOPIC_PROFILES[SECTION_TOPIC_KEYS[title]]
+    except KeyError as error:
+        raise ValueError(f"Не задан тематический профиль для раздела «{title}».") from error
 
 
 SYSTEM_PROMPT = """
