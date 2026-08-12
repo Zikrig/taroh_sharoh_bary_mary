@@ -25,6 +25,35 @@ MAX_SELECTED_ASPECTS = 6
 MAX_SECTION_SUMMARY_CHARS = 220
 MAX_CACHED_SECTIONS = 512
 
+
+def _message_text(message: Any) -> str:
+    """Extract the assistant reply text from an OpenAI-style chat message."""
+    if message is None:
+        return ""
+    content = getattr(message, "content", None)
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict) and item.get("type") == "text":
+                parts.append(str(item.get("text") or ""))
+            else:
+                text = getattr(item, "text", None)
+                if isinstance(text, str):
+                    parts.append(text)
+        return "".join(parts)
+    return ""
+
+
+def _is_timeout_error(error: BaseException) -> bool:
+    name = type(error).__name__
+    if name in {"TimeoutError", "APITimeoutError", "ReadTimeout", "ConnectTimeout", "WriteTimeout", "PoolTimeout"}:
+        return True
+    return "timeout" in str(error).lower()
+
 # Phrases banned by the product brief: fatalism, guarantees and categorical claims.
 FORBIDDEN_PATTERNS: tuple[tuple[str, str], ...] = (
     (r"гарантирован", "гарантии результата"),
@@ -926,21 +955,52 @@ def _forbidden_phrases(text: str) -> list[str]:
     return found
 
 
+def _is_degenerate_section_text(text: str) -> str | None:
+    """Reject model collapse: multilingual garbage, Latin soup, exotic scripts."""
+    cyrillic = len(re.findall(r"[А-Яа-яЁё]", text))
+    latin = len(re.findall(r"[A-Za-z]", text))
+    exotic = len(re.findall(
+        r"["
+        r"\u0590-\u05FF"  # Hebrew
+        r"\u0600-\u06FF\u0750-\u077F"  # Arabic
+        r"\u0900-\u097F"  # Devanagari
+        r"\u0E00-\u0E7F"  # Thai
+        r"\u3040-\u30FF\u4E00-\u9FFF"  # Japanese / CJK
+        r"\uAC00-\uD7AF"  # Hangul
+        r"]",
+        text,
+    ))
+    letters = cyrillic + latin
+    if exotic >= 8:
+        return "в тексте слишком много символов чужих алфавитов"
+    if letters >= 80:
+        cyr_share = cyrillic / letters
+        if cyr_share < 0.75:
+            return (
+                f"текст не похож на русский отчёт "
+                f"(кириллица {cyr_share:.0%}, нужно ≥75%)"
+            )
+    camel = re.findall(r"\b[A-Z][a-z]+[A-Z][A-Za-z]{2,}\b", text)
+    if len(camel) >= 6:
+        return "в тексте много бессмысленных латиницей CamelCase-токенов"
+    return None
+
+
 def _validate_section(
     content: Any,
     section: dict[str, Any],
     allowed_facts: list[str],
 ) -> tuple[dict[str, Any] | None, str | None]:
-    """Check one plain-text section and explain why it was rejected."""
+    """Accept non-empty Russian section text; length is only a prompt hint."""
     if not isinstance(content, str) or not content.strip():
         return None, "модель вернула пустой ответ"
     normalized = re.sub(r"\*\*(.*?)\*\*", r"\1", content.strip(), flags=re.DOTALL)
     normalized = normalized.replace("**", "")
-    requirements = section.get("requirements") or {}
-    min_words = requirements.get("min_words", 30)
-    word_count = len(normalized.split())
-    if word_count < min_words:
-        return None, f"в тексте {word_count} слов, нужно не меньше {min_words}"
+    if not normalized.strip():
+        return None, "модель вернула пустой ответ"
+    degeneration = _is_degenerate_section_text(normalized)
+    if degeneration:
+        return None, degeneration
     # forbidden = _forbidden_phrases(normalized)
     # if forbidden:
     #     return None, "недопустимые формулировки: " + ", ".join(forbidden)
@@ -1075,12 +1135,20 @@ async def generate_report_content(
                             presence_penalty=settings.ai_presence_penalty,
                             frequency_penalty=settings.ai_frequency_penalty,
                         )
-                    raw_content = response.choices[0].message.content
+                    message = response.choices[0].message
+                    raw_content = _message_text(message)
                     _save_payload_sample(
                         "response",
                         {
                             "content": raw_content or "",
                             "word_count": len((raw_content or "").split()),
+                            "finish_reason": getattr(response.choices[0], "finish_reason", None),
+                            "message": message.model_dump()
+                            if hasattr(message, "model_dump")
+                            else {
+                                "content": getattr(message, "content", None),
+                                "reasoning_content": getattr(message, "reasoning_content", None),
+                            },
                         },
                         report_type=report_type,
                         attempt=attempt + 1,
@@ -1100,13 +1168,15 @@ async def generate_report_content(
                         attempt + 1,
                         rejection,
                     )
-                except (TimeoutError, ValueError) as error:
-                    logger.warning(
-                        "Не удалось получить раздел «%s»: %s",
-                        section["title"],
-                        error,
-                    )
-                except Exception:
+                except Exception as error:
+                    if _is_timeout_error(error) or isinstance(error, (TimeoutError, ValueError)):
+                        logger.warning(
+                            "Не удалось получить раздел «%s», попытка %s: %s",
+                            section["title"],
+                            attempt + 1,
+                            error,
+                        )
+                        continue
                     logger.exception(
                         "Неожиданная ошибка при генерации раздела «%s»",
                         section["title"],

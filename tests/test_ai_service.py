@@ -16,6 +16,7 @@ from services.ai import (
     SYSTEM_PROMPT,
     _allowed_facts,
     _filter_aspects,
+    _is_degenerate_section_text,
     _section_batches,
     _section_summary,
     _selected_hint_cards,
@@ -220,14 +221,53 @@ class AiServiceTests(unittest.TestCase):
         self.assertIsNone(rejection)
         self.assertEqual(validated["references"], allowed_facts)
 
+        # Length is only a prompt hint — short answers are accepted.
         short, rejection = _validate_section("Слишком коротко", section, allowed_facts)
-        self.assertIsNone(short)
-        self.assertIn("не меньше 5", rejection)
+        self.assertIsNone(rejection)
+        self.assertEqual(short["content"], "Слишком коротко")
+
+        empty, rejection = _validate_section("   ", section, allowed_facts)
+        self.assertIsNone(empty)
+        self.assertIn("пустой", rejection)
 
         long_text = " ".join(["Точный"] * 11)
         accepted, rejection = _validate_section(long_text, section, allowed_facts)
         self.assertIsNone(rejection)
         self.assertEqual(accepted["content"], long_text)
+
+    def test_rejects_degenerate_multilingual_garbage(self):
+        section = {"title": "Какой ты человек", "requirements": {}}
+        garbage = (
+            "Люди обычно видят сначала вашу мягкую внешность — спокойный голос. "
+            "Но если что-то вас по-настоящему задело — импульсы вспыхивают мгновенно: "
+            "быстрое решение разрастается на глазах энергией поисков коллективного "
+            "одобрения плодотворных шагов ради moving off premise keeping vulnerable "
+            "bullies прогре AlPatrick ar approximated elapsed بمUSSelde meaningful "
+            "sailed harmonic Section standards separation generous 이후Li gascharged "
+            "origin difícil OctoberCounting express abstract EU hours pressure "
+            "comfortablycin rustic luc explanation BrandtFM Patterns trumpOB shades "
+            "novo Arguments onder solid Right conduct durableFresh decisive "
+            "pythonism astrology patterns Demographic rem apolog coherence lacked "
+            "waterspers car backlog permanent implication biometric Simple acceler "
+            "ambition configured honestchild galaxies poem hered shaftStew "
+            "constructedcomfort alliesmeasuredAr sustained Island rationaleCar "
+            "Budget lawsuit generous extendedReligion obvious translate smile "
+            "hospitality strengthen advertisement inspiration knitted commentaries"
+        )
+        self.assertIsNotNone(_is_degenerate_section_text(garbage))
+        validated, rejection = _validate_section(garbage, section, ["Солнце в Овен"])
+        self.assertIsNone(validated)
+        self.assertIsNotNone(rejection)
+
+        normal = (
+            "Люди обычно видят сначала вашу мягкую внешность — спокойный голос, "
+            "умение слушать и тягу к домашнему уюту. Если тема вас задела по-настоящему, "
+            "реакция может быть быстрой и собранной, но при этом вы стараетесь не "
+            "терять контакт с близким кругом и сохранять ощущение опоры."
+        )
+        validated, rejection = _validate_section(normal, section, ["Солнце в Овен"])
+        self.assertIsNone(rejection)
+        self.assertEqual(validated["title"], "Какой ты человек")
 
     def test_removes_markdown_bold_markers_from_section_text(self):
         section = {
