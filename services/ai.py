@@ -402,43 +402,6 @@ _SECTION_HINT_INDEX: dict[tuple[str, str], Path] | None = None
 _SECTION_CACHE: dict[str, dict[str, Any]] = {}
 
 
-def _redact_payload_sample(kind: str, payload: Any) -> Any:
-    """Keep debug samples useful without birth dates, coordinates or raw charts."""
-    if kind == "response":
-        text = payload if isinstance(payload, str) else str(payload)
-        return {
-            "word_count": len(text.split()),
-            "preview": text[:400],
-        }
-    if not isinstance(payload, dict):
-        return {"kind": type(payload).__name__}
-    section_payload = payload.get("payload") if "payload" in payload else payload
-    if not isinstance(section_payload, dict):
-        return {"rejection": payload.get("rejection")}
-    section = section_payload.get("section") or {}
-    facts = section_payload.get("facts") or []
-    return {
-        "report_type": section_payload.get("report_type"),
-        "section": {
-            "id": section.get("id"),
-            "title": section.get("title"),
-        },
-        "fact_ids": [
-            fact.get("id")
-            for fact in facts
-            if isinstance(fact, dict) and fact.get("id")
-        ],
-        "interpretation_hints": section_payload.get("interpretation_hints") or [],
-        "covered_sections": [
-            item.get("title")
-            for item in (section_payload.get("covered_sections") or [])
-            if isinstance(item, dict)
-        ],
-        "rejection": payload.get("rejection") if "rejection" in payload else None,
-        "time_is_approximate": section_payload.get("time_is_approximate"),
-    }
-
-
 def _save_payload_sample(
     kind: str,
     payload: Any,
@@ -447,6 +410,7 @@ def _save_payload_sample(
     attempt: int,
     request_id: str,
 ) -> None:
+    """Persist the exact request/response text used with the model."""
     if not settings.save_payload_samples:
         return
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
@@ -454,7 +418,7 @@ def _save_payload_sample(
     try:
         PAYLOAD_SAMPLES_DIR.mkdir(parents=True, exist_ok=True)
         (PAYLOAD_SAMPLES_DIR / filename).write_text(
-            json.dumps(_redact_payload_sample(kind, payload), ensure_ascii=False, indent=2),
+            json.dumps(payload, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
     except (OSError, TypeError, ValueError) as error:
@@ -1092,7 +1056,13 @@ async def generate_report_content(
                         })
                     _save_payload_sample(
                         "request",
-                        {"payload": section_payload, "rejection": rejection},
+                        {
+                            "model": settings.ai_model,
+                            "temperature": settings.ai_temperature,
+                            "presence_penalty": settings.ai_presence_penalty,
+                            "frequency_penalty": settings.ai_frequency_penalty,
+                            "messages": messages,
+                        },
                         report_type=report_type,
                         attempt=attempt + 1,
                         request_id=request_id,
@@ -1108,7 +1078,10 @@ async def generate_report_content(
                     raw_content = response.choices[0].message.content
                     _save_payload_sample(
                         "response",
-                        raw_content or "",
+                        {
+                            "content": raw_content or "",
+                            "word_count": len((raw_content or "").split()),
+                        },
                         report_type=report_type,
                         attempt=attempt + 1,
                         request_id=request_id,
