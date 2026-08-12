@@ -27,7 +27,7 @@ from services.ai import (
 )
 from services.astro import local_time_to_utc, timezone_for_coordinates
 from services.prompt_guides.career import build_career_hints
-from services.reports import SECTIONS
+from services.reports_new import SECTIONS
 
 
 def chart() -> dict:
@@ -190,8 +190,8 @@ class AiServiceTests(unittest.TestCase):
         section = payload["sections"][0]
         section_payload = build_section_payload(payload, section)
         self.assertEqual(section_payload["section"]["id"], "personality_free.01")
-        self.assertEqual(section_payload["section"]["requirements"]["min_words"], 120)
-        self.assertEqual(section_payload["section"]["requirements"]["max_words"], 200)
+        self.assertEqual(section_payload["section"]["requirements"]["min_words"], 60)
+        self.assertEqual(section_payload["section"]["requirements"]["max_words"], 100)
 
     def test_validates_plain_text_and_assigns_application_references(self):
         section = {
@@ -290,7 +290,8 @@ class AiServiceTests(unittest.TestCase):
         self.assertLessEqual(len(selected), 6)
 
     def test_prompt_requires_hints_to_be_rephrased(self):
-        self.assertIn("не копируй дословно", SYSTEM_PROMPT)
+        self.assertIn("не копируйте дословно", SYSTEM_PROMPT)
+        self.assertIn("не упоминай астрологию", SYSTEM_PROMPT)
 
 
 if __name__ == "__main__":

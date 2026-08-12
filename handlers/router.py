@@ -33,7 +33,7 @@ from database.repository import (
     set_app_setting,
     set_test_mode,
 )
-from services.reports import generate_report
+from services.reports_new import generate_report
 
 router = Router()
 PRICES = {"personality": 349, "love": 399, "compatibility": 449, "money": 399}
@@ -44,6 +44,7 @@ NAMES = {
     "money": "Деньги и реализация",
 }
 PENDING_REPORTS: dict[int, tuple[dict, dict | None]] = {}
+PENDING_FREE_SECTIONS: dict[int, list[dict[str, str]]] = {}
 REPORT_PROGRESS_TEXT = "🔮 Формирую ваш персональный результат"
 SCENARIO_INTROS = {
     "personality": (
@@ -169,6 +170,15 @@ def back_to_menu():
 
 def back_to_edit_profile():
     return back_keyboard("edit_profile")
+
+
+def free_section_keyboard(title: str, section_index: int):
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text=f"Посмотреть раздел «{title}»",
+        callback_data=f"free_section:{section_index}",
+    )
+    return builder.as_markup()
 
 
 def edit_profile_menu():
@@ -857,22 +867,19 @@ async def show_teaser(
             if free_content:
                 mark_completed()
         if free_content:
+            sections = free_content["sections"]
+            if not sections:
+                await message.answer(
+                    "Не удалось сформировать бесплатный разбор прямо сейчас. "
+                    "Можно сразу открыть полный PDF — он строится индивидуально по вашим данным.",
+                    reply_markup=builder.as_markup(),
+                )
+                return
+            PENDING_FREE_SECTIONS[user_id] = sections
             await message.answer(
                 f"<b>{free_content['title']}</b>\n{free_content['intro']}",
                 parse_mode=ParseMode.HTML,
-            )
-            for section in free_content["sections"]:
-                text = (
-                    f"<b>{section['title']}</b>\n\n"
-                    f"{section['content']}"
-                )
-                if len(text) > 4000:
-                    text = text[:3990] + "…"
-                await message.answer(text, parse_mode=ParseMode.HTML)
-            await message.answer(
-                "Это бесплатный мини-разбор. Полный PDF раскрывает любовь, деньги, "
-                "сценарии, блоки и практические рекомендации глубже.",
-                reply_markup=builder.as_markup(),
+                reply_markup=free_section_keyboard(sections[0]["title"], 0),
             )
             return
         await message.answer(
@@ -890,6 +897,52 @@ async def show_teaser(
         reply_markup=builder.as_markup(),
     )
 
+
+
+@router.callback_query(F.data.startswith("free_section:"))
+async def show_free_section(callback: CallbackQuery):
+    _, _, index_text = callback.data.partition(":")
+    try:
+        section_index = int(index_text)
+    except ValueError:
+        await callback.answer("Раздел недоступен", show_alert=True)
+        return
+
+    sections = PENDING_FREE_SECTIONS.get(callback.from_user.id)
+    if not sections or not 0 <= section_index < len(sections):
+        await callback.answer("Этот бесплатный разбор больше недоступен. Запустите новый.", show_alert=True)
+        return
+
+    await callback.answer()
+    section = sections[section_index]
+    text = f"<b>{section['title']}</b>\n\n{section['content']}"
+    if len(text) > 4000:
+        text = text[:3990] + "…"
+
+    next_index = section_index + 1
+    reply_markup = None
+    if next_index < len(sections):
+        reply_markup = free_section_keyboard(sections[next_index]["title"], next_index)
+    else:
+        PENDING_FREE_SECTIONS.pop(callback.from_user.id, None)
+
+    with suppress(Exception):
+        await callback.message.edit_reply_markup(reply_markup=None)
+    await callback.message.answer(text, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+
+    if next_index == len(sections):
+        builder = InlineKeyboardBuilder()
+        builder.button(
+            text=f"🔓 Получить полный PDF · {PRICES['personality']}⭐",
+            callback_data="buy:personality",
+        )
+        builder.button(text="⬅️ Назад", callback_data="back:menu")
+        builder.adjust(1)
+        await callback.message.answer(
+            "Это бесплатный мини-разбор. Полный PDF раскрывает любовь, деньги, "
+            "сценарии, блоки и практические рекомендации глубже.",
+            reply_markup=builder.as_markup(),
+        )
 
 
 @router.callback_query(F.data == "menu")

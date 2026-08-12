@@ -23,11 +23,11 @@ from services.ai import (  # noqa: E402
     SECTION_CONTEXT_FOCUS,
     SIGN_CODES,
 )
-from services.reports import SECTIONS  # noqa: E402
+from services.reports_new import SECTIONS  # noqa: E402
 
 HINTS_DIR = PROJECT_ROOT / "section_hints"
 WORD_LIMITS = {
-    "personality_free": (120, 200),
+    "personality_free": (60, 100),
     "personality": (150, 250),
     "love": (150, 250),
     "money": (150, 250),

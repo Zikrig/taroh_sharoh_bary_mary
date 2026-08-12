@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from services.reports import SECTIONS, generate_report
+from services.reports_new import SECTIONS, generate_report
 
 OUTPUT_DIR = ROOT / "data" / "design_samples"
 TEMP_REPORTS_DIR = ROOT / "reports"

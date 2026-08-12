@@ -1,6 +1,12 @@
 import unittest
 
-from handlers.router import NAMES, PRICES, SCENARIO_INTROS, TEASER_TEXTS
+from handlers.router import (
+    NAMES,
+    PRICES,
+    SCENARIO_INTROS,
+    TEASER_TEXTS,
+    free_section_keyboard,
+)
 from config.settings import settings
 
 
@@ -22,6 +28,12 @@ class RouterUiTests(unittest.TestCase):
 
     def test_payload_samples_are_disabled_by_default(self):
         self.assertFalse(settings.save_payload_samples)
+
+    def test_free_section_button_contains_the_next_section_title(self):
+        markup = free_section_keyboard("Любовь", 6)
+        button = markup.inline_keyboard[0][0]
+        self.assertEqual(button.text, "Посмотреть раздел «Любовь»")
+        self.assertEqual(button.callback_data, "free_section:6")
 
 
 if __name__ == "__main__":

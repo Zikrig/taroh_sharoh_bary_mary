@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from services.reports import SECTIONS, generate_report
+from services.reports_new import SECTIONS, generate_report
 
 
 def chart() -> dict:
