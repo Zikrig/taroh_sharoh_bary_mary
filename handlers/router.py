@@ -45,6 +45,31 @@ NAMES = {
 }
 PENDING_REPORTS: dict[int, tuple[dict, dict | None]] = {}
 PENDING_FREE_SECTIONS: dict[int, list[dict[str, str]]] = {}
+PENDING_FREE_SCENARIO: dict[int, str] = {}
+FREE_REPORT_TYPES = {
+    "personality": "personality_free",
+    "love": "love_free",
+    "compatibility": "compatibility_free",
+    "money": "money_free",
+}
+FREE_UPSELL_TEXTS = {
+    "personality": (
+        "Это бесплатный мини-разбор. Полный PDF раскрывает любовь, деньги, "
+        "сценарии, блоки и практические рекомендации глубже."
+    ),
+    "love": (
+        "Это бесплатный мини-разбор. Полный PDF раскрывает ревность, дистанцию, "
+        "сценарии, конфликты и практические рекомендации глубже."
+    ),
+    "compatibility": (
+        "Это бесплатный мини-разбор пары. Полный PDF раскрывает общение, доверие, "
+        "границы, конфликты и способы улучшить отношения."
+    ),
+    "money": (
+        "Это бесплатный мини-разбор. Полный PDF раскрывает карьеру, рабочий формат, "
+        "навыки, блоки и практические рекомендации глубже."
+    ),
+}
 REPORT_PROGRESS_TEXT = "🔮 Формирую ваш персональный результат"
 SCENARIO_INTROS = {
     "personality": (
@@ -55,59 +80,22 @@ SCENARIO_INTROS = {
     ),
     "love": (
         "❤️ ЛЮБОВЬ И ОТНОШЕНИЯ\n\n"
-        "Разберём, как вы влюбляетесь, что важно в близости, как вы реагируете "
-        "на конфликт и какой стиль партнёра может вам подходить."
+        "Сначала подготовлю бесплатный мини-разбор по вашим данным — чтобы вы "
+        "почувствовали персональный подход. Затем можно открыть полный любовный "
+        "портрет с более глубоким разбором близости, конфликтов и сценариев."
     ),
     "compatibility": (
         "💑 СОВМЕСТИМОСТЬ\n\n"
-        "Посмотрим, что притягивает вас друг к другу, как вы проживаете эмоции, "
-        "общаетесь и где могут возникать точки напряжения.\n\n"
+        "Сначала подготовлю бесплатный мини-разбор по данным вашей пары. "
+        "Затем можно открыть полный PDF с динамикой, доверием, границами и "
+        "конфликтами.\n\n"
         "Для анализа понадобятся данные вас и партнёра."
     ),
     "money": (
         "💰 ДЕНЬГИ И РЕАЛИЗАЦИЯ\n\n"
-        "Разберём ваш стиль взаимодействия с деньгами, рабочие сильные стороны, "
-        "мотивацию и направления, в которых может раскрыться потенциал реализации."
-    ),
-}
-TEASER_TEXTS = {
-    "love": (
-        "✨ ТВОЙ ЛЮБОВНЫЙ ПРОФИЛЬ\n\n"
-        "❤️ КАК ТЫ ВЛЮБЛЯЕШЬСЯ\n"
-        "Тебе важно чувствовать эмоциональный отклик и понимать, что тебя выбирают "
-        "осознанно, а не по инерции.\n\n"
-        "🔥 ПРИТЯЖЕНИЕ\n"
-        "Сильнее цепляет сочетание тепла и самостоятельности в другом человеке.\n\n"
-        "⚠️ ЗОНА ВНИМАНИЯ\n"
-        "Иногда ты можешь дольше молчать о важном, чем хотелось бы партнёру."
-    ),
-    "money": (
-        "✨ ТВОЙ ДЕНЕЖНЫЙ ПРОФИЛЬ\n\n"
-        "💰 ТВОЙ СТИЛЬ РЕАЛИЗАЦИИ\n"
-        "Тебе может быть легче включаться в работу, когда понятен личный вклад "
-        "и виден результат. Однообразные задачи без ощущения развития способны "
-        "быстро снижать мотивацию.\n\n"
-        "💪 ТВОЯ СИЛЬНАЯ СТОРОНА\n"
-        "Ты умеешь замечать практичные решения и соединять идею с конкретным действием.\n\n"
-        "⚠️ ЧТО МОЖЕТ МЕШАТЬ\n"
-        "Временная потеря интереса может заставлять тебя бросать перспективное дело "
-        "раньше, чем оно успевает принести результат.\n\n"
-        "🎯 ТОЧКА РОСТА\n"
-        "Последовательность и понятная система действий могут стать важнее "
-        "краткого всплеска вдохновения."
-    ),
-    "compatibility": (
-        "✨ ПЕРВЫЙ ВЗГЛЯД НА ВАШУ ПАРУ\n\n"
-        "❤️ ЭМОЦИОНАЛЬНАЯ СОВМЕСТИМОСТЬ\n"
-        "Между вами может быть сильное притяжение, но эмоциональные потребности "
-        "могут отличаться. Одному может требоваться больше ясности и подтверждения, "
-        "а второму — больше пространства.\n\n"
-        "🔥 ПРИТЯЖЕНИЕ\n"
-        "В этой паре может быть заметная химия: вас способен привлекать "
-        "контраст характеров и то, как каждый проявляет себя по-разному.\n\n"
-        "⚠️ ГЛАВНАЯ СЛОЖНОСТЬ\n"
-        "Разные способы выражать чувства могут приводить к недопониманию, "
-        "если важные ожидания остаются невысказанными."
+        "Сначала подготовлю бесплатный мини-разбор по вашим данным — чтобы вы "
+        "почувствовали персональный подход. Затем можно открыть полный разбор "
+        "денег, карьеры, навыков и точек роста."
     ),
 }
 
@@ -859,11 +847,16 @@ async def show_teaser(
     builder.button(text="⬅️ Назад", callback_data="back:menu")
     builder.adjust(1)
 
-    if scenario_name == "personality":
+    free_report_type = FREE_REPORT_TYPES.get(scenario_name)
+    if free_report_type:
         await message.answer("Готовлю ваш бесплатный персональный мини-разбор…")
         free_content = None
         async with report_status_animation(message) as mark_completed:
-            free_content = await generate_report_content("personality_free", chart, None)
+            free_content = await generate_report_content(
+                free_report_type,
+                chart,
+                second_chart,
+            )
             if free_content:
                 mark_completed()
         if free_content:
@@ -876,6 +869,7 @@ async def show_teaser(
                 )
                 return
             PENDING_FREE_SECTIONS[user_id] = sections
+            PENDING_FREE_SCENARIO[user_id] = scenario_name
             await message.answer(
                 f"<b>{free_content['title']}</b>\n{free_content['intro']}",
                 parse_mode=ParseMode.HTML,
@@ -890,10 +884,8 @@ async def show_teaser(
         return
 
     await message.answer(
-        f"{TEASER_TEXTS[scenario_name]}\n\n"
-        "🔐 ЭТО ТОЛЬКО ВЕРХНИЙ СЛОЙ ПРОФИЛЯ\n"
-        "В полном разборе можно посмотреть более глубокий персональный анализ "
-        "по вашим данным рождения.",
+        "Не удалось подготовить бесплатный разбор для этого сценария. "
+        "Можно сразу открыть полный PDF.",
         reply_markup=builder.as_markup(),
     )
 
@@ -925,6 +917,7 @@ async def show_free_section(callback: CallbackQuery):
         reply_markup = free_section_keyboard(sections[next_index]["title"], next_index)
     else:
         PENDING_FREE_SECTIONS.pop(callback.from_user.id, None)
+        scenario_name = PENDING_FREE_SCENARIO.pop(callback.from_user.id, "personality")
 
     with suppress(Exception):
         await callback.message.edit_reply_markup(reply_markup=None)
@@ -933,14 +926,16 @@ async def show_free_section(callback: CallbackQuery):
     if next_index == len(sections):
         builder = InlineKeyboardBuilder()
         builder.button(
-            text=f"🔓 Получить полный PDF · {PRICES['personality']}⭐",
-            callback_data="buy:personality",
+            text=f"🔓 Получить полный PDF · {PRICES[scenario_name]}⭐",
+            callback_data=f"buy:{scenario_name}",
         )
         builder.button(text="⬅️ Назад", callback_data="back:menu")
         builder.adjust(1)
         await callback.message.answer(
-            "Это бесплатный мини-разбор. Полный PDF раскрывает любовь, деньги, "
-            "сценарии, блоки и практические рекомендации глубже.",
+            FREE_UPSELL_TEXTS.get(
+                scenario_name,
+                "Это бесплатный мини-разбор. Полный PDF раскрывает тему глубже.",
+            ),
             reply_markup=builder.as_markup(),
         )
 

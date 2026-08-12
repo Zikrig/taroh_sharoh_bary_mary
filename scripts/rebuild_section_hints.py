@@ -28,6 +28,9 @@ from services.reports_new import SECTIONS  # noqa: E402
 HINTS_DIR = PROJECT_ROOT / "section_hints"
 WORD_LIMITS = {
     "personality_free": (60, 67),
+    "love_free": (60, 67),
+    "compatibility_free": (60, 67),
+    "money_free": (60, 67),
     "personality": (100, 167),
     "love": (100, 167),
     "money": (100, 167),

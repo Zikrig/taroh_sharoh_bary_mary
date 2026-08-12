@@ -122,6 +122,9 @@ class AiServiceTests(unittest.TestCase):
 
     def test_catalog_sections_and_word_budgets(self):
         self.assertEqual(len(SECTIONS["personality_free"]), 9)
+        self.assertEqual(len(SECTIONS["love_free"]), 7)
+        self.assertEqual(len(SECTIONS["compatibility_free"]), 4)
+        self.assertEqual(len(SECTIONS["money_free"]), 6)
         self.assertEqual(len(SECTIONS["personality"]), 20)
         self.assertEqual(len(SECTIONS["love"]), 18)
         self.assertEqual(len(SECTIONS["money"]), 18)
@@ -192,6 +195,19 @@ class AiServiceTests(unittest.TestCase):
         self.assertEqual(section_payload["section"]["id"], "personality_free.01")
         self.assertEqual(section_payload["section"]["requirements"]["min_words"], 60)
         self.assertEqual(section_payload["section"]["requirements"]["max_words"], 67)
+
+    def test_love_free_payload_builds_from_saved_profile(self):
+        payload = build_prompt_payload("love_free", chart(), None)
+        section_payload = build_section_payload(payload, payload["sections"][0])
+        self.assertEqual(section_payload["section"]["id"], "love_free.01")
+        self.assertEqual(section_payload["section"]["requirements"]["min_words"], 60)
+
+    def test_compatibility_free_requires_both_charts(self):
+        with self.assertRaises(ValueError):
+            build_prompt_payload("compatibility_free", chart(), None)
+        payload = build_prompt_payload("compatibility_free", chart(), chart())
+        self.assertIn("Карта 1: Солнце в Овен, дом 1", payload["allowed_facts"])
+        self.assertIn("Карта 2: Солнце в Овен, дом 1", payload["allowed_facts"])
 
     def test_validates_plain_text_and_assigns_application_references(self):
         section = {

@@ -65,6 +65,125 @@
       "card_count": 357
     },
     {
+      "section_id": "love_free.01",
+      "report_type": "love_free",
+      "title_ru": "Как ты влюбляешься",
+      "path": "love_free/01.json",
+      "card_count": 94
+    },
+    {
+      "section_id": "love_free.02",
+      "report_type": "love_free",
+      "title_ru": "Что вызывает притяжение",
+      "path": "love_free/02.json",
+      "card_count": 94
+    },
+    {
+      "section_id": "love_free.03",
+      "report_type": "love_free",
+      "title_ru": "Что важно чувствовать в отношениях",
+      "path": "love_free/03.json",
+      "card_count": 94
+    },
+    {
+      "section_id": "love_free.04",
+      "report_type": "love_free",
+      "title_ru": "Ты в конфликтах",
+      "path": "love_free/04.json",
+      "card_count": 78
+    },
+    {
+      "section_id": "love_free.05",
+      "report_type": "love_free",
+      "title_ru": "Какой партнёр тебе подходит",
+      "path": "love_free/05.json",
+      "card_count": 94
+    },
+    {
+      "section_id": "love_free.06",
+      "report_type": "love_free",
+      "title_ru": "Что может разрушать отношения",
+      "path": "love_free/06.json",
+      "card_count": 78
+    },
+    {
+      "section_id": "love_free.07",
+      "report_type": "love_free",
+      "title_ru": "Итоговый любовный портрет",
+      "path": "love_free/07.json",
+      "card_count": 94
+    },
+    {
+      "section_id": "compatibility_free.01",
+      "report_type": "compatibility_free",
+      "title_ru": "Эмоциональная совместимость",
+      "path": "compatibility_free/01.json",
+      "card_count": 12
+    },
+    {
+      "section_id": "compatibility_free.02",
+      "report_type": "compatibility_free",
+      "title_ru": "Притяжение",
+      "path": "compatibility_free/02.json",
+      "card_count": 51
+    },
+    {
+      "section_id": "compatibility_free.03",
+      "report_type": "compatibility_free",
+      "title_ru": "Сложные стороны",
+      "path": "compatibility_free/03.json",
+      "card_count": 222
+    },
+    {
+      "section_id": "compatibility_free.04",
+      "report_type": "compatibility_free",
+      "title_ru": "Общая динамика пары",
+      "path": "compatibility_free/04.json",
+      "card_count": 357
+    },
+    {
+      "section_id": "money_free.01",
+      "report_type": "money_free",
+      "title_ru": "Отношение к деньгам",
+      "path": "money_free/01.json",
+      "card_count": 160
+    },
+    {
+      "section_id": "money_free.02",
+      "report_type": "money_free",
+      "title_ru": "Что мотивирует зарабатывать",
+      "path": "money_free/02.json",
+      "card_count": 160
+    },
+    {
+      "section_id": "money_free.03",
+      "report_type": "money_free",
+      "title_ru": "Отношение к риску",
+      "path": "money_free/03.json",
+      "card_count": 78
+    },
+    {
+      "section_id": "money_free.04",
+      "report_type": "money_free",
+      "title_ru": "Подходящие направления",
+      "path": "money_free/04.json",
+      "card_count": 364
+    },
+    {
+      "section_id": "money_free.05",
+      "report_type": "money_free",
+      "title_ru": "Что может мешать финансовому росту",
+      "path": "money_free/05.json",
+      "card_count": 120
+    },
+    {
+      "section_id": "money_free.06",
+      "report_type": "money_free",
+      "title_ru": "Главная точка роста",
+      "path": "money_free/06.json",
+      "card_count": 346
+    },
+    {
       "section_id": "personality.01",
       "report_type": "personality",
       "title_ru": "Твой главный психологический портрет",

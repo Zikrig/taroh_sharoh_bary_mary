@@ -1,10 +1,11 @@
 import unittest
 
 from handlers.router import (
+    FREE_REPORT_TYPES,
+    FREE_UPSELL_TEXTS,
     NAMES,
     PRICES,
     SCENARIO_INTROS,
-    TEASER_TEXTS,
     free_section_keyboard,
 )
 from config.settings import settings
@@ -20,11 +21,11 @@ class RouterUiTests(unittest.TestCase):
         for scenario in ("personality", "love", "compatibility", "money"):
             self.assertIn(scenario, SCENARIO_INTROS)
 
-    def test_paid_previews_exist_except_personality_uses_generated_free(self):
-        self.assertNotIn("personality", TEASER_TEXTS)
-        for scenario in ("love", "money", "compatibility"):
-            self.assertIn(scenario, TEASER_TEXTS)
-            self.assertIn("✨", TEASER_TEXTS[scenario])
+    def test_all_scenarios_have_generated_free_reports(self):
+        self.assertEqual(set(FREE_REPORT_TYPES), set(PRICES))
+        for scenario, free_type in FREE_REPORT_TYPES.items():
+            self.assertTrue(free_type.endswith("_free"))
+            self.assertIn(scenario, FREE_UPSELL_TEXTS)
 
     def test_payload_samples_are_disabled_by_default(self):
         self.assertFalse(settings.save_payload_samples)

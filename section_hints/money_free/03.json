@@ -1,0 +1,828 @@
+{
+  "schema_version": "section-hint.v1",
+  "section_id": "money_free.03",
+  "report_type": "money_free",
+  "title_ru": "Отношение к риску",
+  "brief": "готовность к неопределённости",
+  "prompt_requirements": {
+    "min_words": 60,
+    "max_words": 67,
+    "style_notes": [
+      "Тема раздела: готовность к неопределённости.",
+      "Минимум воды. Только конкретные наблюдения."
+    ],
+    "avoid_repeating_sections": []
+  },
+  "hint_cards": [
+    {
+      "id": "mars_aries",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "aries"
+      },
+      "text_ru": "Марс в Овен: действие и энергия через инициативу и прямое действие.",
+      "priority": 100
+    },
+    {
+      "id": "mars_scorpio",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "scorpio"
+      },
+      "text_ru": "Марс в Скорпион: действие и энергия через глубину и собранность.",
+      "priority": 90
+    },
+    {
+      "id": "jupiter_sagittarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "jupiter",
+        "sign": "sagittarius"
+      },
+      "text_ru": "Юпитер в Стрелец: рост и убеждения через расширение горизонтов и поиск смысла.",
+      "priority": 80
+    },
+    {
+      "id": "mars_taurus",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "taurus"
+      },
+      "text_ru": "Марс в Телец: действие и энергия через устойчивость и практичность.",
+      "priority": 0
+    },
+    {
+      "id": "mars_gemini",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "gemini"
+      },
+      "text_ru": "Марс в Близнецы: действие и энергия через гибкость и обмен информацией.",
+      "priority": 0
+    },
+    {
+      "id": "mars_cancer",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "cancer"
+      },
+      "text_ru": "Марс в Рак: действие и энергия через эмоциональную близость и безопасность.",
+      "priority": 0
+    },
+    {
+      "id": "mars_leo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "leo"
+      },
+      "text_ru": "Марс в Лев: действие и энергия через самовыражение и признание.",
+      "priority": 0
+    },
+    {
+      "id": "mars_virgo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "virgo"
+      },
+      "text_ru": "Марс в Дева: действие и энергия через анализ и внимание к деталям.",
+      "priority": 0
+    },
+    {
+      "id": "mars_libra",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "libra"
+      },
+      "text_ru": "Марс в Весы: действие и энергия через гармонию и взаимодействие.",
+      "priority": 0
+    },
+    {
+      "id": "mars_sagittarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "sagittarius"
+      },
+      "text_ru": "Марс в Стрелец: действие и энергия через расширение горизонтов и поиск смысла.",
+      "priority": 0
+    },
+    {
+      "id": "mars_capricorn",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "capricorn"
+      },
+      "text_ru": "Марс в Козерог: действие и энергия через дисциплину и долгосрочную цель.",
+      "priority": 0
+    },
+    {
+      "id": "mars_aquarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "aquarius"
+      },
+      "text_ru": "Марс в Водолей: действие и энергия через самостоятельность и нестандартный взгляд.",
+      "priority": 0
+    },
+    {
+      "id": "mars_pisces",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "mars",
+        "sign": "pisces"
+      },
+      "text_ru": "Марс в Рыбы: действие и энергия через чуткость и образное восприятие.",
+      "priority": 0
+    },
+    {
+      "id": "jupiter_aries",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "jupiter",
+        "sign": "aries"
+      },
+      "text_ru": "Юпитер в Овен: рост и убеждения через инициативу и прямое действие.",
+      "priority": 0
+    },
+    {
+      "id": "jupiter_taurus",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "jupiter",
+        "sign": "taurus"
+      },
+      "text_ru": "Юпитер в Телец: рост и убеждения через устойчивость и практичность.",
+      "priority": 0
+    },
+    {
+      "id": "jupiter_gemini",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "jupiter",
+        "sign": "gemini"
+      },
+      "text_ru": "Юпитер в Близнецы: рост и убеждения через гибкость и обмен информацией.",
+      "priority": 0
+    },
+    {
+      "id": "jupiter_cancer",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "jupiter",
+        "sign": "cancer"
+      },
+      "text_ru": "Юпитер в Рак: рост и убеждения через эмоциональную близость и безопасность.",
+      "priority": 0
+    },
+    {
+      "id": "jupiter_leo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "jupiter",
+        "sign": "leo"
+      },
+      "text_ru": "Юпитер в Лев: рост и убеждения через самовыражение и признание.",
+      "priority": 0
+    },
+    {
+      "id": "jupiter_virgo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "jupiter",
+        "sign": "virgo"
+      },
+      "text_ru": "Юпитер в Дева: рост и убеждения через анализ и внимание к деталям.",
+      "priority": 0
+    },
+    {
+      "id": "jupiter_libra",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "jupiter",
+        "sign": "libra"
+      },
+      "text_ru": "Юпитер в Весы: рост и убеждения через гармонию и взаимодействие.",
+      "priority": 0
+    },
+    {
+      "id": "jupiter_scorpio",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "jupiter",
+        "sign": "scorpio"
+      },
+      "text_ru": "Юпитер в Скорпион: рост и убеждения через глубину и собранность.",
+      "priority": 0
+    },
+    {
+      "id": "jupiter_capricorn",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "jupiter",
+        "sign": "capricorn"
+      },
+      "text_ru": "Юпитер в Козерог: рост и убеждения через дисциплину и долгосрочную цель.",
+      "priority": 0
+    },
+    {
+      "id": "jupiter_aquarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "jupiter",
+        "sign": "aquarius"
+      },
+      "text_ru": "Юпитер в Водолей: рост и убеждения через самостоятельность и нестандартный взгляд.",
+      "priority": 0
+    },
+    {
+      "id": "jupiter_pisces",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "jupiter",
+        "sign": "pisces"
+      },
+      "text_ru": "Юпитер в Рыбы: рост и убеждения через чуткость и образное восприятие.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_aries",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "aries"
+      },
+      "text_ru": "Сатурн в Овен: границы и ответственность через инициативу и прямое действие.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_taurus",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "taurus"
+      },
+      "text_ru": "Сатурн в Телец: границы и ответственность через устойчивость и практичность.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_gemini",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "gemini"
+      },
+      "text_ru": "Сатурн в Близнецы: границы и ответственность через гибкость и обмен информацией.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_cancer",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "cancer"
+      },
+      "text_ru": "Сатурн в Рак: границы и ответственность через эмоциональную близость и безопасность.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_leo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "leo"
+      },
+      "text_ru": "Сатурн в Лев: границы и ответственность через самовыражение и признание.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_virgo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "virgo"
+      },
+      "text_ru": "Сатурн в Дева: границы и ответственность через анализ и внимание к деталям.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_libra",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "libra"
+      },
+      "text_ru": "Сатурн в Весы: границы и ответственность через гармонию и взаимодействие.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_scorpio",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "scorpio"
+      },
+      "text_ru": "Сатурн в Скорпион: границы и ответственность через глубину и собранность.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_sagittarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "sagittarius"
+      },
+      "text_ru": "Сатурн в Стрелец: границы и ответственность через расширение горизонтов и поиск смысла.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_capricorn",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "capricorn"
+      },
+      "text_ru": "Сатурн в Козерог: границы и ответственность через дисциплину и долгосрочную цель.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_aquarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "aquarius"
+      },
+      "text_ru": "Сатурн в Водолей: границы и ответственность через самостоятельность и нестандартный взгляд.",
+      "priority": 0
+    },
+    {
+      "id": "saturn_pisces",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "saturn",
+        "sign": "pisces"
+      },
+      "text_ru": "Сатурн в Рыбы: границы и ответственность через чуткость и образное восприятие.",
+      "priority": 0
+    },
+    {
+      "id": "uranus_aries",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "uranus",
+        "sign": "aries"
+      },
+      "text_ru": "Уран в Овен: свобода и обновление через инициативу и прямое действие.",
+      "priority": 0
+    },
+    {
+      "id": "uranus_taurus",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "uranus",
+        "sign": "taurus"
+      },
+      "text_ru": "Уран в Телец: свобода и обновление через устойчивость и практичность.",
+      "priority": 0
+    },
+    {
+      "id": "uranus_gemini",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "uranus",
+        "sign": "gemini"
+      },
+      "text_ru": "Уран в Близнецы: свобода и обновление через гибкость и обмен информацией.",
+      "priority": 0
+    },
+    {
+      "id": "uranus_cancer",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "uranus",
+        "sign": "cancer"
+      },
+      "text_ru": "Уран в Рак: свобода и обновление через эмоциональную близость и безопасность.",
+      "priority": 0
+    },
+    {
+      "id": "uranus_leo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "uranus",
+        "sign": "leo"
+      },
+      "text_ru": "Уран в Лев: свобода и обновление через самовыражение и признание.",
+      "priority": 0
+    },
+    {
+      "id": "uranus_virgo",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "uranus",
+        "sign": "virgo"
+      },
+      "text_ru": "Уран в Дева: свобода и обновление через анализ и внимание к деталям.",
+      "priority": 0
+    },
+    {
+      "id": "uranus_libra",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "uranus",
+        "sign": "libra"
+      },
+      "text_ru": "Уран в Весы: свобода и обновление через гармонию и взаимодействие.",
+      "priority": 0
+    },
+    {
+      "id": "uranus_scorpio",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "uranus",
+        "sign": "scorpio"
+      },
+      "text_ru": "Уран в Скорпион: свобода и обновление через глубину и собранность.",
+      "priority": 0
+    },
+    {
+      "id": "uranus_sagittarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "uranus",
+        "sign": "sagittarius"
+      },
+      "text_ru": "Уран в Стрелец: свобода и обновление через расширение горизонтов и поиск смысла.",
+      "priority": 0
+    },
+    {
+      "id": "uranus_capricorn",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "uranus",
+        "sign": "capricorn"
+      },
+      "text_ru": "Уран в Козерог: свобода и обновление через дисциплину и долгосрочную цель.",
+      "priority": 0
+    },
+    {
+      "id": "uranus_aquarius",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "uranus",
+        "sign": "aquarius"
+      },
+      "text_ru": "Уран в Водолей: свобода и обновление через самостоятельность и нестандартный взгляд.",
+      "priority": 0
+    },
+    {
+      "id": "uranus_pisces",
+      "when": {
+        "kind": "planet_sign",
+        "planet": "uranus",
+        "sign": "pisces"
+      },
+      "text_ru": "Уран в Рыбы: свобода и обновление через чуткость и образное восприятие.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_conjunction_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "jupiter",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Марс — Юпитер: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_sextile_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "jupiter",
+        "aspect": "sextile"
+      },
+      "text_ru": "Марс — Юпитер: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_square_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "jupiter",
+        "aspect": "square"
+      },
+      "text_ru": "Марс — Юпитер: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_trine_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "jupiter",
+        "aspect": "trine"
+      },
+      "text_ru": "Марс — Юпитер: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_opposition_jupiter",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "jupiter",
+        "aspect": "opposition"
+      },
+      "text_ru": "Марс — Юпитер: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_conjunction_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "saturn",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Марс — Сатурн: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_sextile_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "saturn",
+        "aspect": "sextile"
+      },
+      "text_ru": "Марс — Сатурн: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_square_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "saturn",
+        "aspect": "square"
+      },
+      "text_ru": "Марс — Сатурн: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_trine_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "saturn",
+        "aspect": "trine"
+      },
+      "text_ru": "Марс — Сатурн: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_opposition_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "saturn",
+        "aspect": "opposition"
+      },
+      "text_ru": "Марс — Сатурн: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_conjunction_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "uranus",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Марс — Уран: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_sextile_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "uranus",
+        "aspect": "sextile"
+      },
+      "text_ru": "Марс — Уран: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_square_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "uranus",
+        "aspect": "square"
+      },
+      "text_ru": "Марс — Уран: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_trine_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "uranus",
+        "aspect": "trine"
+      },
+      "text_ru": "Марс — Уран: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_mars_opposition_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "mars",
+        "second": "uranus",
+        "aspect": "opposition"
+      },
+      "text_ru": "Марс — Уран: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_conjunction_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "saturn",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Юпитер — Сатурн: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_sextile_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "saturn",
+        "aspect": "sextile"
+      },
+      "text_ru": "Юпитер — Сатурн: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_square_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "saturn",
+        "aspect": "square"
+      },
+      "text_ru": "Юпитер — Сатурн: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_trine_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "saturn",
+        "aspect": "trine"
+      },
+      "text_ru": "Юпитер — Сатурн: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_opposition_saturn",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "saturn",
+        "aspect": "opposition"
+      },
+      "text_ru": "Юпитер — Сатурн: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_conjunction_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "uranus",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Юпитер — Уран: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_sextile_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "uranus",
+        "aspect": "sextile"
+      },
+      "text_ru": "Юпитер — Уран: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_square_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "uranus",
+        "aspect": "square"
+      },
+      "text_ru": "Юпитер — Уран: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_trine_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "uranus",
+        "aspect": "trine"
+      },
+      "text_ru": "Юпитер — Уран: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_jupiter_opposition_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "jupiter",
+        "second": "uranus",
+        "aspect": "opposition"
+      },
+      "text_ru": "Юпитер — Уран: оппозиция требует баланса между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_conjunction_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "uranus",
+        "aspect": "conjunction"
+      },
+      "text_ru": "Сатурн — Уран: соединение усиливает общую тему.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_sextile_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "uranus",
+        "aspect": "sextile"
+      },
+      "text_ru": "Сатурн — Уран: секстиль облегчает взаимодействие тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_square_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "uranus",
+        "aspect": "square"
+      },
+      "text_ru": "Сатурн — Уран: квадрат создаёт напряжение между темами.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_trine_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "uranus",
+        "aspect": "trine"
+      },
+      "text_ru": "Сатурн — Уран: тригон поддерживает согласованное проявление тем.",
+      "priority": 0
+    },
+    {
+      "id": "aspect_saturn_opposition_uranus",
+      "when": {
+        "kind": "aspect",
+        "first": "saturn",
+        "second": "uranus",
+        "aspect": "opposition"
+      },
+      "text_ru": "Сатурн — Уран: оппозиция требует баланса между темами.",
+      "priority": 0
+    }
+  ]
+}
