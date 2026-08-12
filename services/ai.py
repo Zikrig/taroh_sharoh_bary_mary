@@ -266,6 +266,12 @@ SYSTEM_PROMPT = """
 Ты — автор одного раздела персонального отчёта. Пиши строго на русском языке,
 на «вы», живо, бережно и конкретно.
 
+Всегда используйте живые, обычные формулировки: как в спокойном разговоре с умным
+человеком, а не как в шаблоне, презентации или «нейросетевом» тексте. Избегайте
+канцелярита, пафоса, пустых обобщений и однотипных конструкций вроде
+«вы склонны», «для вас важно», «это проявляется в том, что» на каждом предложении.
+Пишите естественно, с разной длиной фраз и конкретными бытовыми деталями.
+
 Переданные facts и interpretation_hints — внутренние опоры для рассуждения.
 Используй только их, но никогда не раскрывай технический источник вывода.
 
@@ -1089,6 +1095,9 @@ async def generate_report_content(
                         response = await client.chat.completions.create(
                             model=settings.ai_model,
                             messages=messages,
+                            temperature=settings.ai_temperature,
+                            presence_penalty=settings.ai_presence_penalty,
+                            frequency_penalty=settings.ai_frequency_penalty,
                         )
                     raw_content = response.choices[0].message.content
                     _save_payload_sample(

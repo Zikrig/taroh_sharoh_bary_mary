@@ -321,6 +321,7 @@ class AiServiceTests(unittest.TestCase):
     def test_prompt_requires_hints_to_be_rephrased(self):
         self.assertIn("не копируйте дословно", SYSTEM_PROMPT)
         self.assertIn("не упоминай астрологию", SYSTEM_PROMPT)
+        self.assertIn("живые, обычные формулировки", SYSTEM_PROMPT)
 
 
 if __name__ == "__main__":

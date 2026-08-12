@@ -27,8 +27,11 @@ class RouterUiTests(unittest.TestCase):
             self.assertTrue(free_type.endswith("_free"))
             self.assertIn(scenario, FREE_UPSELL_TEXTS)
 
-    def test_payload_samples_are_disabled_by_default(self):
-        self.assertFalse(settings.save_payload_samples)
+    def test_payload_samples_and_sampling_settings_are_configured(self):
+        self.assertTrue(settings.save_payload_samples)
+        self.assertGreaterEqual(settings.ai_temperature, 1.0)
+        self.assertGreater(settings.ai_presence_penalty, 0)
+        self.assertGreater(settings.ai_frequency_penalty, 0)
 
     def test_free_section_button_contains_the_next_section_title(self):
         markup = free_section_keyboard("Любовь", 6)

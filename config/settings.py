@@ -18,6 +18,9 @@ class Settings:
     )
     ai_base_url: str = os.getenv("AITUNNEL_BASE_URL", "https://api.aitunnel.ru/v1/")
     ai_model: str = os.getenv("AITUNNEL_MODEL", "deepseek-v4-flash-0731")
+    ai_temperature: float = float(os.getenv("AITUNNEL_TEMPERATURE", "1.2"))
+    ai_presence_penalty: float = float(os.getenv("AITUNNEL_PRESENCE_PENALTY", "0.3"))
+    ai_frequency_penalty: float = float(os.getenv("AITUNNEL_FREQUENCY_PENALTY", "0.2"))
     database_path: Path = Path(os.getenv("DATABASE_PATH", "data/bot.db"))
     save_payload_samples: bool = os.getenv("SAVE_PAYLOAD_SAMPLES", "").strip().lower() in {
         "1",
