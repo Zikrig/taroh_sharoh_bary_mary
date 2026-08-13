@@ -815,27 +815,123 @@ _SECTION_HINT_INDEX: dict[tuple[str, str], Path] | None = None
 _SECTION_CACHE: dict[str, dict[str, Any]] = {}
 
 
-def _save_payload_sample(
-    kind: str,
-    payload: Any,
+def _safe_path_part(value: str) -> str:
+    cleaned = re.sub(r"[^\w.\-]+", "_", (value or "").strip(), flags=re.UNICODE)
+    return cleaned.strip("._") or "unknown"
+
+
+def _payload_sample_attempt_dir(
     *,
     report_type: str,
-    attempt: int,
+    section_id: str,
     request_id: str,
+    attempt: int,
+) -> Path:
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    return (
+        PAYLOAD_SAMPLES_DIR
+        / _safe_path_part(report_type)
+        / _safe_path_part(section_id)
+        / f"{timestamp}_a{attempt}_{request_id[:12]}"
+    )
+
+
+def _write_sample_text(path: Path, text: str) -> None:
+    path.write_text(text, encoding="utf-8")
+
+
+def _write_sample_json(path: Path, payload: Any) -> None:
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+
+
+def _user_message_body(content: str) -> Any:
+    try:
+        return json.loads(content)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return content
+
+
+def _extract_reasoning(message: Any, dumped: dict[str, Any] | None) -> str:
+    for source in (dumped or {}, message):
+        if source is None:
+            continue
+        getter = source.get if isinstance(source, dict) else lambda key, default=None: getattr(source, key, default)
+        for key in ("reasoning", "reasoning_content"):
+            value = getter(key)
+            if isinstance(value, str) and value.strip():
+                return value
+    return ""
+
+
+def _save_request_transcript(
+    sample_dir: Path,
+    *,
+    messages: list[dict[str, str]],
+    request_meta: dict[str, Any],
 ) -> None:
-    """Persist the exact request/response text used with the model."""
+    """Save the exact outbound payload: system prompt, user JSON, sampling params."""
     if not settings.save_payload_samples:
         return
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    filename = f"{kind}_{timestamp}_{request_id}_{report_type}_attempt{attempt}.json"
     try:
-        PAYLOAD_SAMPLES_DIR.mkdir(parents=True, exist_ok=True)
-        (PAYLOAD_SAMPLES_DIR / filename).write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2),
-            encoding="utf-8",
+        sample_dir.mkdir(parents=True, exist_ok=True)
+        _write_sample_json(
+            sample_dir / "03_request_as_sent.json",
+            {**request_meta, "messages": messages},
         )
+        if messages:
+            _write_sample_text(sample_dir / "00_system.txt", messages[0].get("content") or "")
+        if len(messages) > 1:
+            _write_sample_json(
+                sample_dir / "01_user.json",
+                _user_message_body(messages[1].get("content") or ""),
+            )
+        if len(messages) > 2:
+            extra = "\n\n".join(
+                str(item.get("content") or "")
+                for item in messages[2:]
+            )
+            _write_sample_text(sample_dir / "02_retry.txt", extra)
     except (OSError, TypeError, ValueError) as error:
-        logger.warning("Не удалось сохранить AI %s в payload_samples: %s", kind, error)
+        logger.warning("Не удалось сохранить AI request в payload_samples: %s", error)
+
+
+def _save_response_transcript(
+    sample_dir: Path,
+    *,
+    content: str,
+    word_count: int,
+    finish_reason: Any,
+    message: Any,
+) -> None:
+    """Save the model reply next to the request; keep reasoning in a separate file."""
+    if not settings.save_payload_samples:
+        return
+    try:
+        sample_dir.mkdir(parents=True, exist_ok=True)
+        dumped = (
+            message.model_dump()
+            if hasattr(message, "model_dump")
+            else {
+                "content": getattr(message, "content", None),
+                "reasoning": getattr(message, "reasoning", None),
+                "reasoning_content": getattr(message, "reasoning_content", None),
+            }
+        )
+        reasoning = _extract_reasoning(message, dumped if isinstance(dumped, dict) else None)
+        _write_sample_text(sample_dir / "10_answer.txt", content or "")
+        if reasoning:
+            _write_sample_text(sample_dir / "11_reasoning.txt", reasoning)
+        _write_sample_json(
+            sample_dir / "12_response_meta.json",
+            {
+                "word_count": word_count,
+                "finish_reason": finish_reason,
+                "has_reasoning": bool(reasoning),
+            },
+        )
+        _write_sample_json(sample_dir / "13_response_raw.json", dumped)
+    except (OSError, TypeError, ValueError) as error:
+        logger.warning("Не удалось сохранить AI response в payload_samples: %s", error)
 
 
 def _chart_for_prompt(chart: dict) -> dict[str, Any]:
@@ -1596,18 +1692,21 @@ async def generate_report_content(
                                 "Исправь именно это и верни только текст раздела."
                             ),
                         })
-                    _save_payload_sample(
-                        "request",
-                        {
+                    sample_dir = _payload_sample_attempt_dir(
+                        report_type=report_type,
+                        section_id=str(section_payload["section"]["id"]),
+                        request_id=request_id,
+                        attempt=attempt + 1,
+                    )
+                    _save_request_transcript(
+                        sample_dir,
+                        messages=messages,
+                        request_meta={
                             "model": settings.ai_model,
                             "temperature": settings.ai_temperature,
                             "presence_penalty": settings.ai_presence_penalty,
                             "frequency_penalty": settings.ai_frequency_penalty,
-                            "messages": messages,
                         },
-                        report_type=report_type,
-                        attempt=attempt + 1,
-                        request_id=request_id,
                     )
                     async with semaphore:
                         response = await client.chat.completions.create(
@@ -1619,22 +1718,12 @@ async def generate_report_content(
                         )
                     message = response.choices[0].message
                     raw_content = _message_text(message)
-                    _save_payload_sample(
-                        "response",
-                        {
-                            "content": raw_content or "",
-                            "word_count": len((raw_content or "").split()),
-                            "finish_reason": getattr(response.choices[0], "finish_reason", None),
-                            "message": message.model_dump()
-                            if hasattr(message, "model_dump")
-                            else {
-                                "content": getattr(message, "content", None),
-                                "reasoning_content": getattr(message, "reasoning_content", None),
-                            },
-                        },
-                        report_type=report_type,
-                        attempt=attempt + 1,
-                        request_id=request_id,
+                    _save_response_transcript(
+                        sample_dir,
+                        content=raw_content or "",
+                        word_count=len((raw_content or "").split()),
+                        finish_reason=getattr(response.choices[0], "finish_reason", None),
+                        message=message,
                     )
                     validated, rejection = _validate_section(
                         raw_content,

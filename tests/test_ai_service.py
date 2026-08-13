@@ -11,6 +11,9 @@ if find_spec("swisseph") is None:
         SATURN=6, URANUS=7, NEPTUNE=8, PLUTO=9,
     )
 
+from unittest.mock import patch
+from tempfile import TemporaryDirectory
+
 from services.ai import (
     MAX_HINT_CARDS,
     MAX_SECTION_SUMMARY_CHARS,
@@ -20,6 +23,9 @@ from services.ai import (
     _allowed_facts,
     _filter_aspects,
     _is_degenerate_section_text,
+    _payload_sample_attempt_dir,
+    _save_request_transcript,
+    _save_response_transcript,
     _section_batches,
     _section_summary,
     _selected_hint_cards,
@@ -421,6 +427,58 @@ class AiServiceTests(unittest.TestCase):
         self.assertIn("живые, обычные формулировки", SYSTEM_PROMPT)
         self.assertIn("Не давайте советов, рекомендаций", SYSTEM_PROMPT)
         self.assertNotIn("практический ориентир", SYSTEM_PROMPT)
+
+    def test_payload_transcript_saves_system_and_user_in_section_folder(self):
+        user_payload = {"section": {"id": "personality_free.02", "title": "Какой ты человек"}}
+        messages = [
+            {"role": "system", "content": "SYSTEM BODY"},
+            {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)},
+        ]
+        with TemporaryDirectory() as tmp:
+            with patch("services.ai.PAYLOAD_SAMPLES_DIR", Path(tmp)), patch(
+                "services.ai.settings"
+            ) as mock_settings:
+                mock_settings.save_payload_samples = True
+                sample_dir = _payload_sample_attempt_dir(
+                    report_type="personality_free",
+                    section_id="personality_free.02",
+                    request_id="abcdef1234567890",
+                    attempt=1,
+                )
+                _save_request_transcript(
+                    sample_dir,
+                    messages=messages,
+                    request_meta={"model": "test-model", "temperature": 1.2},
+                )
+                _save_response_transcript(
+                    sample_dir,
+                    content="готовый текст раздела",
+                    word_count=3,
+                    finish_reason="stop",
+                    message=SimpleNamespace(
+                        content="готовый текст раздела",
+                        reasoning="длинные внутренние рассуждения",
+                        reasoning_content=None,
+                    ),
+                )
+                self.assertTrue(sample_dir.is_dir())
+                self.assertEqual(
+                    sample_dir.parent.name, "personality_free.02"
+                )
+                self.assertEqual(sample_dir.parent.parent.name, "personality_free")
+                self.assertEqual((sample_dir / "00_system.txt").read_text(encoding="utf-8"), "SYSTEM BODY")
+                saved_user = json.loads((sample_dir / "01_user.json").read_text(encoding="utf-8"))
+                self.assertEqual(saved_user, user_payload)
+                sent = json.loads((sample_dir / "03_request_as_sent.json").read_text(encoding="utf-8"))
+                self.assertEqual(sent["messages"], messages)
+                self.assertEqual(
+                    (sample_dir / "10_answer.txt").read_text(encoding="utf-8"),
+                    "готовый текст раздела",
+                )
+                self.assertEqual(
+                    (sample_dir / "11_reasoning.txt").read_text(encoding="utf-8"),
+                    "длинные внутренние рассуждения",
+                )
 
 
 if __name__ == "__main__":
