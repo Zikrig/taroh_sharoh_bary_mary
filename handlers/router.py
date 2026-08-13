@@ -23,11 +23,13 @@ from config.settings import settings
 from database.repository import (
     complete_order,
     create_order,
+    get_free_generation,
     get_order,
     get_profile,
     get_app_setting,
     get_report_context,
     get_test_mode,
+    save_free_generation,
     save_profile,
     save_report_context,
     set_order_status,
@@ -920,6 +922,7 @@ async def show_teaser(
                 )
                 return
             report_id = store_pending_free_report(user_id, scenario_name, sections)
+            await save_free_generation(user_id, scenario_name, sections)
             await message.answer(
                 f"<b>{free_content['title']}</b>\n{free_content['intro']}",
                 parse_mode=ParseMode.HTML,
@@ -1102,7 +1105,13 @@ async def deliver_report(
         "Начинаю формировать ваш персональный разбор. Это займёт несколько секунд."
     )
     async with report_status_animation(message) as mark_completed:
-        content = await generate_report_content(scenario_name, chart, second_chart)
+        prior_sections = await get_free_generation(user_id, scenario_name)
+        content = await generate_report_content(
+            scenario_name,
+            chart,
+            second_chart,
+            prior_sections=prior_sections,
+        )
         if content is None:
             await set_order_status(order_id, "report_pending")
             await message.answer(

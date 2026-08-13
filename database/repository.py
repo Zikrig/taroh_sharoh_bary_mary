@@ -41,6 +41,13 @@ async def init_db() -> None:
                 second_chart_json TEXT,
                 FOREIGN KEY (order_id) REFERENCES orders(id)
             );
+            CREATE TABLE IF NOT EXISTS free_generations (
+                user_id INTEGER NOT NULL,
+                scenario TEXT NOT NULL,
+                sections_json TEXT NOT NULL,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, scenario)
+            );
             INSERT OR IGNORE INTO app_settings (key, value)
             VALUES ('test_mode', '0');
             """
@@ -174,6 +181,62 @@ async def get_report_context(order_id: int) -> tuple[dict[str, Any], dict[str, A
     if not row:
         return None
     return json.loads(row[0]), json.loads(row[1]) if row[1] else None
+
+
+def _normalize_stored_sections(sections: list[Any]) -> list[dict[str, str]]:
+    stored: list[dict[str, str]] = []
+    for item in sections:
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("title") or "").strip()
+        content = str(item.get("content") or "").strip()
+        if title and content:
+            stored.append({"title": title, "content": content})
+    return stored
+
+
+async def save_free_generation(
+    user_id: int,
+    scenario: str,
+    sections: list[dict[str, Any]],
+) -> None:
+    stored = _normalize_stored_sections(sections)
+    if not stored:
+        return
+    async with aiosqlite.connect(settings.database_path) as db:
+        await db.execute(
+            """
+            INSERT INTO free_generations (user_id, scenario, sections_json)
+            VALUES (?, ?, ?)
+            ON CONFLICT(user_id, scenario) DO UPDATE SET
+                sections_json=excluded.sections_json,
+                updated_at=CURRENT_TIMESTAMP
+            """,
+            (user_id, scenario, json.dumps(stored, ensure_ascii=False)),
+        )
+        await db.commit()
+
+
+async def get_free_generation(user_id: int, scenario: str) -> list[dict[str, str]] | None:
+    async with aiosqlite.connect(settings.database_path) as db:
+        async with db.execute(
+            """
+            SELECT sections_json FROM free_generations
+            WHERE user_id = ? AND scenario = ?
+            """,
+            (user_id, scenario),
+        ) as cur:
+            row = await cur.fetchone()
+    if not row:
+        return None
+    try:
+        parsed = json.loads(row[0])
+    except (TypeError, json.JSONDecodeError):
+        return None
+    if not isinstance(parsed, list):
+        return None
+    stored = _normalize_stored_sections(parsed)
+    return stored or None
 
 
 async def complete_order(order_id: int, payment_id: str) -> None:

@@ -238,6 +238,7 @@ def generate_report(
         Spacer(1, 5 * mm),
         _paragraph("ДОМА", heading),
         _houses_table(chart, table_body),
+        PageBreak(),
     ])
 
     generated_by_title = {section["title"]: section for section in content["sections"]}
@@ -246,7 +247,6 @@ def generate_report(
         if section is None:
             raise ValueError(f"Отсутствует раздел «{title_text}».")
         story.extend([
-            PageBreak(),
             _paragraph(title_text, heading),
             _paragraph(section["content"], body),
         ])

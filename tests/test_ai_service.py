@@ -32,11 +32,14 @@ from services.ai import (
 from services.astro import local_time_to_utc
 from services.prompt_guides.career import build_career_hints
 from services.report_prompts import (
+    EDITOR_SYSTEM_PROMPT,
     FREE_SECTION_BATCH,
     PAID_SECTION_BATCH,
     PRODUCT_PROMPTS,
     SECTION_DELIMITER,
     SECTION_MAX_WORDS,
+    build_editorial_prompt,
+    format_delimited_sections,
     product_prompt_for_titles,
     section_max_words,
     section_title_batches,
@@ -397,6 +400,25 @@ class AiServiceTests(unittest.TestCase):
         self.assertIn("Верни только эти разделы одним сообщением", prompt)
         self.assertNotIn("Твой главный психологический портрет\n=====", prompt)
 
+    def test_paid_prompt_includes_prior_free_generation(self):
+        titles = catalog_titles("personality")[:1]
+        prompt = build_user_prompt(
+            "personality",
+            "Натальная карта",
+            titles,
+            None,
+            [
+                {
+                    "title": "Твой портрет",
+                    "content": "Ты действуешь быстро и прямо, почти без разгона.",
+                }
+            ],
+        )
+        self.assertIn("бесплатный мини-разбор по той же теме", prompt)
+        self.assertIn("Ты действуешь быстро и прямо", prompt)
+        self.assertIn("--- Твой портрет ---", prompt)
+        self.assertNotIn("--- Твой портрет ---", build_user_prompt("personality", "карта", titles))
+
     def test_system_prompt_asks_to_analyze_chart_before_writing(self):
         self.assertIn("Проанализируй всю карту", SYSTEM_PROMPT)
         self.assertIn("от 0 до 2 упоминаний", SYSTEM_PROMPT)
@@ -407,6 +429,28 @@ class AiServiceTests(unittest.TestCase):
         self.assertIn("Если раздел можно было бы отправить человеку с совершенно другой картой", SYSTEM_PROMPT)
         self.assertIn("Не определяй и не подразумевай пол читателя", SYSTEM_PROMPT)
         self.assertIn("не назначай пол", SYSTEM_PROMPT)
+
+    def test_editorial_prompt_sends_full_draft_and_asks_to_cut_repeats(self):
+        self.assertIn("лёгкая редактура", EDITOR_SYSTEM_PROMPT)
+        self.assertIn("не переписывай абзацы", EDITOR_SYSTEM_PROMPT)
+        draft = format_delimited_sections(
+            [
+                {"title": "Твой главный психологический портрет", "content": "Ты быстро включаешься."},
+                {"title": "Твой внутренний мир", "content": "Ты быстро включаешься и устаёшь от шума."},
+            ]
+        )
+        self.assertIn("Ты быстро включаешься.", draft)
+        prompt = build_editorial_prompt(
+            draft,
+            ["Твой главный психологический портрет", "Твой внутренний мир"],
+            report_type="personality",
+        )
+        self.assertIn("ПОЛНЫЙ ЧЕРНОВИК", prompt)
+        self.assertIn("Ты быстро включаешься и устаёшь от шума.", prompt)
+        self.assertIn("лёгкая редактура одним проходом", prompt)
+        self.assertIn("Верни весь разбор одним сообщением", prompt)
+        self.assertIn("Твой главный психологический портрет", prompt)
+        self.assertIn("Твой внутренний мир", prompt)
 
     def test_natal_dump_includes_houses_for_the_model(self):
         text = render_natal_dump(chart(), None, "personality_free")

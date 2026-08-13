@@ -11,11 +11,14 @@ from uuid import uuid4
 from services.astro import SIGNS, calculate_synastry
 from config.settings import settings
 from services.report_prompts import (
+    EDITOR_SYSTEM_PROMPT,
     FREE_SECTION_BATCH,
     PAID_SECTION_BATCH,
     PRODUCT_PROMPTS,
     SECTION_DELIMITER,
     SYSTEM_PROMPT,
+    build_editorial_prompt,
+    format_delimited_sections,
     output_format_block,
     product_prompt_for_titles,
     section_title_batches,
@@ -424,17 +427,42 @@ def _covered_sections_block(covered: list[dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
+def _prior_free_block(sections: list[dict[str, str]] | None) -> str:
+    if not sections:
+        return ""
+    lines = [
+        "Уже показанный этому человеку бесплатный мини-разбор по той же теме.",
+        "Не повторяй его определения, названия качеств, метафоры, примеры и формулировки.",
+        "Платный текст должен быть новым по словам и глубже по содержанию.",
+        "",
+        "Текст бесплатного разбора:",
+    ]
+    for item in sections:
+        title = str(item.get("title") or "").strip()
+        content = str(item.get("content") or "").strip()
+        if not title or not content:
+            continue
+        lines.append(f"--- {title} ---")
+        lines.append(content)
+        lines.append("")
+    return "\n".join(lines).strip()
+
+
 def build_user_prompt(
     report_type: str,
     natal_text: str,
     titles: list[str],
     covered: list[dict[str, str]] | None = None,
+    prior_sections: list[dict[str, str]] | None = None,
 ) -> str:
     batch = True
     parts = [
         natal_text,
         product_prompt_for_titles(report_type, titles),
     ]
+    prior_block = _prior_free_block(prior_sections)
+    if prior_block:
+        parts.append(prior_block)
     covered_block = _covered_sections_block(covered or [])
     if covered_block:
         parts.append(covered_block)
@@ -632,12 +660,13 @@ async def _request_delimited_sections(
     user_prompt: str,
     allowed_facts: list[str],
     wave_id: str,
+    system_prompt: str | None = None,
 ) -> list[dict[str, Any]] | None:
     request_id = uuid4().hex
     rejection: str | None = None
     for attempt in range(FAILED_BATCH_RETRIES + 1):
         messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt or SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt},
         ]
         if rejection:
@@ -728,8 +757,42 @@ async def _request_delimited_sections(
     return None
 
 
+async def _edit_paid_sections(
+    client: Any,
+    *,
+    report_type: str,
+    sections: list[dict[str, Any]],
+    allowed_facts: list[str],
+) -> list[dict[str, Any]]:
+    titles = [str(item.get("title") or "") for item in sections if item.get("title")]
+    if not titles:
+        return sections
+    user_prompt = build_editorial_prompt(
+        format_delimited_sections(sections),
+        titles,
+        report_type=report_type,
+    )
+    edited = await _request_delimited_sections(
+        client,
+        report_type=report_type,
+        titles=titles,
+        user_prompt=user_prompt,
+        allowed_facts=allowed_facts,
+        wave_id="edit",
+        system_prompt=EDITOR_SYSTEM_PROMPT,
+    )
+    if edited is None:
+        logger.warning("Редактура «%s» не удалась, оставляю черновик", report_type)
+        return sections
+    return edited
+
+
 async def generate_report_content(
-    report_type: str, chart: dict, second_chart: dict | None = None
+    report_type: str,
+    chart: dict,
+    second_chart: dict | None = None,
+    *,
+    prior_sections: list[dict[str, str]] | None = None,
 ) -> dict[str, Any] | None:
     """Generate the report in batches and split each reply by =====."""
     if not settings.ai_api_key:
@@ -737,8 +800,18 @@ async def generate_report_content(
     try:
         from openai import AsyncOpenAI
 
+        if str(report_type).endswith("_free"):
+            prior_sections = None
         payload = build_prompt_payload(report_type, chart, second_chart)
-        cache_key = _report_cache_key(report_type, payload["natal_text"])
+        prior_blob = json.dumps(
+            [
+                {"title": item.get("title"), "content": item.get("content")}
+                for item in (prior_sections or [])
+            ],
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+        cache_key = _report_cache_key(report_type, payload["natal_text"] + "\n" + prior_blob)
         cached = _REPORT_CACHE.get(cache_key)
         if cached:
             return cached
@@ -761,6 +834,7 @@ async def generate_report_content(
                 natal_text,
                 batch_titles,
                 covered,
+                prior_sections,
             )
             validated = await _request_delimited_sections(
                 client,
@@ -779,6 +853,13 @@ async def generate_report_content(
                     "summary": _section_summary(item["content"]),
                 }
                 for item in validated
+            )
+        if collected and not str(report_type).endswith("_free"):
+            collected = await _edit_paid_sections(
+                client,
+                report_type=report_type,
+                sections=collected,
+                allowed_facts=allowed_facts,
             )
         title, intro = _report_shell(report_type)
         result = {
