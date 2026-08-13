@@ -116,6 +116,8 @@ class RouterUiTests(unittest.TestCase):
         callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
         self.assertIn("🟢 Лимит бесплатных: ВКЛ", texts)
         self.assertIn("admin:free_daily_limit_toggle", callbacks)
+        self.assertIn("💰 Цены", texts)
+        self.assertIn("admin:prices", callbacks)
         text = admin_text(
             test_mode=False,
             free_daily_limit=True,
@@ -124,6 +126,7 @@ class RouterUiTests(unittest.TestCase):
         self.assertIn("Лимит бесплатных: ВКЛ", text)
         self.assertIn("не больше одного бесплатного мини-разбора в сутки", text)
         self.assertIn("admin:generations", callbacks)
+        self.assertIn("Цены", text)
 
     def test_admin_generations_menu_mirrors_products_without_stars(self):
         markup = admin_generations_menu()

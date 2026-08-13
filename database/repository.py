@@ -60,6 +60,14 @@ async def init_db() -> None:
             VALUES ('test_mode', '0');
             INSERT OR IGNORE INTO app_settings (key, value)
             VALUES ('free_daily_limit', '1');
+            INSERT OR IGNORE INTO app_settings (key, value)
+            VALUES ('price_personality', '349');
+            INSERT OR IGNORE INTO app_settings (key, value)
+            VALUES ('price_love', '399');
+            INSERT OR IGNORE INTO app_settings (key, value)
+            VALUES ('price_compatibility', '449');
+            INSERT OR IGNORE INTO app_settings (key, value)
+            VALUES ('price_money', '399');
             """
         )
         columns = {
@@ -163,6 +171,43 @@ async def set_app_setting(key: str, value: str) -> None:
             (key, value),
         )
         await db.commit()
+
+
+DEFAULT_REPORT_PRICES = {
+    "personality": 349,
+    "love": 399,
+    "compatibility": 449,
+    "money": 399,
+}
+
+
+async def get_report_prices() -> dict[str, int]:
+    prices: dict[str, int] = {}
+    for scenario, default in DEFAULT_REPORT_PRICES.items():
+        raw = await get_app_setting(f"price_{scenario}")
+        try:
+            value = int(str(raw).strip()) if raw is not None else default
+        except (TypeError, ValueError):
+            value = default
+        if value < 1:
+            value = default
+        prices[scenario] = value
+    return prices
+
+
+async def get_report_price(scenario: str) -> int:
+    prices = await get_report_prices()
+    if scenario not in prices:
+        raise KeyError(scenario)
+    return prices[scenario]
+
+
+async def set_report_price(scenario: str, amount: int) -> None:
+    if scenario not in DEFAULT_REPORT_PRICES:
+        raise KeyError(scenario)
+    if amount < 1:
+        raise ValueError("price must be >= 1")
+    await set_app_setting(f"price_{scenario}", str(amount))
 
 
 async def get_profile(user_id: int) -> dict[str, Any] | None:

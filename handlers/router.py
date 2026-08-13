@@ -21,6 +21,7 @@ from services.astro import (
 )
 from config.settings import settings
 from database.repository import (
+    DEFAULT_REPORT_PRICES,
     complete_order,
     create_order,
     get_free_daily_limit_enabled,
@@ -29,6 +30,8 @@ from database.repository import (
     get_profile,
     get_app_setting,
     get_report_context,
+    get_report_price,
+    get_report_prices,
     get_test_mode,
     save_free_generation,
     save_profile,
@@ -36,12 +39,13 @@ from database.repository import (
     set_free_daily_limit_enabled,
     set_order_status,
     set_app_setting,
+    set_report_price,
     set_test_mode,
 )
 from services.reports_new import generate_report
 
 router = Router()
-PRICES = {"personality": 349, "love": 399, "compatibility": 449, "money": 399}
+PRICES = DEFAULT_REPORT_PRICES
 NAMES = {
     "personality": "Разбор личности",
     "love": "Любовь и отношения",
@@ -137,6 +141,7 @@ class AdminStates(StatesGroup):
     support_text = State()
     share_text = State()
     main_menu_text = State()
+    price_value = State()
 
 
 async def menu(user_id: int):
@@ -192,7 +197,12 @@ def flow_back_keyboard(*, admin_mode: bool):
     return back_to_admin_gens() if admin_mode else back_to_menu()
 
 
-def pdf_offer_keyboard(scenario_name: str, *, admin_mode: bool = False):
+def pdf_offer_keyboard(
+    scenario_name: str,
+    *,
+    admin_mode: bool = False,
+    price: int | None = None,
+):
     builder = InlineKeyboardBuilder()
     if admin_mode:
         builder.button(
@@ -201,8 +211,9 @@ def pdf_offer_keyboard(scenario_name: str, *, admin_mode: bool = False):
         )
         builder.button(text="⬅️ К генерациям", callback_data="admin:generations")
     else:
+        amount = price if price is not None else PRICES[scenario_name]
         builder.button(
-            text=f"🔓 Получить полный PDF · {PRICES[scenario_name]}⭐",
+            text=f"🔓 Получить полный PDF · {amount}⭐",
             callback_data=f"buy:{scenario_name}",
         )
         builder.button(text="⬅️ Назад", callback_data="back:menu")
@@ -320,9 +331,37 @@ def admin_menu(*, test_mode: bool, free_daily_limit: bool):
     builder.button(text=test_label, callback_data="admin:test_toggle")
     builder.button(text=limit_label, callback_data="admin:free_daily_limit_toggle")
     builder.button(text="🧪 Генерации", callback_data="admin:generations")
+    builder.button(text="💰 Цены", callback_data="admin:prices")
     builder.button(text="📝 Настройки текстов", callback_data="admin:texts")
     builder.adjust(1)
     return builder.as_markup()
+
+
+async def prices_settings_menu():
+    prices = await get_report_prices()
+    builder = InlineKeyboardBuilder()
+    for scenario in ("personality", "love", "money", "compatibility"):
+        builder.button(
+            text=f"{NAMES[scenario]} · {prices[scenario]}⭐",
+            callback_data=f"admin:price:{scenario}",
+        )
+    builder.button(text="⬅️ Назад", callback_data="admin:back")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def prices_settings_message(prices: dict[str, int] | None = None) -> str:
+    lines = [
+        "Настройка цен генерации",
+        "",
+        "Цены в Telegram Stars за полный PDF.",
+        "Выберите сценарий, чтобы изменить цену.",
+    ]
+    if prices:
+        lines.append("")
+        for scenario in ("personality", "love", "money", "compatibility"):
+            lines.append(f"• {NAMES[scenario]}: {prices[scenario]}⭐")
+    return "\n".join(lines)
 
 
 def text_settings_menu():
@@ -365,7 +404,8 @@ def admin_text(
         "после нажатия кнопки покупки PDF формируется сразу.\n\n"
         "Лимит бесплатных: не больше одного бесплатного мини-разбора в сутки "
         "на пользователя. При исчерпании лимита остаётся кнопка полного PDF.\n\n"
-        "Раздел «Генерации» — проверка разборов без оплаты и без лимита."
+        "Раздел «Генерации» — проверка разборов без оплаты и без лимита.\n"
+        "Раздел «Цены» — стоимость полного PDF в Stars."
     )
 
 
@@ -419,6 +459,85 @@ async def toggle_free_daily_limit(callback: CallbackQuery):
         "Лимит бесплатных включён" if enabled else "Лимит бесплатных выключен"
     )
     await _refresh_admin_panel(callback.message)
+
+
+@router.callback_query(F.data == "admin:prices")
+async def open_prices_settings(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    await state.clear()
+    await callback.answer()
+    prices = await get_report_prices()
+    await callback.message.edit_text(
+        prices_settings_message(prices),
+        reply_markup=await prices_settings_menu(),
+    )
+
+
+@router.callback_query(F.data.startswith("admin:price:"))
+async def edit_report_price(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    scenario_name = callback.data.rsplit(":", 1)[-1]
+    if scenario_name not in PRICES:
+        await callback.answer("Этот сценарий пока недоступен.", show_alert=True)
+        return
+    current = await get_report_price(scenario_name)
+    await callback.answer()
+    await state.set_state(AdminStates.price_value)
+    await state.update_data(price_scenario=scenario_name)
+    builder = InlineKeyboardBuilder()
+    builder.button(text="⬅️ Назад", callback_data="admin:cancel_price_edit")
+    await callback.message.answer(
+        f"Текущая цена «{NAMES[scenario_name]}»: {current}⭐\n\n"
+        "Отправьте новую цену целым числом Stars (минимум 1).",
+        reply_markup=builder.as_markup(),
+    )
+
+
+@router.callback_query(F.data == "admin:cancel_price_edit")
+async def cancel_price_edit(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    await state.clear()
+    await callback.answer("Изменение отменено")
+    prices = await get_report_prices()
+    await callback.message.edit_text(
+        prices_settings_message(prices),
+        reply_markup=await prices_settings_menu(),
+    )
+
+
+@router.message(AdminStates.price_value)
+async def save_report_price_value(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await message.answer("Команда доступна только администраторам.")
+        return
+    data = await state.get_data()
+    scenario_name = data.get("price_scenario")
+    if scenario_name not in PRICES:
+        await state.clear()
+        await message.answer("Сценарий не выбран. Откройте настройку цен заново.")
+        return
+    raw = (message.text or "").strip().replace("⭐", "").replace(" ", "")
+    try:
+        amount = int(raw)
+    except ValueError:
+        await message.answer("Нужно целое число Stars, например 399. Попробуйте ещё раз.")
+        return
+    if amount < 1:
+        await message.answer("Цена должна быть не меньше 1⭐. Попробуйте ещё раз.")
+        return
+    await set_report_price(scenario_name, amount)
+    await state.clear()
+    await message.answer(
+        f"Цена «{NAMES[scenario_name]}» обновлена: {amount}⭐ ✅",
+        reply_markup=back_keyboard("prices"),
+    )
 
 
 @router.callback_query(F.data == "admin:texts")
@@ -491,6 +610,12 @@ async def navigate_back(callback: CallbackQuery, state: FSMContext):
         await start_edit(callback.message, state, callback.from_user.id)
     elif destination == "text_settings" and is_admin(callback.from_user.id):
         await callback.message.answer(text_settings_message(), reply_markup=text_settings_menu())
+    elif destination == "prices" and is_admin(callback.from_user.id):
+        prices = await get_report_prices()
+        await callback.message.answer(
+            prices_settings_message(prices),
+            reply_markup=await prices_settings_menu(),
+        )
 
 
 @router.callback_query(F.data == "admin:support_text")
@@ -1068,7 +1193,8 @@ async def show_teaser(
     admin_mode: bool = False,
 ):
     PENDING_REPORTS[user_id] = (chart, second_chart)
-    offer_markup = pdf_offer_keyboard(scenario_name, admin_mode=admin_mode)
+    price = None if admin_mode else await get_report_price(scenario_name)
+    offer_markup = pdf_offer_keyboard(scenario_name, admin_mode=admin_mode, price=price)
 
     # Regular users pay for generation; only admin keeps the free mini-report path.
     if not admin_mode:
@@ -1165,12 +1291,15 @@ async def show_free_section(callback: CallbackQuery):
     if next_index == len(sections):
         scenario_name = record.get("scenario") or "personality"
         admin_mode = bool(record.get("admin_mode"))
+        price = None if admin_mode else await get_report_price(scenario_name)
         await callback.message.answer(
             FREE_UPSELL_TEXTS.get(
                 scenario_name,
                 "Это бесплатный мини-разбор. Полный PDF раскрывает тему глубже.",
             ),
-            reply_markup=pdf_offer_keyboard(scenario_name, admin_mode=admin_mode),
+            reply_markup=pdf_offer_keyboard(
+                scenario_name, admin_mode=admin_mode, price=price
+            ),
         )
 
 
@@ -1187,7 +1316,11 @@ async def back_menu(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("buy:"))
 async def buy(callback: CallbackQuery):
     scenario_name = callback.data.split(":", 1)[1]
-    order_id = await create_order(callback.from_user.id, scenario_name, PRICES[scenario_name])
+    if scenario_name not in PRICES:
+        await callback.answer("Этот сценарий пока недоступен.", show_alert=True)
+        return
+    amount = await get_report_price(scenario_name)
+    order_id = await create_order(callback.from_user.id, scenario_name, amount)
     charts = PENDING_REPORTS.get(callback.from_user.id)
     if charts:
         await save_report_context(order_id, *charts)
@@ -1213,7 +1346,7 @@ async def buy(callback: CallbackQuery):
     await callback.message.answer_invoice(
         title=NAMES[scenario_name], description="Персональный PDF-отчёт ASTRO MARY",
         payload=payload, currency="XTR",
-        prices=[LabeledPrice(label=NAMES[scenario_name], amount=PRICES[scenario_name])],
+        prices=[LabeledPrice(label=NAMES[scenario_name], amount=amount)],
     )
 
 
