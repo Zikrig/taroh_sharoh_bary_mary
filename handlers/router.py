@@ -56,6 +56,8 @@ PENDING_REPORTS: dict[int, tuple[dict, dict | None]] = {}
 MAX_PENDING_FREE_REPORTS_PER_USER = 8
 PENDING_FREE_REPORTS: dict[str, dict] = {}
 PENDING_FREE_REPORT_IDS_BY_USER: dict[int, list[str]] = {}
+_REPORT_GUARD = asyncio.Lock()
+_REPORT_IN_PROGRESS: set[int] = set()
 FREE_REPORT_TYPES = {
     "personality": "personality_free",
     "love": "love_free",
@@ -195,6 +197,24 @@ def back_to_admin_gens():
 
 def flow_back_keyboard(*, admin_mode: bool):
     return back_to_admin_gens() if admin_mode else back_to_menu()
+
+
+async def _try_begin_report(user_id: int) -> bool:
+    async with _REPORT_GUARD:
+        if user_id in _REPORT_IN_PROGRESS:
+            return False
+        _REPORT_IN_PROGRESS.add(user_id)
+        return True
+
+
+async def _end_report(user_id: int) -> None:
+    async with _REPORT_GUARD:
+        _REPORT_IN_PROGRESS.discard(user_id)
+
+
+async def _clear_callback_keyboard(callback: CallbackQuery) -> None:
+    with suppress(Exception):
+        await callback.message.edit_reply_markup(reply_markup=None)
 
 
 def pdf_offer_keyboard(
@@ -1319,35 +1339,49 @@ async def buy(callback: CallbackQuery):
     if scenario_name not in PRICES:
         await callback.answer("Этот сценарий пока недоступен.", show_alert=True)
         return
-    amount = await get_report_price(scenario_name)
-    order_id = await create_order(callback.from_user.id, scenario_name, amount)
-    charts = PENDING_REPORTS.get(callback.from_user.id)
-    if charts:
-        await save_report_context(order_id, *charts)
-    if await get_test_mode():
-        await callback.answer("Тестовый заказ принят")
-        await deliver_report(
-            callback.message,
-            callback.from_user.id,
-            callback.from_user,
-            scenario_name,
-            order_id,
-            "TEST",
-        )
+    user_id = callback.from_user.id
+    if not await _try_begin_report(user_id):
+        await callback.answer("PDF уже формируется, подождите.", show_alert=True)
         return
-    payload = f"report:{scenario_name}:{order_id}"
-    await callback.answer()
-    await callback.message.answer(
-        f"Ваш «{NAMES[scenario_name]}» будет сформирован индивидуально по вашим данным.\n\n"
-        "Это не готовый текст для вашего знака — содержание зависит от даты, "
-        "времени и места рождения.\n"
-        "После оплаты вы получите полный персональный результат прямо здесь, в Telegram."
-    )
-    await callback.message.answer_invoice(
-        title=NAMES[scenario_name], description="Персональный PDF-отчёт ASTRO MARY",
-        payload=payload, currency="XTR",
-        prices=[LabeledPrice(label=NAMES[scenario_name], amount=amount)],
-    )
+    await _clear_callback_keyboard(callback)
+    hold_lock = True
+    try:
+        amount = await get_report_price(scenario_name)
+        order_id = await create_order(user_id, scenario_name, amount)
+        charts = PENDING_REPORTS.get(user_id)
+        if charts:
+            await save_report_context(order_id, *charts)
+        if await get_test_mode():
+            await callback.answer("Тестовый заказ принят")
+            await deliver_report(
+                callback.message,
+                user_id,
+                callback.from_user,
+                scenario_name,
+                order_id,
+                "TEST",
+            )
+            return
+        # Invoice path: unlock until payment succeeds and deliver_report runs again.
+        await _end_report(user_id)
+        hold_lock = False
+        payload = f"report:{scenario_name}:{order_id}"
+        await callback.answer()
+        await callback.message.answer(
+            f"Ваш «{NAMES[scenario_name]}» будет сформирован индивидуально по вашим данным.\n\n"
+            "Это не готовый текст для вашего знака — содержание зависит от даты, "
+            "времени и места рождения.\n"
+            "После оплаты вы получите полный персональный результат прямо здесь, в Telegram."
+        )
+        await callback.message.answer_invoice(
+            title=NAMES[scenario_name], description="Персональный PDF-отчёт ASTRO MARY",
+            payload=payload, currency="XTR",
+            prices=[LabeledPrice(label=NAMES[scenario_name], amount=amount)],
+            provider_token="",
+        )
+    finally:
+        if hold_lock:
+            await _end_report(user_id)
 
 
 @router.callback_query(F.data.startswith("admin_buy:"))
@@ -1359,20 +1393,28 @@ async def admin_buy(callback: CallbackQuery):
     if scenario_name not in PRICES:
         await callback.answer("Этот сценарий пока недоступен.", show_alert=True)
         return
-    order_id = await create_order(callback.from_user.id, scenario_name, 0)
-    charts = PENDING_REPORTS.get(callback.from_user.id)
-    if charts:
-        await save_report_context(order_id, *charts)
-    await callback.answer("Админ-заказ принят")
-    await deliver_report(
-        callback.message,
-        callback.from_user.id,
-        callback.from_user,
-        scenario_name,
-        order_id,
-        "ADMIN",
-        admin_mode=True,
-    )
+    user_id = callback.from_user.id
+    if not await _try_begin_report(user_id):
+        await callback.answer("PDF уже формируется, подождите.", show_alert=True)
+        return
+    await _clear_callback_keyboard(callback)
+    try:
+        order_id = await create_order(user_id, scenario_name, 0)
+        charts = PENDING_REPORTS.get(user_id)
+        if charts:
+            await save_report_context(order_id, *charts)
+        await callback.answer("Админ-заказ принят")
+        await deliver_report(
+            callback.message,
+            user_id,
+            callback.from_user,
+            scenario_name,
+            order_id,
+            "ADMIN",
+            admin_mode=True,
+        )
+    finally:
+        await _end_report(user_id)
 
 
 @router.pre_checkout_query()
@@ -1391,14 +1433,21 @@ async def paid(message: Message):
         )
         return
     scenario_name, order_id = parts[1], int(parts[2])
-    await deliver_report(
-        message,
-        message.from_user.id,
-        message.from_user,
-        scenario_name,
-        order_id,
-        payment.telegram_payment_charge_id,
-    )
+    user_id = message.from_user.id
+    if not await _try_begin_report(user_id):
+        await message.answer("PDF уже формируется. Дождитесь окончания текущей сборки.")
+        return
+    try:
+        await deliver_report(
+            message,
+            user_id,
+            message.from_user,
+            scenario_name,
+            order_id,
+            payment.telegram_payment_charge_id,
+        )
+    finally:
+        await _end_report(user_id)
 
 
 async def deliver_report(
@@ -1413,9 +1462,9 @@ async def deliver_report(
 ):
     await complete_order(order_id, payment_id)
     charts = await get_report_context(order_id) or PENDING_REPORTS.pop(user_id, None)
-    back_markup = (
-        admin_generations_menu() if admin_mode else back_to_menu()
-    )
+    # Only a back button — full generations menu under the PDF caused accidental
+    # re-starts of scenarios from the document message.
+    back_markup = back_to_admin_gens() if admin_mode else back_to_menu()
     if charts:
         chart, second_chart = charts
     elif scenario_name == "compatibility":
@@ -1512,15 +1561,31 @@ async def retry_report(callback: CallbackQuery):
     if not order or order["status"] not in {"paid", "report_pending"}:
         await callback.answer("Этот отчёт нельзя сформировать повторно.", show_alert=True)
         return
-    await callback.answer("Повторно формирую отчёт…")
-    await deliver_report(
-        callback.message,
-        callback.from_user.id,
-        callback.from_user,
-        order["report_type"],
-        order_id,
-        order["telegram_payment_id"] or "RETRY",
+    user_id = callback.from_user.id
+    admin_mode = (
+        is_admin(user_id)
+        and (
+            str(order.get("telegram_payment_id") or "") == "ADMIN"
+            or int(order.get("amount") or 0) == 0
+        )
     )
+    if not await _try_begin_report(user_id):
+        await callback.answer("PDF уже формируется, подождите.", show_alert=True)
+        return
+    await _clear_callback_keyboard(callback)
+    await callback.answer("Повторно формирую отчёт…")
+    try:
+        await deliver_report(
+            callback.message,
+            user_id,
+            callback.from_user,
+            order["report_type"],
+            order_id,
+            order["telegram_payment_id"] or "RETRY",
+            admin_mode=admin_mode,
+        )
+    finally:
+        await _end_report(user_id)
 
 
 async def get_profile_photo(message: Message, user_id: int):
