@@ -1,10 +1,14 @@
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import aiosqlite
 
 from config.settings import settings
+
+FREE_DAILY_TZ = ZoneInfo("Europe/Moscow")
 
 
 async def init_db() -> None:
@@ -48,8 +52,14 @@ async def init_db() -> None:
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (user_id, scenario)
             );
+            CREATE TABLE IF NOT EXISTS free_daily_usage (
+                user_id INTEGER PRIMARY KEY,
+                last_used_date TEXT NOT NULL
+            );
             INSERT OR IGNORE INTO app_settings (key, value)
             VALUES ('test_mode', '0');
+            INSERT OR IGNORE INTO app_settings (key, value)
+            VALUES ('free_daily_limit', '1');
             """
         )
         columns = {
@@ -79,6 +89,57 @@ async def set_test_mode(enabled: bool) -> None:
             ON CONFLICT(key) DO UPDATE SET value=excluded.value
             """,
             ("1" if enabled else "0",),
+        )
+        await db.commit()
+
+
+async def get_free_daily_limit_enabled() -> bool:
+    async with aiosqlite.connect(settings.database_path) as db:
+        async with db.execute(
+            "SELECT value FROM app_settings WHERE key = 'free_daily_limit'"
+        ) as cur:
+            row = await cur.fetchone()
+            # Default ON when the setting is missing.
+            return bool(row is None or row[0] == "1")
+
+
+async def set_free_daily_limit_enabled(enabled: bool) -> None:
+    async with aiosqlite.connect(settings.database_path) as db:
+        await db.execute(
+            """
+            INSERT INTO app_settings (key, value) VALUES ('free_daily_limit', ?)
+            ON CONFLICT(key) DO UPDATE SET value=excluded.value
+            """,
+            ("1" if enabled else "0",),
+        )
+        await db.commit()
+
+
+def moscow_today() -> str:
+    return datetime.now(FREE_DAILY_TZ).date().isoformat()
+
+
+async def has_used_free_today(user_id: int) -> bool:
+    today = moscow_today()
+    async with aiosqlite.connect(settings.database_path) as db:
+        async with db.execute(
+            "SELECT last_used_date FROM free_daily_usage WHERE user_id = ?",
+            (user_id,),
+        ) as cur:
+            row = await cur.fetchone()
+            return bool(row and row[0] == today)
+
+
+async def mark_free_used_today(user_id: int) -> None:
+    today = moscow_today()
+    async with aiosqlite.connect(settings.database_path) as db:
+        await db.execute(
+            """
+            INSERT INTO free_daily_usage (user_id, last_used_date)
+            VALUES (?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET last_used_date=excluded.last_used_date
+            """,
+            (user_id, today),
         )
         await db.commit()
 

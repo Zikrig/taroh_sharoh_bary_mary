@@ -23,15 +23,19 @@ from config.settings import settings
 from database.repository import (
     complete_order,
     create_order,
+    get_free_daily_limit_enabled,
     get_free_generation,
     get_order,
     get_profile,
     get_app_setting,
     get_report_context,
     get_test_mode,
+    has_used_free_today,
+    mark_free_used_today,
     save_free_generation,
     save_profile,
     save_report_context,
+    set_free_daily_limit_enabled,
     set_order_status,
     set_app_setting,
     set_test_mode,
@@ -74,6 +78,11 @@ FREE_UPSELL_TEXTS = {
         "навыки, блоки и практические рекомендации глубже."
     ),
 }
+FREE_DAILY_LIMIT_TEXT = (
+    "Сегодня бесплатный мини-разбор уже получен.\n\n"
+    "Бесплатно доступен один персональный разбор в сутки.\n"
+    "Полный PDF можно открыть сразу — он строится индивидуально по вашим данным."
+)
 REPORT_PROGRESS_TEXT = "🔮 Формирую ваш персональный результат"
 SCENARIO_INTROS = {
     "personality": (
@@ -240,10 +249,16 @@ def unknown_time_keyboard(back_destination: str):
     return builder.as_markup()
 
 
-def admin_menu(test_mode: bool):
+def admin_menu(*, test_mode: bool, free_daily_limit: bool):
     builder = InlineKeyboardBuilder()
-    label = "🟢 Тестовый режим: ВКЛ" if test_mode else "⚪ Тестовый режим: ВЫКЛ"
-    builder.button(text=label, callback_data="admin:test_toggle")
+    test_label = "🟢 Тестовый режим: ВКЛ" if test_mode else "⚪ Тестовый режим: ВЫКЛ"
+    limit_label = (
+        "🟢 Лимит бесплатных: ВКЛ"
+        if free_daily_limit
+        else "⚪ Лимит бесплатных: ВЫКЛ"
+    )
+    builder.button(text=test_label, callback_data="admin:test_toggle")
+    builder.button(text=limit_label, callback_data="admin:free_daily_limit_toggle")
     builder.button(text="📝 Настройки текстов", callback_data="admin:texts")
     builder.adjust(1)
     return builder.as_markup()
@@ -268,8 +283,14 @@ def text_settings_message() -> str:
     )
 
 
-def admin_text(test_mode: bool, balance_data: dict[str, float] | None) -> str:
-    mode = "ВКЛ" if test_mode else "ВЫКЛ"
+def admin_text(
+    *,
+    test_mode: bool,
+    free_daily_limit: bool,
+    balance_data: dict[str, float] | None,
+) -> str:
+    test_label = "ВКЛ" if test_mode else "ВЫКЛ"
+    limit_label = "ВКЛ" if free_daily_limit else "ВЫКЛ"
     if balance_data is None:
         balance = "недоступен — проверьте ключ AITUNNEL и подключение"
     else:
@@ -277,9 +298,12 @@ def admin_text(test_mode: bool, balance_data: dict[str, float] | None) -> str:
     return (
         "Панель администратора\n\n"
         f"Баланс AITUNNEL: {balance}\n"
-        f"Тестовый режим: {mode}\n\n"
+        f"Тестовый режим: {test_label}\n"
+        f"Лимит бесплатных: {limit_label}\n\n"
         "В тестовом режиме реальные Telegram Stars не списываются: "
-        "после нажатия кнопки покупки PDF формируется сразу."
+        "после нажатия кнопки покупки PDF формируется сразу.\n\n"
+        "Лимит бесплатных: не больше одного бесплатного мини-разбора в сутки "
+        "на пользователя. При исчерпании лимита остаётся кнопка полного PDF."
     )
 
 
@@ -287,14 +311,28 @@ def is_admin(user_id: int) -> bool:
     return user_id in settings.admin_ids
 
 
+async def _refresh_admin_panel(message: Message, *, answer_text: str | None = None):
+    test_mode = await get_test_mode()
+    free_daily_limit = await get_free_daily_limit_enabled()
+    balance = await get_aitunnel_balance()
+    text = admin_text(
+        test_mode=test_mode,
+        free_daily_limit=free_daily_limit,
+        balance_data=balance,
+    )
+    markup = admin_menu(test_mode=test_mode, free_daily_limit=free_daily_limit)
+    if answer_text is None:
+        await message.edit_text(text, reply_markup=markup)
+    else:
+        await message.answer(text, reply_markup=markup)
+
+
 @router.message(Command("admin"))
 async def admin(message: Message):
     if not is_admin(message.from_user.id):
         await message.answer("Команда доступна только администраторам.")
         return
-    test_mode = await get_test_mode()
-    balance = await get_aitunnel_balance()
-    await message.answer(admin_text(test_mode, balance), reply_markup=admin_menu(test_mode))
+    await _refresh_admin_panel(message, answer_text="ok")
 
 
 @router.callback_query(F.data == "admin:test_toggle")
@@ -304,12 +342,21 @@ async def toggle_test_mode(callback: CallbackQuery):
         return
     enabled = not await get_test_mode()
     await set_test_mode(enabled)
-    balance = await get_aitunnel_balance()
     await callback.answer("Тестовый режим включён" if enabled else "Тестовый режим выключен")
-    await callback.message.edit_text(
-        admin_text(enabled, balance),
-        reply_markup=admin_menu(enabled),
+    await _refresh_admin_panel(callback.message)
+
+
+@router.callback_query(F.data == "admin:free_daily_limit_toggle")
+async def toggle_free_daily_limit(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    enabled = not await get_free_daily_limit_enabled()
+    await set_free_daily_limit_enabled(enabled)
+    await callback.answer(
+        "Лимит бесплатных включён" if enabled else "Лимит бесплатных выключен"
     )
+    await _refresh_admin_panel(callback.message)
 
 
 @router.callback_query(F.data == "admin:texts")
@@ -327,9 +374,7 @@ async def back_to_admin(callback: CallbackQuery):
         await callback.answer("Нет доступа", show_alert=True)
         return
     await callback.answer()
-    test_mode = await get_test_mode()
-    balance = await get_aitunnel_balance()
-    await callback.message.edit_text(admin_text(test_mode, balance), reply_markup=admin_menu(test_mode))
+    await _refresh_admin_panel(callback.message)
 
 
 @router.callback_query(F.data.startswith("back:"))
@@ -902,6 +947,12 @@ async def show_teaser(
 
     free_report_type = FREE_REPORT_TYPES.get(scenario_name)
     if free_report_type:
+        if await get_free_daily_limit_enabled() and await has_used_free_today(user_id):
+            await message.answer(
+                FREE_DAILY_LIMIT_TEXT,
+                reply_markup=builder.as_markup(),
+            )
+            return
         await message.answer("Готовлю ваш бесплатный персональный мини-разбор…")
         free_content = None
         async with report_status_animation(message) as mark_completed:
@@ -923,6 +974,7 @@ async def show_teaser(
                 return
             report_id = store_pending_free_report(user_id, scenario_name, sections)
             await save_free_generation(user_id, scenario_name, sections)
+            await mark_free_used_today(user_id)
             await message.answer(
                 f"<b>{free_content['title']}</b>\n{free_content['intro']}",
                 parse_mode=ParseMode.HTML,

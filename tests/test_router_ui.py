@@ -10,6 +10,7 @@ if find_spec("swisseph") is None:
     )
 
 from handlers.router import (
+    FREE_DAILY_LIMIT_TEXT,
     FREE_REPORT_TYPES,
     FREE_UPSELL_TEXTS,
     NAMES,
@@ -17,6 +18,8 @@ from handlers.router import (
     PENDING_FREE_REPORT_IDS_BY_USER,
     PRICES,
     SCENARIO_INTROS,
+    admin_menu,
+    admin_text,
     free_section_keyboard,
     parse_free_section_callback,
     resolve_pending_free_report,
@@ -95,6 +98,22 @@ class RouterUiTests(unittest.TestCase):
         parsed = parse_free_section_callback(first_button.callback_data)
         bound = resolve_pending_free_report(7, parsed[0])
         self.assertEqual(bound["sections"][parsed[1]]["content"], "первый разбор")
+
+    def test_free_daily_limit_copy_and_admin_toggle_exist(self):
+        self.assertIn("один персональный разбор в сутки", FREE_DAILY_LIMIT_TEXT)
+        self.assertIn("Полный PDF можно открыть сразу", FREE_DAILY_LIMIT_TEXT)
+        markup = admin_menu(test_mode=False, free_daily_limit=True)
+        texts = [button.text for row in markup.inline_keyboard for button in row]
+        callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
+        self.assertIn("🟢 Лимит бесплатных: ВКЛ", texts)
+        self.assertIn("admin:free_daily_limit_toggle", callbacks)
+        text = admin_text(
+            test_mode=False,
+            free_daily_limit=True,
+            balance_data={"balance": 12.5},
+        )
+        self.assertIn("Лимит бесплатных: ВКЛ", text)
+        self.assertIn("не больше одного бесплатного мини-разбора в сутки", text)
 
 
 if __name__ == "__main__":
