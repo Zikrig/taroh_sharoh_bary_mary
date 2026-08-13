@@ -1,17 +1,17 @@
 import asyncio
 import secrets
 from contextlib import asynccontextmanager, suppress
-from random import uniform
 
 from aiogram import F, Router
 from aiogram.enums import ParseMode
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, FSInputFile, LabeledPrice, Message, User
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from services.ai import generate_report_content, get_aitunnel_balance
+from services.ai import generate_report_content, get_aitunnel_balance, progress_percent
 from services.astro import (
     calculate_chart,
     geocode,
@@ -433,6 +433,23 @@ def is_admin(user_id: int) -> bool:
     return user_id in settings.admin_ids
 
 
+async def _edit_or_answer(
+    message: Message,
+    text: str,
+    *,
+    reply_markup=None,
+    parse_mode: str | None = None,
+) -> None:
+    """Edit message text when possible; otherwise send a new message.
+
+    Needed when the callback sits on a document/photo (PDF) that has no text body.
+    """
+    try:
+        await message.edit_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
+    except TelegramBadRequest:
+        await message.answer(text, reply_markup=reply_markup, parse_mode=parse_mode)
+
+
 async def _refresh_admin_panel(message: Message, *, answer_text: str | None = None):
     test_mode = await get_test_mode()
     free_daily_limit = await get_free_daily_limit_enabled()
@@ -444,7 +461,7 @@ async def _refresh_admin_panel(message: Message, *, answer_text: str | None = No
     )
     markup = admin_menu(test_mode=test_mode, free_daily_limit=free_daily_limit)
     if answer_text is None:
-        await message.edit_text(text, reply_markup=markup)
+        await _edit_or_answer(message, text, reply_markup=markup)
     else:
         await message.answer(text, reply_markup=markup)
 
@@ -489,7 +506,8 @@ async def open_prices_settings(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.answer()
     prices = await get_report_prices()
-    await callback.message.edit_text(
+    await _edit_or_answer(
+        callback.message,
         prices_settings_message(prices),
         reply_markup=await prices_settings_menu(),
     )
@@ -525,7 +543,8 @@ async def cancel_price_edit(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.answer("Изменение отменено")
     prices = await get_report_prices()
-    await callback.message.edit_text(
+    await _edit_or_answer(
+        callback.message,
         prices_settings_message(prices),
         reply_markup=await prices_settings_menu(),
     )
@@ -566,7 +585,11 @@ async def open_text_settings(callback: CallbackQuery):
         await callback.answer("Нет доступа", show_alert=True)
         return
     await callback.answer()
-    await callback.message.edit_text(text_settings_message(), reply_markup=text_settings_menu())
+    await _edit_or_answer(
+        callback.message,
+        text_settings_message(),
+        reply_markup=text_settings_menu(),
+    )
 
 
 @router.callback_query(F.data == "admin:back")
@@ -585,7 +608,8 @@ async def open_admin_generations(callback: CallbackQuery, state: FSMContext):
         return
     await state.clear()
     await callback.answer()
-    await callback.message.edit_text(
+    await _edit_or_answer(
+        callback.message,
         admin_generations_text(),
         reply_markup=admin_generations_menu(),
     )
@@ -678,7 +702,11 @@ async def cancel_main_menu_text_edit(callback: CallbackQuery, state: FSMContext)
         return
     await state.clear()
     await callback.answer("Изменение отменено")
-    await callback.message.edit_text(text_settings_message(), reply_markup=text_settings_menu())
+    await _edit_or_answer(
+        callback.message,
+        text_settings_message(),
+        reply_markup=text_settings_menu(),
+    )
 
 
 @router.message(AdminStates.main_menu_text)
@@ -721,7 +749,8 @@ async def cancel_share_text_edit(callback: CallbackQuery, state: FSMContext):
         return
     await state.clear()
     await callback.answer("Изменение отменено")
-    await callback.message.edit_text(
+    await _edit_or_answer(
+        callback.message,
         text_settings_message(),
         reply_markup=text_settings_menu(),
     )
@@ -752,7 +781,8 @@ async def cancel_support_text_edit(callback: CallbackQuery, state: FSMContext):
         return
     await state.clear()
     await callback.answer("Изменение отменено")
-    await callback.message.edit_text(
+    await _edit_or_answer(
+        callback.message,
         text_settings_message(),
         reply_markup=text_settings_menu(),
     )
@@ -1231,14 +1261,15 @@ async def show_teaser(
     if free_report_type:
         await message.answer("Готовлю ваш бесплатный персональный мини-разбор…")
         free_content = None
-        async with report_status_animation(message) as mark_completed:
+        async with report_status_animation(message) as status:
             free_content = await generate_report_content(
                 free_report_type,
                 chart,
                 second_chart,
+                on_progress=status.set_progress,
             )
             if free_content:
-                mark_completed()
+                status.mark_completed()
         if free_content:
             sections = free_content["sections"]
             if not sections:
@@ -1502,13 +1533,14 @@ async def deliver_report(
             "✅ Оплата получена.\n"
             "Начинаю формировать ваш персональный разбор. Это займёт несколько секунд."
         )
-    async with report_status_animation(message) as mark_completed:
+    async with report_status_animation(message) as status:
         prior_sections = await get_free_generation(user_id, scenario_name)
         content = await generate_report_content(
             scenario_name,
             chart,
             second_chart,
             prior_sections=prior_sections,
+            on_progress=status.set_progress,
         )
         if content is None:
             await set_order_status(order_id, "report_pending")
@@ -1520,7 +1552,7 @@ async def deliver_report(
                 reply_markup=retry_report_keyboard(order_id, admin_mode=admin_mode),
             )
             return
-        mark_completed()
+        status.mark_completed()
         profile_photo = await get_profile_photo(message, user_id)
         path = generate_report(
             scenario_name,
@@ -1599,71 +1631,32 @@ async def get_profile_photo(message: Message, user_id: int):
         return None
 
 
-async def _report_progress(status_message: Message, finished: asyncio.Event) -> None:
-    progress = 0.0
+class ReportStatusSession:
+    def __init__(self, status_message: Message):
+        self.status_message = status_message
+        self.completed = False
+        self._last_text: str | None = None
 
-    while not finished.is_set():
-        pause = uniform(0.4, 15.0)
-        try:
-            await asyncio.wait_for(finished.wait(), timeout=pause)
-            break
-        except asyncio.TimeoutError:
-            if progress < 99.9:
-                progress = min(99.9, round(progress + uniform(0.1, 2.5), 1))
-                with suppress(Exception):
-                    await status_message.edit_text(
-                        f"{REPORT_PROGRESS_TEXT}… {progress:.1f}%"
-                    )
-
-    if not finished.is_set():
-        return
-
-    start_progress = progress
-    completion_deadline = asyncio.get_running_loop().time() + 10.0
-    while progress < 100:
-        remaining = completion_deadline - asyncio.get_running_loop().time()
-        if remaining <= 0:
-            progress = 100
-        else:
-            pause = min(uniform(0.4, 1.0), remaining)
-            try:
-                await asyncio.sleep(pause)
-            except asyncio.CancelledError:
-                raise
-            elapsed = 10.0 - max(
-                0.0,
-                completion_deadline - asyncio.get_running_loop().time(),
-            )
-            progress = min(100.0, max(
-                progress,
-                round(start_progress + (100.0 - start_progress) * elapsed / 10.0, 1),
-            ))
+    async def set_progress(self, done: int, total: int) -> None:
+        percent = progress_percent(done, total)
+        text = f"{REPORT_PROGRESS_TEXT}… {percent}%"
+        if text == self._last_text:
+            return
+        self._last_text = text
         with suppress(Exception):
-            await status_message.edit_text(f"{REPORT_PROGRESS_TEXT}… {progress:.1f}%")
+            await self.status_message.edit_text(text)
+
+    def mark_completed(self) -> None:
+        self.completed = True
 
 
 @asynccontextmanager
 async def report_status_animation(message: Message):
-    status_message = await message.answer(f"{REPORT_PROGRESS_TEXT}… 0,0%")
-    finished = asyncio.Event()
-    completed = False
-    animation = asyncio.create_task(_report_progress(status_message, finished))
-
-    def mark_completed() -> None:
-        nonlocal completed
-        completed = True
-
+    status_message = await message.answer(f"{REPORT_PROGRESS_TEXT}… 0%")
+    session = ReportStatusSession(status_message)
     try:
-        yield mark_completed
+        yield session
     finally:
-        if completed:
-            finished.set()
-            with suppress(asyncio.CancelledError):
-                await animation
-        else:
-            animation.cancel()
-            with suppress(asyncio.CancelledError):
-                await animation
         with suppress(Exception):
             await status_message.delete()
 

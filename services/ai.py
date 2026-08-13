@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import re
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
 from hashlib import sha1
 from pathlib import Path
@@ -33,6 +34,7 @@ RETRYABLE_HTTP_STATUSES = {408, 409, 425, 429, 500, 502, 503, 504}
 PAYLOAD_SAMPLES_DIR = Path("data/payload_samples")
 MAX_CACHED_REPORTS = 128
 MAX_SECTION_SUMMARY_CHARS = 220
+ProgressCallback = Callable[[int, int], Awaitable[None]]
 
 # Kept for maintenance scripts that still import these names.
 SECTION_RULES: dict[str, Any] = {}
@@ -147,6 +149,22 @@ def _is_retryable_api_error(error: BaseException) -> bool:
 
 def _section_batch_size(report_type: str) -> int:
     return FREE_SECTION_BATCH if str(report_type).endswith("_free") else PAID_SECTION_BATCH
+
+
+def planned_generation_steps(report_type: str) -> int:
+    """How many successful AI calls are planned for this report type."""
+    titles = catalog_titles(report_type)
+    waves = len(section_title_batches(titles, _section_batch_size(report_type)))
+    if str(report_type).endswith("_free"):
+        return waves
+    # Paid reports get one editorial pass after all section waves.
+    return waves + 1
+
+
+def progress_percent(done: int, total: int) -> int:
+    if total <= 0:
+        return 0
+    return min(100, max(0, round(100 * done / total)))
 
 
 def _safe_path_part(value: str) -> str:
@@ -793,6 +811,7 @@ async def generate_report_content(
     second_chart: dict | None = None,
     *,
     prior_sections: list[dict[str, str]] | None = None,
+    on_progress: ProgressCallback | None = None,
 ) -> dict[str, Any] | None:
     """Generate the report in batches and split each reply by =====."""
     if not settings.ai_api_key:
@@ -814,6 +833,8 @@ async def generate_report_content(
         cache_key = _report_cache_key(report_type, payload["natal_text"] + "\n" + prior_blob)
         cached = _REPORT_CACHE.get(cache_key)
         if cached:
+            if on_progress is not None:
+                await on_progress(1, 1)
             return cached
         client = AsyncOpenAI(
             api_key=settings.ai_api_key,
@@ -823,6 +844,17 @@ async def generate_report_content(
         )
         titles = catalog_titles(report_type)
         batches = section_title_batches(titles, _section_batch_size(report_type))
+        total_steps = planned_generation_steps(report_type)
+        done_steps = 0
+        if on_progress is not None:
+            await on_progress(done_steps, total_steps)
+
+        async def _mark_step_done() -> None:
+            nonlocal done_steps
+            done_steps += 1
+            if on_progress is not None:
+                await on_progress(done_steps, total_steps)
+
         allowed_facts = payload["allowed_facts"]
         natal_text = payload["natal_text"]
         collected: list[dict[str, Any]] = []
@@ -854,6 +886,7 @@ async def generate_report_content(
                 }
                 for item in validated
             )
+            await _mark_step_done()
         if collected and not str(report_type).endswith("_free"):
             collected = await _edit_paid_sections(
                 client,
@@ -861,6 +894,7 @@ async def generate_report_content(
                 sections=collected,
                 allowed_facts=allowed_facts,
             )
+            await _mark_step_done()
         title, intro = _report_shell(report_type)
         result = {
             "title": title,

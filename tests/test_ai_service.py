@@ -27,6 +27,8 @@ from services.ai import (
     build_user_prompt,
     catalog_titles,
     parse_delimited_sections,
+    planned_generation_steps,
+    progress_percent,
     render_natal_dump,
 )
 from services.astro import local_time_to_utc
@@ -358,6 +360,15 @@ class AiServiceTests(unittest.TestCase):
         one = product_prompt_for_titles("personality", personality[:1])
         self.assertIn("ТОЛЬКО раздел «Твой главный психологический портрет»", one)
         self.assertNotIn("ПРАКТИЧЕСКИЕ РЕКОМЕНДАЦИИ", one)
+
+    def test_progress_tracks_completed_ai_calls(self):
+        # 20 section waves + 1 editorial pass.
+        self.assertEqual(planned_generation_steps("personality"), 21)
+        self.assertEqual(progress_percent(0, 21), 0)
+        self.assertEqual(progress_percent(1, 21), 5)
+        self.assertEqual(progress_percent(21, 21), 100)
+        self.assertEqual(planned_generation_steps("personality_free"), 3)
+        self.assertEqual(progress_percent(1, 3), 33)
 
     def test_aitunnel_503_is_retryable(self):
         error = type("InternalServerError", (Exception,), {})("503 worker")
