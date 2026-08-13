@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import re
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from hashlib import sha1
 from pathlib import Path
@@ -10,6 +11,7 @@ from uuid import uuid4
 
 from services.astro import SIGNS, calculate_synastry
 from config.settings import settings
+from database.repository import get_ai_model
 from services.report_prompts import (
     EDITOR_SYSTEM_PROMPT,
     FREE_SECTION_BATCH,
@@ -45,6 +47,80 @@ class GenerationProgress(Protocol):
     async def finish_step(self, step_id: int) -> None: ...
 
     async def fail_step(self, step_id: int) -> None: ...
+
+
+@dataclass
+class UsageLedger:
+    generation_cost_rub: float = 0.0
+    review_cost_rub: float = 0.0
+    generation_requests: int = 0
+    review_requests: int = 0
+    generation_model: str = ""
+    review_model: str = ""
+    _lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
+
+    async def add(self, phase: str, cost_rub: float, model: str) -> None:
+        amount = max(0.0, float(cost_rub or 0.0))
+        async with self._lock:
+            if phase == "review":
+                self.review_cost_rub += amount
+                self.review_requests += 1
+                if model:
+                    self.review_model = model
+            else:
+                self.generation_cost_rub += amount
+                self.generation_requests += 1
+                if model:
+                    self.generation_model = model
+
+    def as_dict(self) -> dict[str, Any]:
+        total = self.generation_cost_rub + self.review_cost_rub
+        return {
+            "generation_cost_rub": round(self.generation_cost_rub, 4),
+            "review_cost_rub": round(self.review_cost_rub, 4),
+            "total_cost_rub": round(total, 4),
+            "generation_requests": self.generation_requests,
+            "review_requests": self.review_requests,
+            "generation_model": self.generation_model,
+            "review_model": self.review_model,
+        }
+
+
+def _usage_cost_rub(response: Any) -> float:
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return 0.0
+    cost = getattr(usage, "cost_rub", None)
+    if cost is None and isinstance(usage, dict):
+        cost = usage.get("cost_rub")
+    if cost is None:
+        model_extra = getattr(usage, "model_extra", None)
+        if isinstance(model_extra, dict):
+            cost = model_extra.get("cost_rub")
+    try:
+        return max(0.0, float(cost))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def format_admin_usage_summary(usage: dict[str, Any] | None) -> str | None:
+    if not usage:
+        return None
+    generation_model = str(usage.get("generation_model") or "—")
+    review_model = str(usage.get("review_model") or "—")
+    generation_cost = float(usage.get("generation_cost_rub") or 0.0)
+    review_cost = float(usage.get("review_cost_rub") or 0.0)
+    total_cost = float(usage.get("total_cost_rub") or (generation_cost + review_cost))
+    generation_requests = int(usage.get("generation_requests") or 0)
+    review_requests = int(usage.get("review_requests") or 0)
+    return (
+        "📊 Сводка расходов AITUNNEL\n\n"
+        f"Отчёт: {generation_cost:.2f} ₽ · {generation_model}"
+        f" ({generation_requests} запрос.)\n"
+        f"Ревью: {review_cost:.2f} ₽ · {review_model}"
+        f" ({review_requests} запрос.)\n"
+        f"Итого: {total_cost:.2f} ₽"
+    )
 
 # Kept for maintenance scripts that still import these names.
 SECTION_RULES: dict[str, Any] = {}
@@ -165,9 +241,7 @@ def planned_generation_steps(report_type: str) -> int:
     """How many successful AI calls are planned for this report type."""
     titles = catalog_titles(report_type)
     waves = len(section_title_batches(titles, _section_batch_size(report_type)))
-    if str(report_type).endswith("_free"):
-        return waves
-    # Paid reports get one editorial pass after all section waves.
+    # Final review pass for both free and paid reports.
     return waves + 1
 
 
@@ -682,7 +756,10 @@ async def _request_delimited_sections(
     user_prompt: str,
     allowed_facts: list[str],
     wave_id: str,
+    model: str,
     system_prompt: str | None = None,
+    usage_ledger: UsageLedger | None = None,
+    usage_phase: str = "generation",
 ) -> list[dict[str, Any]] | None:
     request_id = uuid4().hex
     rejection: str | None = None
@@ -712,7 +789,7 @@ async def _request_delimited_sections(
             sample_dir,
             messages=messages,
             request_meta={
-                "model": settings.ai_model,
+                "model": model,
                 "temperature": settings.ai_temperature,
                 "presence_penalty": settings.ai_presence_penalty,
                 "frequency_penalty": settings.ai_frequency_penalty,
@@ -720,7 +797,7 @@ async def _request_delimited_sections(
         )
         try:
             response = await client.chat.completions.create(
-                model=settings.ai_model,
+                model=model,
                 messages=messages,
                 temperature=settings.ai_temperature,
                 presence_penalty=settings.ai_presence_penalty,
@@ -745,6 +822,8 @@ async def _request_delimited_sections(
                 wave_id,
             )
             return None
+        if usage_ledger is not None:
+            await usage_ledger.add(usage_phase, _usage_cost_rub(response), model)
         message = response.choices[0].message
         raw_content = _message_text(message)
         _save_response_transcript(
@@ -779,12 +858,14 @@ async def _request_delimited_sections(
     return None
 
 
-async def _edit_paid_sections(
+async def _review_sections(
     client: Any,
     *,
     report_type: str,
     sections: list[dict[str, Any]],
     allowed_facts: list[str],
+    model: str,
+    usage_ledger: UsageLedger | None = None,
 ) -> list[dict[str, Any]]:
     titles = [str(item.get("title") or "") for item in sections if item.get("title")]
     if not titles:
@@ -801,7 +882,10 @@ async def _edit_paid_sections(
         user_prompt=user_prompt,
         allowed_facts=allowed_facts,
         wave_id="edit",
+        model=model,
         system_prompt=EDITOR_SYSTEM_PROMPT,
+        usage_ledger=usage_ledger,
+        usage_phase="review",
     )
     if edited is None:
         logger.warning("Редактура «%s» не удалась, оставляю черновик", report_type)
@@ -817,9 +901,11 @@ async def _run_section_wave(
     natal_text: str,
     allowed_facts: list[str],
     wave_id: str,
+    model: str,
     prior_sections: list[dict[str, str]] | None,
     covered: list[dict[str, str]] | None,
     progress: GenerationProgress | None,
+    usage_ledger: UsageLedger | None = None,
 ) -> list[dict[str, Any]]:
     step_id: int | None = None
     if progress is not None:
@@ -838,6 +924,9 @@ async def _run_section_wave(
         user_prompt=user_prompt,
         allowed_facts=allowed_facts,
         wave_id=wave_id,
+        model=model,
+        usage_ledger=usage_ledger,
+        usage_phase="generation",
     )
     if validated is None:
         if progress is not None and step_id is not None:
@@ -846,7 +935,6 @@ async def _run_section_wave(
     if progress is not None and step_id is not None:
         await progress.finish_step(step_id)
     return validated
-
 
 def _sections_by_title(sections: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     by_title: dict[str, dict[str, Any]] = {}
@@ -912,7 +1000,13 @@ async def generate_report_content(
         titles = catalog_titles(report_type)
         batch_size = _section_batch_size(report_type)
         batches = section_title_batches(titles, batch_size)
-        needs_editorial = not str(report_type).endswith("_free")
+        is_free = str(report_type).endswith("_free")
+        generation_model = await get_ai_model("free" if is_free else "pdf")
+        review_model = await get_ai_model("review")
+        usage_ledger = UsageLedger(
+            generation_model=generation_model,
+            review_model=review_model,
+        )
         if progress is not None:
             await progress.configure(planned_generation_steps(report_type))
 
@@ -928,9 +1022,11 @@ async def generate_report_content(
                     natal_text=natal_text,
                     allowed_facts=allowed_facts,
                     wave_id=f"wave{index:02d}",
+                    model=generation_model,
                     prior_sections=prior_sections,
                     covered=None,
                     progress=progress,
+                    usage_ledger=usage_ledger,
                 )
                 for index, batch_titles in enumerate(batches, start=1)
             ]
@@ -957,9 +1053,7 @@ async def generate_report_content(
             if progress is not None:
                 successful_waves = sum(1 for validated in wave_results if validated)
                 await progress.set_total(
-                    successful_waves
-                    + len(retry_batches)
-                    + (1 if needs_editorial else 0)
+                    successful_waves + len(retry_batches) + 1
                 )
             retry_results = await asyncio.gather(
                 *[
@@ -970,9 +1064,11 @@ async def generate_report_content(
                         natal_text=natal_text,
                         allowed_facts=allowed_facts,
                         wave_id=f"retry{index:02d}",
+                        model=generation_model,
                         prior_sections=prior_sections,
                         covered=covered,
                         progress=progress,
+                        usage_ledger=usage_ledger,
                     )
                     for index, batch_titles in enumerate(retry_batches, start=1)
                 ]
@@ -984,18 +1080,19 @@ async def generate_report_content(
         if not collected:
             return None
 
-        if needs_editorial:
-            step_id: int | None = None
-            if progress is not None:
-                step_id = await progress.start_step()
-            collected = await _edit_paid_sections(
-                client,
-                report_type=report_type,
-                sections=collected,
-                allowed_facts=allowed_facts,
-            )
-            if progress is not None and step_id is not None:
-                await progress.finish_step(step_id)
+        step_id: int | None = None
+        if progress is not None:
+            step_id = await progress.start_step()
+        collected = await _review_sections(
+            client,
+            report_type=report_type,
+            sections=collected,
+            allowed_facts=allowed_facts,
+            model=review_model,
+            usage_ledger=usage_ledger,
+        )
+        if progress is not None and step_id is not None:
+            await progress.finish_step(step_id)
         title, intro = _report_shell(report_type)
         result = {
             "title": title,
@@ -1005,6 +1102,7 @@ async def generate_report_content(
                 "Материал носит символический и развлекательный характер и "
                 "предназначен для саморефлексии."
             ),
+            "usage": usage_ledger.as_dict(),
         }
         _remember_report(cache_key, result)
         return result

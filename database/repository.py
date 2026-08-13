@@ -68,6 +68,12 @@ async def init_db() -> None:
             VALUES ('price_compatibility', '449');
             INSERT OR IGNORE INTO app_settings (key, value)
             VALUES ('price_money', '399');
+            INSERT OR IGNORE INTO app_settings (key, value)
+            VALUES ('model_free', 'deepseek-v4-flash');
+            INSERT OR IGNORE INTO app_settings (key, value)
+            VALUES ('model_pdf', 'deepseek-v4-flash');
+            INSERT OR IGNORE INTO app_settings (key, value)
+            VALUES ('model_review', 'deepseek-v4-pro-0813');
             """
         )
         columns = {
@@ -208,6 +214,43 @@ async def set_report_price(scenario: str, amount: int) -> None:
     if amount < 1:
         raise ValueError("price must be >= 1")
     await set_app_setting(f"price_{scenario}", str(amount))
+
+
+DEFAULT_AI_MODELS = {
+    "free": "deepseek-v4-flash",
+    "pdf": "deepseek-v4-flash",
+    "review": "deepseek-v4-pro-0813",
+}
+AI_MODEL_ROLE_LABELS = {
+    "free": "Модель бесплатных сообщений",
+    "pdf": "Модель PDF",
+    "review": "Модель финальной проверки",
+}
+
+
+async def get_ai_models() -> dict[str, str]:
+    models: dict[str, str] = {}
+    for role, default in DEFAULT_AI_MODELS.items():
+        raw = await get_app_setting(f"model_{role}")
+        value = str(raw).strip() if raw is not None else ""
+        models[role] = value or default
+    return models
+
+
+async def get_ai_model(role: str) -> str:
+    models = await get_ai_models()
+    if role not in models:
+        raise KeyError(role)
+    return models[role]
+
+
+async def set_ai_model(role: str, model_name: str) -> None:
+    if role not in DEFAULT_AI_MODELS:
+        raise KeyError(role)
+    cleaned = model_name.strip()
+    if not cleaned:
+        raise ValueError("model must not be empty")
+    await set_app_setting(f"model_{role}", cleaned)
 
 
 async def get_profile(user_id: int) -> dict[str, Any] | None:

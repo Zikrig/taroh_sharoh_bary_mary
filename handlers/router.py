@@ -11,7 +11,11 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, FSInputFile, LabeledPrice, Message, User
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from services.ai import generate_report_content, get_aitunnel_balance
+from services.ai import (
+    format_admin_usage_summary,
+    generate_report_content,
+    get_aitunnel_balance,
+)
 from services.generation_progress import (
     TaskProgress,
     active_fraction,
@@ -27,9 +31,13 @@ from services.astro import (
 )
 from config.settings import settings
 from database.repository import (
+    AI_MODEL_ROLE_LABELS,
+    DEFAULT_AI_MODELS,
     DEFAULT_REPORT_PRICES,
     complete_order,
     create_order,
+    get_ai_model,
+    get_ai_models,
     get_free_daily_limit_enabled,
     get_free_generation,
     get_order,
@@ -42,6 +50,7 @@ from database.repository import (
     save_free_generation,
     save_profile,
     save_report_context,
+    set_ai_model,
     set_free_daily_limit_enabled,
     set_order_status,
     set_app_setting,
@@ -150,6 +159,7 @@ class AdminStates(StatesGroup):
     share_text = State()
     main_menu_text = State()
     price_value = State()
+    model_value = State()
 
 
 async def menu(user_id: int):
@@ -358,9 +368,40 @@ def admin_menu(*, test_mode: bool, free_daily_limit: bool):
     builder.button(text=limit_label, callback_data="admin:free_daily_limit_toggle")
     builder.button(text="🧪 Генерации", callback_data="admin:generations")
     builder.button(text="💰 Цены", callback_data="admin:prices")
+    builder.button(text="🤖 Модели", callback_data="admin:models")
     builder.button(text="📝 Настройки текстов", callback_data="admin:texts")
     builder.adjust(1)
     return builder.as_markup()
+
+
+async def models_settings_menu():
+    models = await get_ai_models()
+    builder = InlineKeyboardBuilder()
+    for role in ("free", "pdf", "review"):
+        builder.button(
+            text=f"{AI_MODEL_ROLE_LABELS[role]}",
+            callback_data=f"admin:model:{role}",
+        )
+    builder.button(text="⬅️ Назад", callback_data="admin:back")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def models_settings_message(models: dict[str, str] | None = None) -> str:
+    lines = [
+        "Управление моделями",
+        "",
+        "• Бесплатные сообщения — мини-разбор",
+        "• PDF — платные разделы полного отчёта",
+        "• Финальная проверка — ревью и бесплатного, и платного текста",
+        "",
+        "Выберите роль, чтобы сменить id модели AITUNNEL.",
+    ]
+    if models:
+        lines.append("")
+        for role in ("free", "pdf", "review"):
+            lines.append(f"• {AI_MODEL_ROLE_LABELS[role]}: {models[role]}")
+    return "\n".join(lines)
 
 
 async def prices_settings_menu():
@@ -431,12 +472,20 @@ def admin_text(
         "Лимит бесплатных: не больше одного бесплатного мини-разбора в сутки "
         "на пользователя. При исчерпании лимита остаётся кнопка полного PDF.\n\n"
         "Раздел «Генерации» — проверка разборов без оплаты и без лимита.\n"
-        "Раздел «Цены» — стоимость полного PDF в Stars."
+        "Раздел «Цены» — стоимость полного PDF в Stars.\n"
+        "Раздел «Модели» — модели для бесплатных, PDF и финальной проверки."
     )
 
 
 def is_admin(user_id: int) -> bool:
     return user_id in settings.admin_ids
+
+
+async def send_admin_usage_summary(message: Message, content: dict | None) -> None:
+    summary = format_admin_usage_summary((content or {}).get("usage"))
+    if not summary:
+        return
+    await message.answer(summary)
 
 
 async def _edit_or_answer(
@@ -585,6 +634,86 @@ async def save_report_price_value(message: Message, state: FSMContext):
     )
 
 
+@router.callback_query(F.data == "admin:models")
+async def open_models_settings(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    await state.clear()
+    await callback.answer()
+    models = await get_ai_models()
+    await _edit_or_answer(
+        callback.message,
+        models_settings_message(models),
+        reply_markup=await models_settings_menu(),
+    )
+
+
+@router.callback_query(F.data.startswith("admin:model:"))
+async def edit_ai_model(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    role = callback.data.rsplit(":", 1)[-1]
+    if role not in DEFAULT_AI_MODELS:
+        await callback.answer("Неизвестная роль модели.", show_alert=True)
+        return
+    current = await get_ai_model(role)
+    await callback.answer()
+    await state.set_state(AdminStates.model_value)
+    await state.update_data(model_role=role)
+    builder = InlineKeyboardBuilder()
+    builder.button(text="⬅️ Назад", callback_data="admin:cancel_model_edit")
+    await callback.message.answer(
+        f"{AI_MODEL_ROLE_LABELS[role]}\n"
+        f"Сейчас: {current}\n\n"
+        "Отправьте id модели AITUNNEL, например deepseek-v4-flash.",
+        reply_markup=builder.as_markup(),
+    )
+
+
+@router.callback_query(F.data == "admin:cancel_model_edit")
+async def cancel_model_edit(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    await state.clear()
+    await callback.answer("Изменение отменено")
+    models = await get_ai_models()
+    await _edit_or_answer(
+        callback.message,
+        models_settings_message(models),
+        reply_markup=await models_settings_menu(),
+    )
+
+
+@router.message(AdminStates.model_value)
+async def save_ai_model_value(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await message.answer("Команда доступна только администраторам.")
+        return
+    data = await state.get_data()
+    role = data.get("model_role")
+    if role not in DEFAULT_AI_MODELS:
+        await state.clear()
+        await message.answer("Роль не выбрана. Откройте настройку моделей заново.")
+        return
+    model_name = (message.text or "").strip().strip("`")
+    if not model_name or any(ch.isspace() for ch in model_name):
+        await message.answer(
+            "Нужен id модели без пробелов, например deepseek-v4-flash. "
+            "Попробуйте ещё раз."
+        )
+        return
+    await set_ai_model(role, model_name)
+    await state.clear()
+    await message.answer(
+        f"{AI_MODEL_ROLE_LABELS[role]} обновлена: {model_name} ✅",
+        reply_markup=back_keyboard("models"),
+    )
+
+
 @router.callback_query(F.data == "admin:texts")
 async def open_text_settings(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):
@@ -665,6 +794,12 @@ async def navigate_back(callback: CallbackQuery, state: FSMContext):
         await callback.message.answer(
             prices_settings_message(prices),
             reply_markup=await prices_settings_menu(),
+        )
+    elif destination == "models" and is_admin(callback.from_user.id):
+        models = await get_ai_models()
+        await callback.message.answer(
+            models_settings_message(models),
+            reply_markup=await models_settings_menu(),
         )
 
 
@@ -1292,6 +1427,7 @@ async def show_teaser(
                 admin_mode=True,
             )
             await save_free_generation(user_id, scenario_name, sections)
+            await send_admin_usage_summary(message, free_content)
             await message.answer(
                 f"<b>{free_content['title']}</b>\n{free_content['intro']}",
                 parse_mode=ParseMode.HTML,
@@ -1574,6 +1710,8 @@ async def deliver_report(
         caption=f"{NAMES[scenario_name]} · ASTRO MARY",
         reply_markup=back_markup,
     )
+    if admin_mode:
+        await send_admin_usage_summary(message, content)
     await set_order_status(order_id, "delivered")
 
 

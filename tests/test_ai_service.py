@@ -25,10 +25,12 @@ from services.ai import (
     _save_response_transcript,
     _section_batch_size,
     _sections_by_title,
+    _usage_cost_rub,
     _validate_section,
     build_prompt_payload,
     build_user_prompt,
     catalog_titles,
+    format_admin_usage_summary,
     parse_delimited_sections,
     planned_generation_steps,
     render_natal_dump,
@@ -386,6 +388,7 @@ class AiServiceTests(unittest.TestCase):
 
     def test_progress_tracks_active_and_finished_task_weights(self):
         self.assertEqual(planned_generation_steps("personality"), 8)
+        self.assertEqual(planned_generation_steps("personality_free"), 4)
         t0 = 1_000.0
         two_active = [
             TaskProgress(started_at=t0),
@@ -406,6 +409,25 @@ class AiServiceTests(unittest.TestCase):
         )
         self.assertEqual(format_progress_percent(7.5), "7.5%")
         self.assertEqual(format_progress_percent(5.0), "5%")
+
+    def test_admin_usage_summary_shows_costs_and_models(self):
+        summary = format_admin_usage_summary(
+            {
+                "generation_cost_rub": 1.25,
+                "review_cost_rub": 0.5,
+                "total_cost_rub": 1.75,
+                "generation_requests": 3,
+                "review_requests": 1,
+                "generation_model": "deepseek-v4-flash",
+                "review_model": "deepseek-v4-pro-0813",
+            }
+        )
+        self.assertIn("Отчёт: 1.25 ₽ · deepseek-v4-flash", summary)
+        self.assertIn("Ревью: 0.50 ₽ · deepseek-v4-pro-0813", summary)
+        self.assertIn("Итого: 1.75 ₽", summary)
+        usage = SimpleNamespace(cost_rub=0.42, model_extra=None)
+        self.assertAlmostEqual(_usage_cost_rub(SimpleNamespace(usage=usage)), 0.42)
+        self.assertEqual(_usage_cost_rub(SimpleNamespace(usage={"cost_rub": 0.1})), 0.1)
 
     def test_aitunnel_503_is_retryable(self):
         error = type("InternalServerError", (Exception,), {})("503 worker")
