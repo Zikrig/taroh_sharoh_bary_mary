@@ -14,6 +14,7 @@ class TaskProgress:
     started_at: float
     finishing_at: float | None = None
     finish_from: float = 0.0
+    step_id: int = 0
 
 
 def active_fraction(elapsed: float) -> float:

@@ -1643,6 +1643,7 @@ class ReportStatusSession:
         self.completed = False
         self.total = 0
         self.tasks: list[TaskProgress] = []
+        self._next_step_id = 0
         self._lock = asyncio.Lock()
         self._stop = asyncio.Event()
         self._last_text: str | None = None
@@ -1652,26 +1653,36 @@ class ReportStatusSession:
         async with self._lock:
             self.total = max(0, int(total))
             self.tasks.clear()
+            self._next_step_id = 0
 
-    async def start_step(self) -> None:
+    async def set_total(self, total: int) -> None:
         async with self._lock:
-            self.tasks.append(TaskProgress(started_at=asyncio.get_running_loop().time()))
+            self.total = max(0, int(total))
 
-    async def finish_step(self) -> None:
+    async def start_step(self) -> int:
+        async with self._lock:
+            step_id = self._next_step_id
+            self._next_step_id += 1
+            self.tasks.append(
+                TaskProgress(
+                    started_at=asyncio.get_running_loop().time(),
+                    step_id=step_id,
+                )
+            )
+            return step_id
+
+    async def finish_step(self, step_id: int) -> None:
         async with self._lock:
             now = asyncio.get_running_loop().time()
             for task in self.tasks:
-                if task.finishing_at is None:
+                if task.step_id == step_id and task.finishing_at is None:
                     task.finish_from = active_fraction(now - task.started_at)
                     task.finishing_at = now
                     break
 
-    async def fail_step(self) -> None:
+    async def fail_step(self, step_id: int) -> None:
         async with self._lock:
-            for index in range(len(self.tasks) - 1, -1, -1):
-                if self.tasks[index].finishing_at is None:
-                    self.tasks.pop(index)
-                    break
+            self.tasks = [task for task in self.tasks if task.step_id != step_id]
 
     def current_percent(self) -> float:
         return displayed_percent(

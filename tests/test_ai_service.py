@@ -18,10 +18,13 @@ from services.ai import (
     SYSTEM_PROMPT,
     _is_degenerate_section_text,
     _is_retryable_api_error,
+    _missing_titles,
+    _ordered_sections,
     _payload_sample_attempt_dir,
     _save_request_transcript,
     _save_response_transcript,
     _section_batch_size,
+    _sections_by_title,
     _validate_section,
     build_prompt_payload,
     build_user_prompt,
@@ -365,6 +368,21 @@ class AiServiceTests(unittest.TestCase):
         one = product_prompt_for_titles("personality", personality[:1])
         self.assertIn("ТОЛЬКО раздел «Твой главный психологический портрет»", one)
         self.assertNotIn("ПРАКТИЧЕСКИЕ РЕКОМЕНДАЦИИ", one)
+
+    def test_missing_sections_are_detected_for_retry_round(self):
+        titles = ["A", "B", "C", "D"]
+        by_title = _sections_by_title(
+            [
+                {"title": "A", "content": "один"},
+                {"title": "C", "content": "три"},
+            ]
+        )
+        self.assertEqual(_missing_titles(titles, by_title), ["B", "D"])
+        self.assertIsNone(_ordered_sections(titles, by_title))
+        by_title["B"] = {"title": "B", "content": "два"}
+        by_title["D"] = {"title": "D", "content": "четыре"}
+        ordered = _ordered_sections(titles, by_title)
+        self.assertEqual([item["title"] for item in ordered], titles)
 
     def test_progress_tracks_active_and_finished_task_weights(self):
         self.assertEqual(planned_generation_steps("personality"), 8)

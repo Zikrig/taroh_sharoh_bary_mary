@@ -38,11 +38,13 @@ MAX_SECTION_SUMMARY_CHARS = 220
 class GenerationProgress(Protocol):
     async def configure(self, total: int) -> None: ...
 
-    async def start_step(self) -> None: ...
+    async def set_total(self, total: int) -> None: ...
 
-    async def finish_step(self) -> None: ...
+    async def start_step(self) -> int: ...
 
-    async def fail_step(self) -> None: ...
+    async def finish_step(self, step_id: int) -> None: ...
+
+    async def fail_step(self, step_id: int) -> None: ...
 
 # Kept for maintenance scripts that still import these names.
 SECTION_RULES: dict[str, Any] = {}
@@ -807,6 +809,67 @@ async def _edit_paid_sections(
     return edited
 
 
+async def _run_section_wave(
+    client: Any,
+    *,
+    report_type: str,
+    batch_titles: list[str],
+    natal_text: str,
+    allowed_facts: list[str],
+    wave_id: str,
+    prior_sections: list[dict[str, str]] | None,
+    covered: list[dict[str, str]] | None,
+    progress: GenerationProgress | None,
+) -> list[dict[str, Any]]:
+    step_id: int | None = None
+    if progress is not None:
+        step_id = await progress.start_step()
+    user_prompt = build_user_prompt(
+        report_type,
+        natal_text,
+        batch_titles,
+        covered,
+        prior_sections,
+    )
+    validated = await _request_delimited_sections(
+        client,
+        report_type=report_type,
+        titles=batch_titles,
+        user_prompt=user_prompt,
+        allowed_facts=allowed_facts,
+        wave_id=wave_id,
+    )
+    if validated is None:
+        if progress is not None and step_id is not None:
+            await progress.fail_step(step_id)
+        return []
+    if progress is not None and step_id is not None:
+        await progress.finish_step(step_id)
+    return validated
+
+
+def _sections_by_title(sections: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    by_title: dict[str, dict[str, Any]] = {}
+    for item in sections:
+        title = str(item.get("title") or "").strip()
+        if title:
+            by_title[title] = item
+    return by_title
+
+
+def _missing_titles(titles: list[str], by_title: dict[str, dict[str, Any]]) -> list[str]:
+    return [title for title in titles if title not in by_title]
+
+
+def _ordered_sections(
+    titles: list[str],
+    by_title: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]] | None:
+    if _missing_titles(titles, by_title):
+        return None
+    return [by_title[title] for title in titles]
+
+
 async def generate_report_content(
     report_type: str,
     chart: dict,
@@ -815,7 +878,7 @@ async def generate_report_content(
     prior_sections: list[dict[str, str]] | None = None,
     progress: GenerationProgress | None = None,
 ) -> dict[str, Any] | None:
-    """Generate the report in batches and split each reply by =====."""
+    """Generate report waves in parallel, then retry only missing sections."""
     if not settings.ai_api_key:
         return None
     try:
@@ -837,8 +900,8 @@ async def generate_report_content(
         if cached:
             if progress is not None:
                 await progress.configure(1)
-                await progress.start_step()
-                await progress.finish_step()
+                step_id = await progress.start_step()
+                await progress.finish_step(step_id)
             return cached
         client = AsyncOpenAI(
             api_key=settings.ai_api_key,
@@ -847,58 +910,92 @@ async def generate_report_content(
             max_retries=0,
         )
         titles = catalog_titles(report_type)
-        batches = section_title_batches(titles, _section_batch_size(report_type))
+        batch_size = _section_batch_size(report_type)
+        batches = section_title_batches(titles, batch_size)
+        needs_editorial = not str(report_type).endswith("_free")
         if progress is not None:
             await progress.configure(planned_generation_steps(report_type))
 
         allowed_facts = payload["allowed_facts"]
         natal_text = payload["natal_text"]
-        collected: list[dict[str, Any]] = []
-        covered: list[dict[str, str]] = []
-        for index, batch_titles in enumerate(batches, start=1):
-            wave_id = f"wave{index:02d}"
-            user_prompt = build_user_prompt(
+
+        wave_results = await asyncio.gather(
+            *[
+                _run_section_wave(
+                    client,
+                    report_type=report_type,
+                    batch_titles=batch_titles,
+                    natal_text=natal_text,
+                    allowed_facts=allowed_facts,
+                    wave_id=f"wave{index:02d}",
+                    prior_sections=prior_sections,
+                    covered=None,
+                    progress=progress,
+                )
+                for index, batch_titles in enumerate(batches, start=1)
+            ]
+        )
+        by_title: dict[str, dict[str, Any]] = {}
+        for validated in wave_results:
+            by_title.update(_sections_by_title(validated))
+
+        missing = _missing_titles(titles, by_title)
+        if missing:
+            logger.warning(
+                "После параллельных волн «%s» не хватает разделов: %s",
                 report_type,
-                natal_text,
-                batch_titles,
-                covered,
-                prior_sections,
+                ", ".join(missing),
             )
-            if progress is not None:
-                await progress.start_step()
-            validated = await _request_delimited_sections(
-                client,
-                report_type=report_type,
-                titles=batch_titles,
-                user_prompt=user_prompt,
-                allowed_facts=allowed_facts,
-                wave_id=wave_id,
-            )
-            if validated is None:
-                if progress is not None:
-                    await progress.fail_step()
-                return None
-            if progress is not None:
-                await progress.finish_step()
-            collected.extend(validated)
-            covered.extend(
+            covered = [
                 {
                     "title": item["title"],
                     "summary": _section_summary(item["content"]),
                 }
-                for item in validated
-            )
-        if collected and not str(report_type).endswith("_free"):
+                for item in (by_title[title] for title in titles if title in by_title)
+            ]
+            retry_batches = section_title_batches(missing, batch_size)
             if progress is not None:
-                await progress.start_step()
+                successful_waves = sum(1 for validated in wave_results if validated)
+                await progress.set_total(
+                    successful_waves
+                    + len(retry_batches)
+                    + (1 if needs_editorial else 0)
+                )
+            retry_results = await asyncio.gather(
+                *[
+                    _run_section_wave(
+                        client,
+                        report_type=report_type,
+                        batch_titles=batch_titles,
+                        natal_text=natal_text,
+                        allowed_facts=allowed_facts,
+                        wave_id=f"retry{index:02d}",
+                        prior_sections=prior_sections,
+                        covered=covered,
+                        progress=progress,
+                    )
+                    for index, batch_titles in enumerate(retry_batches, start=1)
+                ]
+            )
+            for validated in retry_results:
+                by_title.update(_sections_by_title(validated))
+
+        collected = _ordered_sections(titles, by_title)
+        if not collected:
+            return None
+
+        if needs_editorial:
+            step_id: int | None = None
+            if progress is not None:
+                step_id = await progress.start_step()
             collected = await _edit_paid_sections(
                 client,
                 report_type=report_type,
                 sections=collected,
                 allowed_facts=allowed_facts,
             )
-            if progress is not None:
-                await progress.finish_step()
+            if progress is not None and step_id is not None:
+                await progress.finish_step(step_id)
         title, intro = _report_shell(report_type)
         result = {
             "title": title,
