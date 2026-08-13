@@ -1692,7 +1692,7 @@ class ReportStatusSession:
         while not self._stop.is_set():
             await self._publish()
             try:
-                await asyncio.wait_for(self._stop.wait(), timeout=0.4)
+                await asyncio.wait_for(self._stop.wait(), timeout=7.0)
             except asyncio.TimeoutError:
                 continue
 
