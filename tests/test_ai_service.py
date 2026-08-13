@@ -33,7 +33,9 @@ from services.report_prompts import (
     PAID_SECTION_BATCH,
     PRODUCT_PROMPTS,
     SECTION_DELIMITER,
+    SECTION_MAX_WORDS,
     product_prompt_for_titles,
+    section_max_words,
     section_title_batches,
 )
 from services.reports_new import SECTIONS
@@ -123,6 +125,17 @@ class AiServiceTests(unittest.TestCase):
         )
         self.assertEqual(SECTIONS["personality_free"][6][0], "Ты в любви")
         self.assertEqual(SECTIONS["personality_free"][9][0], "5 фраз, в которых ты можешь узнать себя")
+        for report_type, sections in SECTIONS.items():
+            self.assertEqual(
+                set(SECTION_MAX_WORDS[report_type]),
+                {title for title, _ in sections},
+                report_type,
+            )
+        for report_type, sections in SECTIONS.items():
+            if not report_type.endswith("_free"):
+                continue
+            for title, _ in sections:
+                self.assertEqual(section_max_words(report_type, title), 250)
 
     def test_every_report_type_has_a_product_prompt(self):
         self.assertEqual(set(PRODUCT_PROMPTS), set(SECTIONS))
@@ -342,6 +355,8 @@ class AiServiceTests(unittest.TestCase):
         self.assertNotIn("ПРАКТИЧЕСКИЕ РЕКОМЕНДАЦИИ", prompt)
         self.assertNotIn("ПРОФЕССИОНАЛЬНЫЕ НАПРАВЛЕНИЯ", prompt)
         self.assertIn("ТОЛЬКО эти разделы", prompt)
+        self.assertIn("Максимум 280 слов", prompt)
+        self.assertIn("Максимум 280 слов", build_user_prompt("personality", "карта", titles))
 
     def test_free_batch_prompt_excludes_later_sections(self):
         titles = catalog_titles("personality_free")[:5]
@@ -350,6 +365,7 @@ class AiServiceTests(unittest.TestCase):
         self.assertIn("ТВОЙ ПОРТРЕТ", prompt)
         self.assertNotIn("5 ФРАЗ", prompt)
         self.assertNotIn("ЭТО ТОЛЬКО ВЕРХНИЙ СЛОЙ", prompt)
+        self.assertIn("100–250 слов", prompt)
 
     def test_paid_user_prompt_includes_covered_sections(self):
         titles = catalog_titles("personality")[5:10]

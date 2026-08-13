@@ -402,7 +402,7 @@ def build_user_prompt(
     covered_block = _covered_sections_block(covered or [])
     if covered_block:
         parts.append(covered_block)
-    parts.append(output_format_block(titles, batch=batch))
+    parts.append(output_format_block(titles, report_type=report_type, batch=batch))
     return "\n\n".join(parts)
 
 
