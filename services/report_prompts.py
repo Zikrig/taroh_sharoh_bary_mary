@@ -1,6 +1,10 @@
 """Product prompts sent to the model together with the full natal chart."""
 
+import re
+
 SECTION_DELIMITER = "====="
+PAID_SECTION_BATCH = 5
+_HEADER_SPLIT = re.compile(r"(?m)^={5,}\s*$")
 
 SYSTEM_PROMPT = """
 Ты — автор персонального разбора по натальной карте. Пиши строго на русском языке,
@@ -716,15 +720,81 @@ PRODUCT_PROMPTS: dict[str, str] = {
 }
 
 
-def output_format_block(titles: list[str]) -> str:
+def _normalize_prompt_title(value: str) -> str:
+    text = value.strip()
+    text = re.sub(r"^раздел\s*\d+\s*[:.\-–)]*\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"^\d{1,2}[.)]\s*", "", text)
+    text = re.sub(r"\s+", " ", text).strip(" .:")
+    return text.casefold()
+
+
+def _split_product_blocks(prompt: str) -> tuple[str, list[tuple[str, str]]]:
+    chunks = [part.strip() for part in _HEADER_SPLIT.split(prompt) if part.strip()]
+    if not chunks:
+        return prompt.strip(), []
+    intro = chunks[0]
+    blocks: list[tuple[str, str]] = []
+    index = 1
+    while index < len(chunks) - 1:
+        blocks.append((chunks[index], chunks[index + 1]))
+        index += 2
+    return intro, blocks
+
+
+def _header_matches(header: str, wanted: dict[str, str]) -> str | None:
+    lines = [line.strip() for line in header.splitlines() if line.strip()]
+    for candidate in (*lines, " ".join(lines)):
+        matched = wanted.get(_normalize_prompt_title(candidate))
+        if matched:
+            return matched
+    return None
+
+
+def product_prompt_for_titles(report_type: str, titles: list[str]) -> str:
+    """Keep the product intro and only the requested section instructions."""
+    full = PRODUCT_PROMPTS[report_type]
+    if not titles:
+        return full
+    intro, blocks = _split_product_blocks(full)
+    wanted = {_normalize_prompt_title(title): title for title in titles}
+    selected: dict[str, str] = {}
+    for header, body in blocks:
+        matched = _header_matches(header, wanted)
+        if not matched or matched in selected:
+            continue
+        selected[matched] = "\n".join(
+            [
+                "==================================================",
+                header,
+                "==================================================",
+                body,
+            ]
+        )
+    only = "Сейчас напиши ТОЛЬКО эти разделы. Остальные разделы этого продукта не пиши."
+    if len(selected) != len(titles):
+        return "\n\n".join([full, only])
+    ordered = [selected[title] for title in titles]
+    return "\n\n".join([intro, only, *ordered])
+
+
+def section_title_batches(titles: list[str], size: int = PAID_SECTION_BATCH) -> list[list[str]]:
+    return [titles[index:index + size] for index in range(0, len(titles), size)]
+
+
+def output_format_block(titles: list[str], *, batch: bool = False) -> str:
     listed = "\n".join(f"- {title}" for title in titles)
     example = titles[0] if titles else "Название раздела"
+    scope = (
+        "Верни только эти разделы одним сообщением."
+        if batch
+        else "Верни весь разбор одним сообщением."
+    )
     return f"""
 ==================================================
 ФОРМАТ ОТВЕТА
 ==================================================
 
-Верни весь разбор одним сообщением.
+{scope}
 Каждый раздел отделяй строго так:
 
 {SECTION_DELIMITER}

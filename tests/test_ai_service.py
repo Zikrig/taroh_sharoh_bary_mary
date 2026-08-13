@@ -22,13 +22,20 @@ from services.ai import (
     _save_response_transcript,
     _validate_section,
     build_prompt_payload,
+    build_user_prompt,
     catalog_titles,
     parse_delimited_sections,
     render_natal_dump,
 )
 from services.astro import local_time_to_utc
 from services.prompt_guides.career import build_career_hints
-from services.report_prompts import PRODUCT_PROMPTS, SECTION_DELIMITER
+from services.report_prompts import (
+    PAID_SECTION_BATCH,
+    PRODUCT_PROMPTS,
+    SECTION_DELIMITER,
+    product_prompt_for_titles,
+    section_title_batches,
+)
 from services.reports_new import SECTIONS
 
 
@@ -305,6 +312,36 @@ class AiServiceTests(unittest.TestCase):
         self.assertEqual(len(payload["sections"]), 18)
         self.assertEqual(payload["sections"][0]["title"], "Как ты влюбляешься")
         self.assertIn("LOVE_FULL", payload["user_prompt"])
+
+    def test_paid_sections_are_batched_by_five(self):
+        personality = catalog_titles("personality")
+        love = catalog_titles("love")
+        batches = section_title_batches(personality, PAID_SECTION_BATCH)
+        self.assertEqual([len(batch) for batch in batches], [5, 5, 5, 5])
+        self.assertEqual(section_title_batches(love, PAID_SECTION_BATCH)[-1], love[15:])
+
+    def test_paid_batch_prompt_keeps_only_requested_section_instructions(self):
+        titles = catalog_titles("personality")[:5]
+        prompt = product_prompt_for_titles("personality", titles)
+        self.assertIn("PERSONALITY_FULL", prompt)
+        self.assertIn("ТВОЙ ГЛАВНЫЙ ПСИХОЛОГИЧЕСКИЙ ПОРТРЕТ", prompt)
+        self.assertIn("КАК ТЕБЯ ВИДЯТ ЛЮДИ", prompt)
+        self.assertNotIn("ПРАКТИЧЕСКИЕ РЕКОМЕНДАЦИИ", prompt)
+        self.assertNotIn("ПРОФЕССИОНАЛЬНЫЕ НАПРАВЛЕНИЯ", prompt)
+        self.assertIn("ТОЛЬКО эти разделы", prompt)
+
+    def test_paid_user_prompt_includes_covered_sections(self):
+        titles = catalog_titles("personality")[5:10]
+        prompt = build_user_prompt(
+            "personality",
+            "Натальная карта",
+            titles,
+            [{"title": "Твой главный психологический портрет", "summary": "Воля и потребность в оценке."}],
+        )
+        self.assertIn("Уже написанные разделы", prompt)
+        self.assertIn("Воля и потребность в оценке", prompt)
+        self.assertIn("Верни только эти разделы одним сообщением", prompt)
+        self.assertNotIn("Твой главный психологический портрет\n=====", prompt)
 
     def test_system_prompt_asks_to_analyze_chart_before_writing(self):
         self.assertIn("Проанализируй всю карту", SYSTEM_PROMPT)

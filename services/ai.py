@@ -9,7 +9,15 @@ from uuid import uuid4
 
 from services.astro import SIGNS, calculate_synastry
 from config.settings import settings
-from services.report_prompts import PRODUCT_PROMPTS, SECTION_DELIMITER, SYSTEM_PROMPT, output_format_block
+from services.report_prompts import (
+    PAID_SECTION_BATCH,
+    PRODUCT_PROMPTS,
+    SECTION_DELIMITER,
+    SYSTEM_PROMPT,
+    output_format_block,
+    product_prompt_for_titles,
+    section_title_batches,
+)
 from services.reports_new import SECTIONS
 
 logger = logging.getLogger(__name__)
@@ -17,6 +25,10 @@ AI_TIMEOUT_SECONDS = 360.0
 FAILED_BATCH_RETRIES = 2
 PAYLOAD_SAMPLES_DIR = Path("data/payload_samples")
 MAX_CACHED_REPORTS = 128
+MAX_SECTION_SUMMARY_CHARS = 220
+FREE_REPORT_TYPES = frozenset(
+    {"personality_free", "love_free", "compatibility_free", "money_free"}
+)
 
 # Kept for maintenance scripts that still import these names.
 SECTION_RULES: dict[str, Any] = {}
@@ -370,14 +382,39 @@ def build_prompt_payload(report_type: str, chart: dict, second_chart: dict | Non
     }
 
 
-def build_user_prompt(report_type: str, natal_text: str, titles: list[str]) -> str:
-    return "\n\n".join(
-        [
-            natal_text,
-            PRODUCT_PROMPTS[report_type],
-            output_format_block(titles),
-        ]
-    )
+def _covered_sections_block(covered: list[dict[str, str]]) -> str:
+    if not covered:
+        return ""
+    lines = ["Уже написанные разделы — не повторяй их мысли, примеры и формулировки:"]
+    for item in covered:
+        lines.append(f"- {item['title']}: {item['summary']}")
+    return "\n".join(lines)
+
+
+def build_user_prompt(
+    report_type: str,
+    natal_text: str,
+    titles: list[str],
+    covered: list[dict[str, str]] | None = None,
+) -> str:
+    batch = report_type not in FREE_REPORT_TYPES
+    parts = [
+        natal_text,
+        product_prompt_for_titles(report_type, titles),
+    ]
+    covered_block = _covered_sections_block(covered or [])
+    if covered_block:
+        parts.append(covered_block)
+    parts.append(output_format_block(titles, batch=batch))
+    return "\n\n".join(parts)
+
+
+def _section_summary(text: str) -> str:
+    collapsed = re.sub(r"\s+", " ", text).strip()
+    if len(collapsed) <= MAX_SECTION_SUMMARY_CHARS:
+        return collapsed
+    trimmed = collapsed[:MAX_SECTION_SUMMARY_CHARS].rsplit(" ", 1)[0]
+    return f"{trimmed}…"
 
 
 def _normalize_title(value: str) -> str:
@@ -554,17 +591,119 @@ def _report_shell(report_type: str) -> tuple[str, str]:
     return titles[report_type], intros[report_type]
 
 
+async def _request_delimited_sections(
+    client: Any,
+    *,
+    report_type: str,
+    titles: list[str],
+    user_prompt: str,
+    allowed_facts: list[str],
+    wave_id: str,
+) -> list[dict[str, Any]] | None:
+    request_id = uuid4().hex
+    rejection: str | None = None
+    for attempt in range(FAILED_BATCH_RETRIES + 1):
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt},
+        ]
+        if rejection:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        f"Предыдущий вариант отклонён: {rejection}. "
+                        "Исправь именно это. Верни только запрошенные разделы "
+                        f"с разделителями {SECTION_DELIMITER} и точными названиями."
+                    ),
+                }
+            )
+        sample_dir = _payload_sample_attempt_dir(
+            report_type=report_type,
+            section_id=wave_id,
+            request_id=request_id,
+            attempt=attempt + 1,
+        )
+        _save_request_transcript(
+            sample_dir,
+            messages=messages,
+            request_meta={
+                "model": settings.ai_model,
+                "temperature": settings.ai_temperature,
+                "presence_penalty": settings.ai_presence_penalty,
+                "frequency_penalty": settings.ai_frequency_penalty,
+            },
+        )
+        try:
+            response = await client.chat.completions.create(
+                model=settings.ai_model,
+                messages=messages,
+                temperature=settings.ai_temperature,
+                presence_penalty=settings.ai_presence_penalty,
+                frequency_penalty=settings.ai_frequency_penalty,
+            )
+        except Exception as error:
+            if _is_timeout_error(error) or isinstance(error, (TimeoutError, ValueError)):
+                logger.warning(
+                    "Не удалось получить отчёт «%s» (%s), попытка %s: %s",
+                    report_type,
+                    wave_id,
+                    attempt + 1,
+                    error,
+                )
+                rejection = str(error)
+                continue
+            logger.exception(
+                "Неожиданная ошибка при генерации отчёта «%s» (%s)",
+                report_type,
+                wave_id,
+            )
+            return None
+        message = response.choices[0].message
+        raw_content = _message_text(message)
+        _save_response_transcript(
+            sample_dir,
+            content=raw_content or "",
+            word_count=len((raw_content or "").split()),
+            finish_reason=getattr(response.choices[0], "finish_reason", None),
+            message=message,
+        )
+        parsed, parse_rejection = parse_delimited_sections(raw_content, titles)
+        if parsed is None:
+            rejection = parse_rejection
+            logger.warning(
+                "AI вернул неотпарсенный отчёт «%s» (%s), попытка %s: %s",
+                report_type,
+                wave_id,
+                attempt + 1,
+                rejection,
+            )
+            continue
+        validated, rejection = _validate_parsed_report(parsed, allowed_facts)
+        if validated is None:
+            logger.warning(
+                "AI вернул некорректный отчёт «%s» (%s), попытка %s: %s",
+                report_type,
+                wave_id,
+                attempt + 1,
+                rejection,
+            )
+            continue
+        return validated
+    return None
+
+
 async def generate_report_content(
     report_type: str, chart: dict, second_chart: dict | None = None
 ) -> dict[str, Any] | None:
-    """Generate the whole report in one request and split it by =====."""
+    """Generate a free report in one request; paid reports in waves of five sections."""
     if not settings.ai_api_key:
         return None
     try:
         from openai import AsyncOpenAI
 
         payload = build_prompt_payload(report_type, chart, second_chart)
-        cache_key = _report_cache_key(report_type, payload["user_prompt"])
+        cache_key = _report_cache_key(report_type, payload["natal_text"])
         cached = _REPORT_CACHE.get(cache_key)
         if cached:
             return cached
@@ -575,102 +714,53 @@ async def generate_report_content(
             max_retries=0,
         )
         titles = catalog_titles(report_type)
+        batches = (
+            [titles]
+            if report_type in FREE_REPORT_TYPES
+            else section_title_batches(titles, PAID_SECTION_BATCH)
+        )
         allowed_facts = payload["allowed_facts"]
-        request_id = uuid4().hex
-        rejection: str | None = None
-        for attempt in range(FAILED_BATCH_RETRIES + 1):
-            messages = [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": payload["user_prompt"]},
-            ]
-            if rejection:
-                messages.append(
-                    {
-                        "role": "user",
-                        "content": (
-                            f"Предыдущий вариант отклонён: {rejection}. "
-                            "Исправь именно это. Верни весь разбор целиком "
-                            f"с разделителями {SECTION_DELIMITER} и точными названиями разделов."
-                        ),
-                    }
-                )
-            sample_dir = _payload_sample_attempt_dir(
+        natal_text = payload["natal_text"]
+        collected: list[dict[str, Any]] = []
+        covered: list[dict[str, str]] = []
+        for index, batch_titles in enumerate(batches, start=1):
+            wave_id = "full" if report_type in FREE_REPORT_TYPES else f"wave{index:02d}"
+            user_prompt = build_user_prompt(
+                report_type,
+                natal_text,
+                batch_titles,
+                covered,
+            )
+            validated = await _request_delimited_sections(
+                client,
                 report_type=report_type,
-                section_id="full",
-                request_id=request_id,
-                attempt=attempt + 1,
+                titles=batch_titles,
+                user_prompt=user_prompt,
+                allowed_facts=allowed_facts,
+                wave_id=wave_id,
             )
-            _save_request_transcript(
-                sample_dir,
-                messages=messages,
-                request_meta={
-                    "model": settings.ai_model,
-                    "temperature": settings.ai_temperature,
-                    "presence_penalty": settings.ai_presence_penalty,
-                    "frequency_penalty": settings.ai_frequency_penalty,
-                },
-            )
-            try:
-                response = await client.chat.completions.create(
-                    model=settings.ai_model,
-                    messages=messages,
-                    temperature=settings.ai_temperature,
-                    presence_penalty=settings.ai_presence_penalty,
-                    frequency_penalty=settings.ai_frequency_penalty,
-                )
-            except Exception as error:
-                if _is_timeout_error(error) or isinstance(error, (TimeoutError, ValueError)):
-                    logger.warning(
-                        "Не удалось получить отчёт «%s», попытка %s: %s",
-                        report_type,
-                        attempt + 1,
-                        error,
-                    )
-                    rejection = str(error)
-                    continue
-                logger.exception("Неожиданная ошибка при генерации отчёта «%s»", report_type)
-                return None
-            message = response.choices[0].message
-            raw_content = _message_text(message)
-            _save_response_transcript(
-                sample_dir,
-                content=raw_content or "",
-                word_count=len((raw_content or "").split()),
-                finish_reason=getattr(response.choices[0], "finish_reason", None),
-                message=message,
-            )
-            parsed, parse_rejection = parse_delimited_sections(raw_content, titles)
-            if parsed is None:
-                rejection = parse_rejection
-                logger.warning(
-                    "AI вернул неотпарсенный отчёт «%s», попытка %s: %s",
-                    report_type,
-                    attempt + 1,
-                    rejection,
-                )
-                continue
-            validated, rejection = _validate_parsed_report(parsed, allowed_facts)
             if validated is None:
-                logger.warning(
-                    "AI вернул некорректный отчёт «%s», попытка %s: %s",
-                    report_type,
-                    attempt + 1,
-                    rejection,
-                )
-                continue
-            title, intro = _report_shell(report_type)
-            result = {
-                "title": title,
-                "intro": intro,
-                "sections": validated,
-                "disclaimer": (
-                    "Материал носит символический и развлекательный характер и "
-                    "предназначен для саморефлексии."
-                ),
-            }
-            _remember_report(cache_key, result)
-            return result
-        return None
+                return None
+            collected.extend(validated)
+            covered.extend(
+                {
+                    "title": item["title"],
+                    "summary": _section_summary(item["content"]),
+                }
+                for item in validated
+            )
+        title, intro = _report_shell(report_type)
+        result = {
+            "title": title,
+            "intro": intro,
+            "sections": collected,
+            "disclaimer": (
+                "Материал носит символический и развлекательный характер и "
+                "предназначен для саморефлексии."
+            ),
+        }
+        _remember_report(cache_key, result)
+        return result
     except (ImportError, ValueError) as error:
         logger.warning("Не удалось подготовить AI-отчёт: %s", error)
         return None
