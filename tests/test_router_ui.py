@@ -35,9 +35,9 @@ class RouterUiTests(unittest.TestCase):
         self.assertGreater(settings.ai_frequency_penalty, 0)
 
     def test_free_section_button_contains_the_next_section_title(self):
-        markup = free_section_keyboard("Любовь", 6)
+        markup = free_section_keyboard("Ты в любви", 6)
         button = markup.inline_keyboard[0][0]
-        self.assertEqual(button.text, "Посмотреть раздел «Любовь»")
+        self.assertEqual(button.text, "Посмотреть раздел «Ты в любви»")
         self.assertEqual(button.callback_data, "free_section:6")
 
 

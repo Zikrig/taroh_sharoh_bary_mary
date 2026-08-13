@@ -39,30 +39,44 @@
     {
       "section_id": "personality_free.06",
       "report_type": "personality_free",
-      "title_ru": "Скрытая сторона",
+      "title_ru": "Твоя скрытая сторона",
       "path": "personality_free/06.json",
       "card_count": 222
     },
     {
       "section_id": "personality_free.07",
       "report_type": "personality_free",
-      "title_ru": "Любовь",
+      "title_ru": "Ты в любви",
       "path": "personality_free/07.json",
       "card_count": 98
     },
     {
       "section_id": "personality_free.08",
       "report_type": "personality_free",
-      "title_ru": "Деньги и работа",
+      "title_ru": "Ты и деньги",
       "path": "personality_free/08.json",
       "card_count": 171
     },
     {
       "section_id": "personality_free.09",
       "report_type": "personality_free",
-      "title_ru": "Главная точка роста",
+      "title_ru": "Твоя главная точка роста",
       "path": "personality_free/09.json",
       "card_count": 357
+    },
+    {
+      "section_id": "personality_free.10",
+      "report_type": "personality_free",
+      "title_ru": "5 фраз, в которых ты можешь узнать себя",
+      "path": "personality_free/10.json",
+      "card_count": 0
+    },
+    {
+      "section_id": "personality_free.11",
+      "report_type": "personality_free",
+      "title_ru": "Это только верхний слой",
+      "path": "personality_free/11.json",
+      "card_count": 0
     },
     {
       "section_id": "love_free.01",

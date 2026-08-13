@@ -15,30 +15,20 @@ from unittest.mock import patch
 from tempfile import TemporaryDirectory
 
 from services.ai import (
-    MAX_HINT_CARDS,
-    MAX_SECTION_SUMMARY_CHARS,
-    SECTION_RULES,
-    SECTION_GUIDANCE,
     SYSTEM_PROMPT,
-    _allowed_facts,
-    _filter_aspects,
     _is_degenerate_section_text,
     _payload_sample_attempt_dir,
     _save_request_transcript,
     _save_response_transcript,
-    _section_batches,
-    _section_summary,
-    _selected_hint_cards,
-    _topic_profile,
-    _rule_for_section,
     _validate_section,
-    _validate_batch,
-    build_batch_payload,
     build_prompt_payload,
-    build_section_payload,
+    catalog_titles,
+    parse_delimited_sections,
+    render_natal_dump,
 )
-from services.astro import local_time_to_utc, timezone_for_coordinates
+from services.astro import local_time_to_utc
 from services.prompt_guides.career import build_career_hints
+from services.report_prompts import PRODUCT_PROMPTS, SECTION_DELIMITER
 from services.reports_new import SECTIONS
 
 
@@ -55,6 +45,8 @@ def chart() -> dict:
         "utc_time": "1990-01-01 09:00 UTC",
         "timezone": "Europe/Moscow",
         "time_is_approximate": False,
+        "latitude": 55.75,
+        "longitude": 37.62,
         "ascendant": {"longitude": 0.0, "sign": "Овен"},
         "houses": [index * 30.0 for index in range(12)],
         "planets": planets,
@@ -77,63 +69,40 @@ def chart() -> dict:
     }
 
 
+def _sample_report(titles: list[str], text: str = "Живое наблюдение про повседневные привычки и реакции.") -> str:
+    parts = []
+    for title in titles:
+        parts.extend([SECTION_DELIMITER, title, SECTION_DELIMITER, text, ""])
+    return "\n".join(parts)
+
+
 class AiServiceTests(unittest.TestCase):
     def test_moscow_local_time_is_converted_using_historical_timezone(self):
         utc_time, timezone_name = local_time_to_utc("2000-05-15", "12:00", 55.7558, 37.6173)
         self.assertEqual(timezone_name, "Europe/Moscow")
         self.assertEqual(utc_time.strftime("%Y-%m-%d %H:%M"), "2000-05-15 08:00")
 
-    def test_payload_contains_only_allowed_chart_facts(self):
+    def test_payload_contains_full_natal_chart_not_selected_roles(self):
         payload = build_prompt_payload("money", chart(), None)
+        self.assertIn("natal_text", payload)
+        self.assertIn("Солнце: Овен, 10.0°, дом 1", payload["natal_text"])
+        self.assertIn("1 дом:", payload["natal_text"])
+        self.assertIn("Солнце тригон Луна", payload["natal_text"])
+        self.assertNotIn("topic_priorities", payload)
+        self.assertNotIn("section_role", payload)
+        self.assertNotIn("interpretation_hints", payload)
         self.assertIn("allowed_facts", payload)
         self.assertIn("Солнце в Овен, дом 1", payload["allowed_facts"])
-        self.assertTrue(payload["sections"][1]["guidance"])
 
-    def test_compatibility_payload_contains_labels(self):
+    def test_compatibility_payload_contains_both_charts(self):
         payload = build_prompt_payload("compatibility", chart(), chart())
-        self.assertIn("allowed_facts", payload)
+        self.assertIn("PERSON A", payload["natal_text"])
+        self.assertIn("PERSON B", payload["natal_text"])
         self.assertIn("Карта 1: Солнце в Овен, дом 1", payload["allowed_facts"])
         self.assertIn("Карта 2: Солнце в Овен, дом 1", payload["allowed_facts"])
 
-    def test_validates_section_batch_and_references(self):
-        report_type = "money"
-        allowed_facts = _allowed_facts(chart(), None, report_type)
-        titles = [title for title, _ in SECTIONS[report_type][:3]]
-        content = {
-            "sections": [
-                {
-                    "title": titles[0],
-                    "content": " ".join(["Точный"] * 30),
-                    "references": [allowed_facts[0].upper() + "."],
-                },
-                {
-                    "title": titles[1],
-                    "content": " ".join(["Точный"] * 30),
-                    "references": [allowed_facts[1]],
-                },
-                {
-                    "title": titles[2],
-                    "content": " ".join(["Точный"] * 30),
-                    "references": [allowed_facts[2]],
-                }
-            ],
-        }
-        validated = _validate_batch(content, titles, set(allowed_facts))
-        self.assertIsNotNone(validated)
-        self.assertEqual(validated[0]["references"][0], allowed_facts[0])
-
-        content["sections"][0]["references"] = ["Выдуманный факт", allowed_facts[0]]
-        self.assertIsNotNone(_validate_batch(content, titles, set(allowed_facts)))
-        content["sections"][0]["references"] = ["Выдуманный факт"]
-        self.assertIsNone(_validate_batch(content, titles, set(allowed_facts)))
-
-    def test_splits_sections_into_single_item_requests(self):
-        payload = build_prompt_payload("money", chart(), None)
-        batches = _section_batches(payload["sections"])
-        self.assertEqual([len(batch) for batch in batches], [1] * len(SECTIONS["money"]))
-
     def test_catalog_sections_and_word_budgets(self):
-        self.assertEqual(len(SECTIONS["personality_free"]), 9)
+        self.assertEqual(len(SECTIONS["personality_free"]), 11)
         self.assertEqual(len(SECTIONS["love_free"]), 7)
         self.assertEqual(len(SECTIONS["compatibility_free"]), 4)
         self.assertEqual(len(SECTIONS["money_free"]), 6)
@@ -145,26 +114,11 @@ class AiServiceTests(unittest.TestCase):
             ("Отношение к деньгам", "как воспринимаешь деньги и ресурсы"),
             SECTIONS["money"],
         )
-        guidance = SECTION_GUIDANCE["personality"]["Профессиональные направления"]
-        self.assertIn("8–12", guidance)
+        self.assertEqual(SECTIONS["personality_free"][6][0], "Ты в любви")
+        self.assertEqual(SECTIONS["personality_free"][9][0], "5 фраз, в которых ты можешь узнать себя")
 
-    def test_every_report_section_has_an_explicit_topic_profile(self):
-        for report_type, sections in SECTIONS.items():
-            for title, _ in sections:
-                profile = _topic_profile(title)
-                self.assertTrue(profile["primary"], f"{report_type}: {title}")
-                self.assertIn("weights", profile, f"{report_type}: {title}")
-
-    def test_every_catalog_section_has_an_explicit_section_rule(self):
-        index_path = Path("section_hints/index.json")
-        index = json.loads(index_path.read_text(encoding="utf-8"))
-        section_ids = {item["section_id"] for item in index["sections"]}
-        self.assertEqual(set(SECTION_RULES), section_ids)
-        for section_id in section_ids:
-            rule = _rule_for_section(section_id)
-            self.assertTrue(rule["profile"]["primary"], section_id)
-            self.assertTrue(rule["role"], section_id)
-            self.assertIn("planets", rule["focus"], section_id)
+    def test_every_report_type_has_a_product_prompt(self):
+        self.assertEqual(set(PRODUCT_PROMPTS), set(SECTIONS))
 
     def test_system_prompt_does_not_restrain_houses_on_approximate_time(self):
         self.assertNotIn("time_is_approximate", SYSTEM_PROMPT)
@@ -176,102 +130,85 @@ class AiServiceTests(unittest.TestCase):
         self.assertIn("личность", hints["active_house_professions"][0]["themes"])
         self.assertTrue(hints["active_house_professions"][0]["profession_examples"])
 
-    def test_batch_payload_filters_structured_chart_then_renders_facts(self):
-        payload = build_prompt_payload("personality", chart(), None)
-        batch = [
-            section
-            for section in payload["sections"]
-            if section["title"] == "Твоё мышление"
-        ]
-        trimmed = build_batch_payload(payload, batch)
-        self.assertEqual(set(trimmed["primary_chart"]["planets"]), {"Солнце", "Уран"})
-        self.assertNotIn("houses", trimmed["primary_chart"])
-        self.assertNotIn("career_and_talent_hints", trimmed)
-        self.assertIn("Солнце в Овен, дом 1", trimmed["allowed_facts"])
-        self.assertNotIn("Луна в Близнецы, дом 3", trimmed["allowed_facts"])
-        self.assertIn("Солнце тригон Луна", trimmed["allowed_facts"])
-
-    def test_section_payload_uses_template_and_canonical_fact_codes(self):
-        payload = build_prompt_payload("personality", chart(), None)
-        section = next(
-            item
-            for item in payload["sections"]
-            if item["title"] == "Твой внутренний мир"
-        )
-        section_payload = build_section_payload(payload, section)
-        self.assertEqual(section_payload["section"]["id"], "personality.02")
-        self.assertEqual(section_payload["section"]["title"], "Твой внутренний мир")
-        self.assertEqual(section_payload["section"]["requirements"]["min_words"], 100)
-        self.assertEqual(section_payload["section"]["requirements"]["max_words"], 167)
-        self.assertIn("Солнце в Овен, дом 1", section_payload["allowed_facts"])
-        self.assertIn(
-            {
-                "id": "primary.planet.sun.sign.aries",
-                "scope": "primary",
-                "kind": "planet_sign",
-                "planet": "sun",
-                "sign": "aries",
-                "house": 1,
-                "text_ru": "Солнце в Овен, дом 1",
-            },
-            section_payload["facts"],
-        )
-        self.assertTrue(section_payload["interpretation_hints"])
-
-    def test_personality_free_payload_uses_shorter_word_budget(self):
+    def test_user_prompt_contains_system_separate_product_and_full_chart(self):
         payload = build_prompt_payload("personality_free", chart(), None)
-        section = payload["sections"][0]
-        section_payload = build_section_payload(payload, section)
-        self.assertEqual(section_payload["section"]["id"], "personality_free.01")
-        self.assertEqual(section_payload["section"]["requirements"]["min_words"], 60)
-        self.assertEqual(section_payload["section"]["requirements"]["max_words"], 67)
+        prompt = payload["user_prompt"]
+        self.assertIn("Натальная карта", prompt)
+        self.assertIn("PERSONALITY_FREE", prompt)
+        self.assertIn(SECTION_DELIMITER, prompt)
+        self.assertIn("Твой портрет", prompt)
+        self.assertIn("Какой ты человек", prompt)
+        self.assertNotIn("section_role", prompt)
+        self.assertNotIn("topic_priorities", prompt)
+
+    def test_personality_free_payload_is_one_shot(self):
+        payload = build_prompt_payload("personality_free", chart(), None)
+        self.assertEqual(len(payload["sections"]), 11)
+        self.assertIn("СОЗДАЙ БЕСПЛАТНЫЙ ПЕРСОНАЛЬНЫЙ РАЗБОР", payload["user_prompt"])
 
     def test_love_free_payload_builds_from_saved_profile(self):
         payload = build_prompt_payload("love_free", chart(), None)
-        section_payload = build_section_payload(payload, payload["sections"][0])
-        self.assertEqual(section_payload["section"]["id"], "love_free.01")
-        self.assertEqual(section_payload["section"]["requirements"]["min_words"], 60)
-
-    def test_topic_priorities_lead_love_and_money_with_thematic_facts(self):
-        love_payload = build_prompt_payload("personality_free", chart(), None)
-        love_section = next(
-            section for section in love_payload["sections"] if section["title"] == "Любовь"
-        )
-        love = build_section_payload(love_payload, love_section)
-        self.assertEqual(love["topic_priorities"]["theme"], "любовь и близость")
-        self.assertIn("venus", love["topic_priorities"]["primary"]["planets"])
-        self.assertEqual(love["facts"][0]["planet"], "venus")
-
-        money_section = next(
-            section
-            for section in love_payload["sections"]
-            if section["title"] == "Деньги и работа"
-        )
-        money = build_section_payload(love_payload, money_section)
-        self.assertEqual(money["topic_priorities"]["theme"], "деньги, работа и реализация")
-        self.assertIn("venus", money["topic_priorities"]["primary"]["planets"])
-        self.assertEqual(money["facts"][0]["planet"], "venus")
-
-    def test_neighboring_sections_receive_distinct_roles_and_priorities(self):
-        payload = build_prompt_payload("personality_free", chart(), None)
-        portrait = build_section_payload(payload, payload["sections"][0])
-        behavior = build_section_payload(payload, payload["sections"][1])
-        public_image = build_section_payload(payload, payload["sections"][2])
-
-        self.assertNotEqual(portrait["section_role"], behavior["section_role"])
-        self.assertNotEqual(behavior["section_role"], public_image["section_role"])
-        self.assertEqual(
-            behavior["topic_priorities"]["primary"]["planets"],
-            ["mars", "mercury", "moon"],
-        )
-        self.assertTrue(public_image["topic_priorities"]["primary"]["ascendant"])
+        self.assertEqual(payload["sections"][0]["title"], "Как ты влюбляешься")
+        self.assertIn("LOVE_FREE", payload["user_prompt"])
 
     def test_compatibility_free_requires_both_charts(self):
         with self.assertRaises(ValueError):
             build_prompt_payload("compatibility_free", chart(), None)
         payload = build_prompt_payload("compatibility_free", chart(), chart())
-        self.assertIn("Карта 1: Солнце в Овен, дом 1", payload["allowed_facts"])
-        self.assertIn("Карта 2: Солнце в Овен, дом 1", payload["allowed_facts"])
+        self.assertIn("PERSON A", payload["natal_text"])
+        self.assertIn("PERSON B", payload["natal_text"])
+
+    def test_parses_delimited_sections_in_catalog_order(self):
+        titles = ["Твой портрет", "Какой ты человек", "Как тебя видят другие"]
+        text = "\n".join(
+            [
+                SECTION_DELIMITER,
+                "Какой ты человек",
+                SECTION_DELIMITER,
+                "Текст про характер.",
+                SECTION_DELIMITER,
+                "Твой портрет",
+                SECTION_DELIMITER,
+                "Текст про портрет.",
+                SECTION_DELIMITER,
+                "Как тебя видят другие",
+                SECTION_DELIMITER,
+                "Текст про впечатление.",
+            ]
+        )
+        parsed, rejection = parse_delimited_sections(text, titles)
+        self.assertIsNone(rejection)
+        self.assertEqual([item["title"] for item in parsed], titles)
+        self.assertEqual(parsed[0]["content"], "Текст про портрет.")
+        self.assertEqual(parsed[1]["content"], "Текст про характер.")
+
+    def test_parses_section_number_headers_and_long_equals(self):
+        titles = ["Твой портрет", "Какой ты человек"]
+        text = """
+==================================================
+РАЗДЕЛ 1
+ТВОЙ ПОРТРЕТ
+==================================================
+Цельное впечатление о человеке.
+
+==================================================
+РАЗДЕЛ 2
+КАКОЙ ТЫ ЧЕЛОВЕК
+==================================================
+Как думает и реагирует.
+"""
+        parsed, rejection = parse_delimited_sections(text, titles)
+        self.assertIsNone(rejection)
+        self.assertEqual(parsed[0]["content"], "Цельное впечатление о человеке.")
+        self.assertEqual(parsed[1]["content"], "Как думает и реагирует.")
+
+    def test_parse_rejects_missing_sections(self):
+        parsed, rejection = parse_delimited_sections(
+            f"{SECTION_DELIMITER}\nТвой портрет\n{SECTION_DELIMITER}\nТолько один раздел.",
+            ["Твой портрет", "Какой ты человек"],
+        )
+        self.assertIsNone(parsed)
+        self.assertIn("Какой ты человек", rejection)
 
     def test_validates_plain_text_and_assigns_application_references(self):
         section = {
@@ -284,7 +221,6 @@ class AiServiceTests(unittest.TestCase):
         self.assertIsNone(rejection)
         self.assertEqual(validated["references"], allowed_facts)
 
-        # Length is only a prompt hint — short answers are accepted.
         short, rejection = _validate_section("Слишком коротко", section, allowed_facts)
         self.assertIsNone(rejection)
         self.assertEqual(short["content"], "Слишком коротко")
@@ -360,42 +296,6 @@ class AiServiceTests(unittest.TestCase):
             self.assertIsNone(validated, text)
             self.assertIn("недопустимые формулировки", rejection)
 
-    def test_hint_cards_are_sorted_by_priority_and_limited(self):
-        hint = {
-            "hint_cards": [
-                {"id": "empty", "when": {}, "text_ru": "   ", "priority": 500},
-                {"id": "low", "when": {}, "text_ru": "Низкий приоритет.", "priority": 10},
-                {"id": "high", "when": {}, "text_ru": "Высокий приоритет.", "priority": 90},
-                *[
-                    {"id": f"filler{index}", "when": {}, "text_ru": f"Текст {index}."}
-                    for index in range(MAX_HINT_CARDS)
-                ],
-            ],
-        }
-        selected = _selected_hint_cards(hint, [])
-        self.assertEqual(len(selected), MAX_HINT_CARDS)
-        self.assertEqual([card["id"] for card in selected[:2]], ["high", "low"])
-        self.assertNotIn("empty", [card["id"] for card in selected])
-
-    def test_covered_sections_are_passed_for_anti_duplication(self):
-        payload = build_prompt_payload("personality", chart(), None)
-        section = next(
-            item
-            for item in payload["sections"]
-            if item["title"] == "Твой внутренний мир"
-        )
-        without_context = build_section_payload(payload, section)
-        self.assertNotIn("covered_sections", without_context)
-
-        covered = [{"title": "Твой главный психологический портрет", "summary": "Уже описана воля."}]
-        with_context = build_section_payload(payload, section, covered)
-        self.assertEqual(with_context["covered_sections"], covered)
-
-    def test_section_summary_is_trimmed_to_one_line(self):
-        summary = _section_summary("Первая строка.\n\n" + "слово " * 200)
-        self.assertNotIn("\n", summary)
-        self.assertLessEqual(len(summary), MAX_SECTION_SUMMARY_CHARS + 1)
-
     def test_compatibility_requires_both_charts(self):
         with self.assertRaises(ValueError):
             build_prompt_payload("compatibility", chart(), None)
@@ -404,35 +304,24 @@ class AiServiceTests(unittest.TestCase):
         payload = build_prompt_payload("love", chart(), None)
         self.assertEqual(len(payload["sections"]), 18)
         self.assertEqual(payload["sections"][0]["title"], "Как ты влюбляешься")
+        self.assertIn("LOVE_FULL", payload["user_prompt"])
 
-    def test_filters_aspects_by_significance_and_exactness(self):
-        aspects = [
-            {"first": "Солнце", "second": "Луна", "type": "тригон", "orb": 0.2},
-            {"first": "Уран", "second": "Нептун", "type": "секстиль", "orb": 0.1},
-            {"first": "Венера", "second": "Марс", "type": "квадрат", "orb": 5.9},
-            {"first": "Меркурий", "second": "Юпитер", "type": "секстиль", "orb": 5.1},
-        ]
-        focus = {
-            "planets": frozenset({"Солнце", "Луна", "Уран", "Нептун", "Венера", "Марс"}),
-            "aspects": "all",
-        }
-        selected = _filter_aspects(aspects, focus)
-        self.assertEqual(selected[0]["first"], "Солнце")
-        self.assertNotIn(aspects[3], selected)
-        self.assertLessEqual(len(selected), 6)
-
-    def test_prompt_requires_hints_to_be_rephrased(self):
-        self.assertIn("не копируйте дословно", SYSTEM_PROMPT)
+    def test_system_prompt_asks_to_analyze_chart_before_writing(self):
+        self.assertIn("Проанализируй всю карту", SYSTEM_PROMPT)
         self.assertIn("не упоминай астрологию", SYSTEM_PROMPT)
         self.assertIn("живые, обычные формулировки", SYSTEM_PROMPT)
-        self.assertIn("Не давайте советов, рекомендаций", SYSTEM_PROMPT)
-        self.assertNotIn("практический ориентир", SYSTEM_PROMPT)
+        self.assertIn("Если раздел можно было бы отправить человеку с совершенно другой картой", SYSTEM_PROMPT)
 
-    def test_payload_transcript_saves_system_and_user_in_section_folder(self):
-        user_payload = {"section": {"id": "personality_free.02", "title": "Какой ты человек"}}
+    def test_natal_dump_includes_houses_for_the_model(self):
+        text = render_natal_dump(chart(), None, "personality_free")
+        self.assertIn("Дома (куспиды):", text)
+        self.assertIn("Планеты:", text)
+        self.assertIn("Асцендент:", text)
+
+    def test_payload_transcript_saves_system_and_user_in_report_folder(self):
         messages = [
             {"role": "system", "content": "SYSTEM BODY"},
-            {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)},
+            {"role": "user", "content": "USER PROMPT WITH CHART"},
         ]
         with TemporaryDirectory() as tmp:
             with patch("services.ai.PAYLOAD_SAMPLES_DIR", Path(tmp)), patch(
@@ -441,7 +330,7 @@ class AiServiceTests(unittest.TestCase):
                 mock_settings.save_payload_samples = True
                 sample_dir = _payload_sample_attempt_dir(
                     report_type="personality_free",
-                    section_id="personality_free.02",
+                    section_id="full",
                     request_id="abcdef1234567890",
                     attempt=1,
                 )
@@ -462,13 +351,13 @@ class AiServiceTests(unittest.TestCase):
                     ),
                 )
                 self.assertTrue(sample_dir.is_dir())
-                self.assertEqual(
-                    sample_dir.parent.name, "personality_free.02"
-                )
+                self.assertEqual(sample_dir.parent.name, "full")
                 self.assertEqual(sample_dir.parent.parent.name, "personality_free")
                 self.assertEqual((sample_dir / "00_system.txt").read_text(encoding="utf-8"), "SYSTEM BODY")
-                saved_user = json.loads((sample_dir / "01_user.json").read_text(encoding="utf-8"))
-                self.assertEqual(saved_user, user_payload)
+                self.assertEqual(
+                    (sample_dir / "01_user.txt").read_text(encoding="utf-8"),
+                    "USER PROMPT WITH CHART",
+                )
                 sent = json.loads((sample_dir / "03_request_as_sent.json").read_text(encoding="utf-8"))
                 self.assertEqual(sent["messages"], messages)
                 self.assertEqual(
@@ -479,6 +368,12 @@ class AiServiceTests(unittest.TestCase):
                     (sample_dir / "11_reasoning.txt").read_text(encoding="utf-8"),
                     "длинные внутренние рассуждения",
                 )
+
+    def test_one_shot_sample_covers_all_free_titles(self):
+        titles = catalog_titles("personality_free")
+        parsed, rejection = parse_delimited_sections(_sample_report(titles), titles)
+        self.assertIsNone(rejection)
+        self.assertEqual(len(parsed), 11)
 
 
 if __name__ == "__main__":

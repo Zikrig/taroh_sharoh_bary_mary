@@ -2,7 +2,7 @@
   "schema_version": "section-hint.v1",
   "section_id": "personality_free.06",
   "report_type": "personality_free",
-  "title_ru": "Скрытая сторона",
+  "title_ru": "Твоя скрытая сторона",
   "brief": "внутренние противоречия",
   "prompt_requirements": {
     "min_words": 60,

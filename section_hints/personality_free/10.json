@@ -1,0 +1,16 @@
+{
+  "schema_version": "section-hint.v1",
+  "section_id": "personality_free.10",
+  "report_type": "personality_free",
+  "title_ru": "5 фраз, в которых ты можешь узнать себя",
+  "brief": "пять коротких жизненных наблюдений",
+  "prompt_requirements": {
+    "min_words": 40,
+    "max_words": 160,
+    "style_notes": [
+      "Тема раздела: пять коротких жизненных наблюдений."
+    ],
+    "avoid_repeating_sections": []
+  },
+  "hint_cards": []
+}

@@ -2,7 +2,7 @@
   "schema_version": "section-hint.v1",
   "section_id": "personality_free.09",
   "report_type": "personality_free",
-  "title_ru": "Главная точка роста",
+  "title_ru": "Твоя главная точка роста",
   "brief": "одно ключевое направление развития",
   "prompt_requirements": {
     "min_words": 60,

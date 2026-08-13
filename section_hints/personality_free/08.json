@@ -2,7 +2,7 @@
   "schema_version": "section-hint.v1",
   "section_id": "personality_free.08",
   "report_type": "personality_free",
-  "title_ru": "Деньги и работа",
+  "title_ru": "Ты и деньги",
   "brief": "мотивация, формат работы и отношение к риску",
   "prompt_requirements": {
     "min_words": 60,

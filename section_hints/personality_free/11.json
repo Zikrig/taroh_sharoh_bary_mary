@@ -1,0 +1,16 @@
+{
+  "schema_version": "section-hint.v1",
+  "section_id": "personality_free.11",
+  "report_type": "personality_free",
+  "title_ru": "Это только верхний слой",
+  "brief": "темы полного разбора без агрессивных продаж",
+  "prompt_requirements": {
+    "min_words": 40,
+    "max_words": 160,
+    "style_notes": [
+      "Тема раздела: темы полного разбора без агрессивных продаж."
+    ],
+    "avoid_repeating_sections": []
+  },
+  "hint_cards": []
+}
