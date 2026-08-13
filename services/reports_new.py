@@ -9,6 +9,7 @@ from datetime import datetime
 from html import escape
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
@@ -25,6 +26,59 @@ NAVY = colors.HexColor("#17130F")
 MUTED = colors.HexColor("#3D3731")
 FONT = "Helvetica"
 FONT_BOLD = "Helvetica-Bold"
+
+TIMEZONE_RU_NAMES: dict[str, str] = {
+    "Europe/Kaliningrad": "Калининград",
+    "Europe/Moscow": "Москва",
+    "Europe/Simferopol": "Симферополь",
+    "Europe/Volgograd": "Волгоград",
+    "Europe/Samara": "Самара",
+    "Europe/Kirov": "Киров",
+    "Europe/Astrakhan": "Астрахань",
+    "Europe/Saratov": "Саратов",
+    "Europe/Ulyanovsk": "Ульяновск",
+    "Asia/Yekaterinburg": "Екатеринбург",
+    "Asia/Omsk": "Омск",
+    "Asia/Novosibirsk": "Новосибирск",
+    "Asia/Barnaul": "Барнаул",
+    "Asia/Tomsk": "Томск",
+    "Asia/Novokuznetsk": "Новокузнецк",
+    "Asia/Krasnoyarsk": "Красноярск",
+    "Asia/Irkutsk": "Иркутск",
+    "Asia/Chita": "Чита",
+    "Asia/Yakutsk": "Якутск",
+    "Asia/Khandyga": "Хандыга",
+    "Asia/Vladivostok": "Владивосток",
+    "Asia/Sakhalin": "Сахалин",
+    "Asia/Ust-Nera": "Усть-Нера",
+    "Asia/Magadan": "Магадан",
+    "Asia/Srednekolymsk": "Среднеколымск",
+    "Asia/Kamchatka": "Камчатка",
+    "Asia/Anadyr": "Анадырь",
+    "Europe/Minsk": "Минск",
+    "Europe/Kyiv": "Киев",
+    "Europe/Kiev": "Киев",
+    "Asia/Almaty": "Алматы",
+    "Asia/Aqtobe": "Актобе",
+    "Asia/Qyzylorda": "Кызылорда",
+    "Asia/Aqtau": "Актау",
+    "Asia/Atyrau": "Атырау",
+    "Asia/Oral": "Уральск",
+    "Asia/Tashkent": "Ташкент",
+    "Asia/Samarkand": "Самарканд",
+    "Asia/Bishkek": "Бишкек",
+    "Asia/Dushanbe": "Душанбе",
+    "Asia/Ashgabat": "Ашхабад",
+    "Asia/Tbilisi": "Тбилиси",
+    "Asia/Yerevan": "Ереван",
+    "Asia/Baku": "Баку",
+    "Europe/Berlin": "Берлин",
+    "Europe/London": "Лондон",
+    "Europe/Paris": "Париж",
+    "Europe/Istanbul": "Стамбул",
+    "America/New_York": "Нью-Йорк",
+    "America/Los_Angeles": "Лос-Анджелес",
+}
 
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
@@ -57,6 +111,53 @@ def _load_sections() -> dict[str, list[tuple[str, str]]]:
 
 
 SECTIONS = _load_sections()
+
+
+def _format_cover_date(value: str) -> str:
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").strftime("%d.%m.%Y")
+    except (TypeError, ValueError):
+        return str(value or "")
+
+
+def _format_cover_time(value: str) -> str:
+    text = str(value or "").strip()
+    for fmt in ("%H:%M:%S", "%H:%M"):
+        try:
+            return datetime.strptime(text, fmt).strftime("%H:%M")
+        except ValueError:
+            continue
+    return text
+
+
+def _format_timezone_ru(timezone_name: str, reference_date: str | None = None) -> str:
+    name = str(timezone_name or "").strip()
+    if not name:
+        return ""
+    city = TIMEZONE_RU_NAMES.get(name)
+    if city is None:
+        city = name.split("/")[-1].replace("_", " ").replace("-", " ")
+    offset_label = ""
+    try:
+        zone = ZoneInfo(name)
+        if reference_date:
+            moment = datetime.strptime(reference_date, "%Y-%m-%d").replace(
+                hour=12, minute=0, tzinfo=zone
+            )
+        else:
+            moment = datetime.now(zone)
+        offset = moment.utcoffset()
+        if offset is not None:
+            total_minutes = int(offset.total_seconds() // 60)
+            hours, minutes = divmod(abs(total_minutes), 60)
+            sign = "+" if total_minutes >= 0 else "-"
+            if minutes:
+                offset_label = f" (UTC{sign}{hours}:{minutes:02d})"
+            else:
+                offset_label = f" (UTC{sign}{hours})"
+    except Exception:
+        offset_label = ""
+    return f"{city}{offset_label}"
 
 
 def _paragraph(text: str, style: ParagraphStyle) -> Paragraph:
@@ -100,14 +201,26 @@ def _cover_summary(chart: dict, label: ParagraphStyle, value: ParagraphStyle) ->
     """The former first-page data summary, retained in the active layout."""
     planets = chart["planets"]
     rows = [
-        [_paragraph("Дата рождения:", label), _paragraph(chart["date"], value)],
-        [_paragraph("Часовой пояс:", label), _paragraph(chart["timezone"], value)],
+        [
+            _paragraph("Дата рождения:", label),
+            _paragraph(_format_cover_date(chart["date"]), value),
+        ],
+        [
+            _paragraph("Часовой пояс:", label),
+            _paragraph(_format_timezone_ru(chart["timezone"], chart.get("date")), value),
+        ],
         [_paragraph("Солнце:", label), _paragraph(planets["Солнце"]["sign"], value)],
         [_paragraph("Луна:", label), _paragraph(planets["Луна"]["sign"], value)],
         [_paragraph("Асцендент:", label), _paragraph(chart["ascendant"]["sign"], value)],
     ]
     if not chart.get("time_is_approximate"):
-        rows.insert(1, [_paragraph("Время рождения:", label), _paragraph(chart["time"], value)])
+        rows.insert(
+            1,
+            [
+                _paragraph("Время рождения:", label),
+                _paragraph(_format_cover_time(chart["time"]), value),
+            ],
+        )
     table = Table(rows, colWidths=[80 * mm, 75 * mm], hAlign="CENTER")
     table.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),

@@ -1,7 +1,13 @@
 import unittest
 from pathlib import Path
 
-from services.reports_new import SECTIONS, generate_report
+from services.reports_new import (
+    SECTIONS,
+    _format_cover_date,
+    _format_cover_time,
+    _format_timezone_ru,
+    generate_report,
+)
 
 
 def chart() -> dict:
@@ -47,6 +53,19 @@ class ReportTests(unittest.TestCase):
     def test_report_rejects_missing_ai_content(self):
         with self.assertRaises(ValueError):
             generate_report("money", chart(), None, None)
+
+    def test_cover_formats_date_time_and_russian_timezone(self):
+        self.assertEqual(_format_cover_date("1998-07-15"), "15.07.1998")
+        self.assertEqual(_format_cover_time("06:00"), "06:00")
+        self.assertEqual(_format_cover_time("6:00:00"), "06:00")
+        # Offset is taken for the birth date from the IANA zone.
+        self.assertEqual(
+            _format_timezone_ru("Asia/Novosibirsk", "1998-07-15"),
+            "Новосибирск (UTC+7)",
+        )
+        moscow = _format_timezone_ru("Europe/Moscow", "2015-01-15")
+        self.assertTrue(moscow.startswith("Москва (UTC"))
+        self.assertIn("UTC+", moscow)
 
 
 if __name__ == "__main__":

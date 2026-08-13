@@ -173,10 +173,58 @@ def back_to_edit_profile():
     return back_keyboard("edit_profile")
 
 
+def back_to_admin_gens():
+    return back_keyboard("admin_gens")
+
+
+def flow_back_keyboard(*, admin_mode: bool):
+    return back_to_admin_gens() if admin_mode else back_to_menu()
+
+
+def pdf_offer_keyboard(scenario_name: str, *, admin_mode: bool = False):
+    builder = InlineKeyboardBuilder()
+    if admin_mode:
+        builder.button(
+            text="📄 Сформировать полный PDF",
+            callback_data=f"admin_buy:{scenario_name}",
+        )
+        builder.button(text="⬅️ К генерациям", callback_data="admin:generations")
+    else:
+        builder.button(
+            text=f"🔓 Получить полный PDF · {PRICES[scenario_name]}⭐",
+            callback_data=f"buy:{scenario_name}",
+        )
+        builder.button(text="⬅️ Назад", callback_data="back:menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def admin_generations_menu():
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🧠 Личность", callback_data="admin_scenario:personality")
+    builder.button(text="❤️ Любовь и отношения", callback_data="admin_scenario:love")
+    builder.button(text="💰 Деньги и реализация", callback_data="admin_scenario:money")
+    builder.button(text="💑 Совместимость", callback_data="admin_scenario:compatibility")
+    builder.button(text="⬅️ В админку", callback_data="admin:back")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def admin_generations_text() -> str:
+    return (
+        "Админ-генерации\n\n"
+        "Тот же набор разборов, что у пользователя, но без Stars и без дневного "
+        "лимита бесплатных.\n"
+        "Можно проверить бесплатный мини-разбор и сразу собрать полный PDF."
+    )
+
+
 def store_pending_free_report(
     user_id: int,
     scenario_name: str,
     sections: list[dict[str, str]],
+    *,
+    admin_mode: bool = False,
 ) -> str:
     report_id = secrets.token_hex(4)
     PENDING_FREE_REPORTS[report_id] = {
@@ -184,6 +232,7 @@ def store_pending_free_report(
         "user_id": user_id,
         "scenario": scenario_name,
         "sections": sections,
+        "admin_mode": admin_mode,
     }
     ids = PENDING_FREE_REPORT_IDS_BY_USER.setdefault(user_id, [])
     ids.append(report_id)
@@ -259,6 +308,7 @@ def admin_menu(*, test_mode: bool, free_daily_limit: bool):
     )
     builder.button(text=test_label, callback_data="admin:test_toggle")
     builder.button(text=limit_label, callback_data="admin:free_daily_limit_toggle")
+    builder.button(text="🧪 Генерации", callback_data="admin:generations")
     builder.button(text="📝 Настройки текстов", callback_data="admin:texts")
     builder.adjust(1)
     return builder.as_markup()
@@ -303,7 +353,8 @@ def admin_text(
         "В тестовом режиме реальные Telegram Stars не списываются: "
         "после нажатия кнопки покупки PDF формируется сразу.\n\n"
         "Лимит бесплатных: не больше одного бесплатного мини-разбора в сутки "
-        "на пользователя. При исчерпании лимита остаётся кнопка полного PDF."
+        "на пользователя. При исчерпании лимита остаётся кнопка полного PDF.\n\n"
+        "Раздел «Генерации» — проверка разборов без оплаты и без лимита."
     )
 
 
@@ -377,6 +428,38 @@ async def back_to_admin(callback: CallbackQuery):
     await _refresh_admin_panel(callback.message)
 
 
+@router.callback_query(F.data == "admin:generations")
+async def open_admin_generations(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    await state.clear()
+    await callback.answer()
+    await callback.message.edit_text(
+        admin_generations_text(),
+        reply_markup=admin_generations_menu(),
+    )
+
+
+@router.callback_query(F.data.startswith("admin_scenario:"))
+async def admin_scenario(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    scenario_name = callback.data.split(":", 1)[1]
+    if scenario_name not in PRICES:
+        await callback.answer("Этот сценарий пока недоступен.", show_alert=True)
+        return
+    await callback.answer()
+    await ask_own_data(
+        callback.message,
+        state,
+        scenario_name,
+        callback.from_user.id,
+        admin_mode=True,
+    )
+
+
 @router.callback_query(F.data.startswith("back:"))
 async def navigate_back(callback: CallbackQuery, state: FSMContext):
     destination = callback.data.split(":", 1)[1]
@@ -387,6 +470,11 @@ async def navigate_back(callback: CallbackQuery, state: FSMContext):
             await get_main_menu_text(),
             parse_mode=ParseMode.HTML,
             reply_markup=await menu(callback.from_user.id),
+        )
+    elif destination == "admin_gens" and is_admin(callback.from_user.id):
+        await callback.message.answer(
+            admin_generations_text(),
+            reply_markup=admin_generations_menu(),
         )
     elif destination == "edit_profile":
         await start_edit(callback.message, state, callback.from_user.id)
@@ -670,7 +758,14 @@ async def save_profile_field(message: Message, field: str, value: str, state: FS
     await message.answer("Данные сохранены ✅", reply_markup=back_to_edit_profile())
 
 
-async def ask_own_data(message: Message, state: FSMContext, scenario: str, user_id: int):
+async def ask_own_data(
+    message: Message,
+    state: FSMContext,
+    scenario: str,
+    user_id: int,
+    *,
+    admin_mode: bool = False,
+):
     await message.answer(SCENARIO_INTROS[scenario])
     profile = await get_profile(user_id)
     if profile and scenario == "compatibility":
@@ -682,14 +777,18 @@ async def ask_own_data(message: Message, state: FSMContext, scenario: str, user_
             time_is_approximate=bool(profile["time_is_approximate"]),
         )
         await state.clear()
-        await state.update_data(own_chart=own_chart, next_scenario=scenario)
+        await state.update_data(
+            own_chart=own_chart,
+            next_scenario=scenario,
+            admin_generation=admin_mode,
+        )
         await state.set_state(BirthStates.partner_date)
         await message.answer(
             "Ваши данные уже сохранены ✅\n\n"
             "Теперь нужны данные второго человека.\n\n"
             "📅 Дата рождения партнёра\n"
             "Например: 24.07.1998",
-            reply_markup=back_to_menu(),
+            reply_markup=flow_back_keyboard(admin_mode=admin_mode),
         )
         return
     if profile:
@@ -700,16 +799,22 @@ async def ask_own_data(message: Message, state: FSMContext, scenario: str, user_
             profile["longitude"],
             time_is_approximate=bool(profile["time_is_approximate"]),
         )
-        await show_teaser(message, scenario, chart, user_id=user_id)
+        await show_teaser(
+            message,
+            scenario,
+            chart,
+            user_id=user_id,
+            admin_mode=admin_mode,
+        )
         return
     await state.clear()
     await state.set_state(BirthStates.own_date)
-    await state.update_data(next_scenario=scenario)
+    await state.update_data(next_scenario=scenario, admin_generation=admin_mode)
     await message.answer(
         "📅 ШАГ 1 ИЗ 3\n\n"
         "Напишите дату своего рождения.\n"
         "Например: 24.07.1998",
-        reply_markup=back_to_menu(),
+        reply_markup=flow_back_keyboard(admin_mode=admin_mode),
     )
 
 
@@ -737,12 +842,13 @@ async def own_date(message: Message, state: FSMContext):
         return
     await state.update_data(own_date=value)
     await state.set_state(BirthStates.own_time)
+    back_destination = "admin_gens" if data.get("admin_generation") else "menu"
     await message.answer(
         "🕐 ШАГ 2 ИЗ 3\n\n"
         "Теперь напишите время рождения.\n"
         "Например: 14:35\n\n"
         "Чем точнее время, тем персональнее получится разбор.",
-        reply_markup=unknown_time_keyboard("menu"),
+        reply_markup=unknown_time_keyboard(back_destination),
     )
 
 
@@ -780,6 +886,7 @@ async def own_time(
         ),
     )
     await state.set_state(BirthStates.own_place)
+    admin_mode = bool(data.get("admin_generation"))
     if is_approximate_time(time_text if time_text is not None else message.text):
         prompt = (
             "Ничего страшного ❤️\n"
@@ -795,7 +902,7 @@ async def own_time(
             "Напишите город и страну, где вы родились.\n"
             "Например: Москва, Россия"
         )
-    await message.answer(prompt, reply_markup=back_to_menu())
+    await message.answer(prompt, reply_markup=flow_back_keyboard(admin_mode=admin_mode))
 
 
 @router.message(BirthStates.own_place)
@@ -832,6 +939,7 @@ async def own_place(message: Message, state: FSMContext):
     }
     await save_profile(message.from_user.id, profile)
     scenario_name = data.get("next_scenario")
+    admin_mode = bool(data.get("admin_generation"))
     own_chart = calculate_chart(
         profile["birth_date"],
         profile["birth_time"],
@@ -843,16 +951,23 @@ async def own_place(message: Message, state: FSMContext):
         await state.clear()
         await message.answer("Профиль сохранён ✅", reply_markup=back_to_menu())
     elif scenario_name == "compatibility":
-        await state.update_data(own_chart=own_chart)
+        await state.update_data(own_chart=own_chart, admin_generation=admin_mode)
         await state.set_state(BirthStates.partner_date)
         await message.answer(
             "📅 Дата рождения партнёра\n\n"
             "Напишите дату в формате ДД.ММ.ГГГГ.\n"
-            "Например: 24.07.1998"
+            "Например: 24.07.1998",
+            reply_markup=flow_back_keyboard(admin_mode=admin_mode),
         )
     else:
         await state.clear()
-        await show_teaser(message, scenario_name, own_chart, user_id=message.from_user.id)
+        await show_teaser(
+            message,
+            scenario_name,
+            own_chart,
+            user_id=message.from_user.id,
+            admin_mode=admin_mode,
+        )
 
 
 @router.message(BirthStates.partner_date)
@@ -864,11 +979,13 @@ async def partner_date(message: Message, state: FSMContext):
         return
     await state.update_data(partner_date=value)
     await state.set_state(BirthStates.partner_time)
+    data = await state.get_data()
+    back_destination = "admin_gens" if data.get("admin_generation") else "menu"
     await message.answer(
         "🕐 Время рождения партнёра\n"
         "Например: 14:35\n\n"
         "Если время неизвестно, нажмите кнопку ниже.",
-        reply_markup=unknown_time_keyboard("menu"),
+        reply_markup=unknown_time_keyboard(back_destination),
     )
 
 
@@ -886,10 +1003,11 @@ async def partner_time(message: Message, state: FSMContext, time_text: str | Non
         ),
     )
     await state.set_state(BirthStates.partner_place)
+    data = await state.get_data()
     await message.answer(
         "📍 Место рождения партнёра\n"
         "Например: Москва, Россия",
-        reply_markup=back_to_menu(),
+        reply_markup=flow_back_keyboard(admin_mode=bool(data.get("admin_generation"))),
     )
 
 
@@ -925,6 +1043,7 @@ async def partner_place(message: Message, state: FSMContext):
         data["own_chart"],
         partner,
         user_id=message.from_user.id,
+        admin_mode=bool(data.get("admin_generation")),
     )
 
 
@@ -935,22 +1054,21 @@ async def show_teaser(
     second_chart: dict | None = None,
     *,
     user_id: int,
+    admin_mode: bool = False,
 ):
     PENDING_REPORTS[user_id] = (chart, second_chart)
-    builder = InlineKeyboardBuilder()
-    builder.button(
-        text=f"🔓 Получить полный PDF · {PRICES[scenario_name]}⭐",
-        callback_data=f"buy:{scenario_name}",
-    )
-    builder.button(text="⬅️ Назад", callback_data="back:menu")
-    builder.adjust(1)
+    offer_markup = pdf_offer_keyboard(scenario_name, admin_mode=admin_mode)
 
     free_report_type = FREE_REPORT_TYPES.get(scenario_name)
     if free_report_type:
-        if await get_free_daily_limit_enabled() and await has_used_free_today(user_id):
+        if (
+            not admin_mode
+            and await get_free_daily_limit_enabled()
+            and await has_used_free_today(user_id)
+        ):
             await message.answer(
                 FREE_DAILY_LIMIT_TEXT,
-                reply_markup=builder.as_markup(),
+                reply_markup=offer_markup,
             )
             return
         await message.answer("Готовлю ваш бесплатный персональный мини-разбор…")
@@ -969,12 +1087,18 @@ async def show_teaser(
                 await message.answer(
                     "Не удалось сформировать бесплатный разбор прямо сейчас. "
                     "Можно сразу открыть полный PDF — он строится индивидуально по вашим данным.",
-                    reply_markup=builder.as_markup(),
+                    reply_markup=offer_markup,
                 )
                 return
-            report_id = store_pending_free_report(user_id, scenario_name, sections)
+            report_id = store_pending_free_report(
+                user_id,
+                scenario_name,
+                sections,
+                admin_mode=admin_mode,
+            )
             await save_free_generation(user_id, scenario_name, sections)
-            await mark_free_used_today(user_id)
+            if not admin_mode:
+                await mark_free_used_today(user_id)
             await message.answer(
                 f"<b>{free_content['title']}</b>\n{free_content['intro']}",
                 parse_mode=ParseMode.HTML,
@@ -984,14 +1108,14 @@ async def show_teaser(
         await message.answer(
             "Не удалось сформировать бесплатный разбор прямо сейчас. "
             "Можно сразу открыть полный PDF — он строится индивидуально по вашим данным.",
-            reply_markup=builder.as_markup(),
+            reply_markup=offer_markup,
         )
         return
 
     await message.answer(
         "Не удалось подготовить бесплатный разбор для этого сценария. "
         "Можно сразу открыть полный PDF.",
-        reply_markup=builder.as_markup(),
+        reply_markup=offer_markup,
     )
 
 
@@ -1030,19 +1154,13 @@ async def show_free_section(callback: CallbackQuery):
 
     if next_index == len(sections):
         scenario_name = record.get("scenario") or "personality"
-        builder = InlineKeyboardBuilder()
-        builder.button(
-            text=f"🔓 Получить полный PDF · {PRICES[scenario_name]}⭐",
-            callback_data=f"buy:{scenario_name}",
-        )
-        builder.button(text="⬅️ Назад", callback_data="back:menu")
-        builder.adjust(1)
+        admin_mode = bool(record.get("admin_mode"))
         await callback.message.answer(
             FREE_UPSELL_TEXTS.get(
                 scenario_name,
                 "Это бесплатный мини-разбор. Полный PDF раскрывает тему глубже.",
             ),
-            reply_markup=builder.as_markup(),
+            reply_markup=pdf_offer_keyboard(scenario_name, admin_mode=admin_mode),
         )
 
 
@@ -1089,6 +1207,31 @@ async def buy(callback: CallbackQuery):
     )
 
 
+@router.callback_query(F.data.startswith("admin_buy:"))
+async def admin_buy(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    scenario_name = callback.data.split(":", 1)[1]
+    if scenario_name not in PRICES:
+        await callback.answer("Этот сценарий пока недоступен.", show_alert=True)
+        return
+    order_id = await create_order(callback.from_user.id, scenario_name, 0)
+    charts = PENDING_REPORTS.get(callback.from_user.id)
+    if charts:
+        await save_report_context(order_id, *charts)
+    await callback.answer("Админ-заказ принят")
+    await deliver_report(
+        callback.message,
+        callback.from_user.id,
+        callback.from_user,
+        scenario_name,
+        order_id,
+        "ADMIN",
+        admin_mode=True,
+    )
+
+
 @router.pre_checkout_query()
 async def pre_checkout(query):
     await query.answer(ok=True)
@@ -1122,9 +1265,14 @@ async def deliver_report(
     scenario_name: str,
     order_id: int,
     payment_id: str,
+    *,
+    admin_mode: bool = False,
 ):
     await complete_order(order_id, payment_id)
     charts = await get_report_context(order_id) or PENDING_REPORTS.pop(user_id, None)
+    back_markup = (
+        admin_generations_menu() if admin_mode else back_to_menu()
+    )
     if charts:
         chart, second_chart = charts
     elif scenario_name == "compatibility":
@@ -1133,7 +1281,7 @@ async def deliver_report(
         await message.answer(
             "Данные партнёра не сохранились, а разбор совместимости без них сделать нельзя. "
             "Оплата сохранена — выберите сценарий заново и введите данные партнёра.",
-            reply_markup=back_to_menu(),
+            reply_markup=back_markup,
         )
         return
     else:
@@ -1141,7 +1289,7 @@ async def deliver_report(
         if not profile:
             await message.answer(
                 "Не удалось восстановить данные для отчёта. Выберите сценарий заново.",
-                reply_markup=back_to_menu(),
+                reply_markup=back_markup,
             )
             return
         chart = calculate_chart(
@@ -1152,10 +1300,16 @@ async def deliver_report(
             time_is_approximate=bool(profile["time_is_approximate"]),
         )
         second_chart = None
-    await message.answer(
-        "✅ Оплата получена.\n"
-        "Начинаю формировать ваш персональный разбор. Это займёт несколько секунд."
-    )
+    if admin_mode:
+        await message.answer(
+            "🧪 Админ-режим.\n"
+            "Начинаю формировать полный PDF без оплаты. Это займёт несколько секунд."
+        )
+    else:
+        await message.answer(
+            "✅ Оплата получена.\n"
+            "Начинаю формировать ваш персональный разбор. Это займёт несколько секунд."
+        )
     async with report_status_animation(message) as mark_completed:
         prior_sections = await get_free_generation(user_id, scenario_name)
         content = await generate_report_content(
@@ -1168,8 +1322,10 @@ async def deliver_report(
             await set_order_status(order_id, "report_pending")
             await message.answer(
                 "Не удалось получить проверенный текст отчёта. Оплата сохранена — "
-                "попробуйте сформировать PDF ещё раз.",
-                reply_markup=retry_report_keyboard(order_id),
+                "попробуйте сформировать PDF ещё раз."
+                if not admin_mode
+                else "Не удалось получить текст отчёта. Попробуйте сформировать PDF ещё раз.",
+                reply_markup=retry_report_keyboard(order_id, admin_mode=admin_mode),
             )
             return
         mark_completed()
@@ -1186,15 +1342,18 @@ async def deliver_report(
     await message.answer_document(
         FSInputFile(path),
         caption=f"{NAMES[scenario_name]} · ASTRO MARY",
-        reply_markup=back_to_menu(),
+        reply_markup=back_markup,
     )
     await set_order_status(order_id, "delivered")
 
 
-def retry_report_keyboard(order_id: int):
+def retry_report_keyboard(order_id: int, *, admin_mode: bool = False):
     builder = InlineKeyboardBuilder()
     builder.button(text="🔄 Сформировать PDF повторно", callback_data=f"retry_report:{order_id}")
-    builder.button(text="⬅️ В меню", callback_data="back:menu")
+    if admin_mode:
+        builder.button(text="⬅️ К генерациям", callback_data="admin:generations")
+    else:
+        builder.button(text="⬅️ В меню", callback_data="back:menu")
     builder.adjust(1)
     return builder.as_markup()
 

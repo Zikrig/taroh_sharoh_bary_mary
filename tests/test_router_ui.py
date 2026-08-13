@@ -18,10 +18,12 @@ from handlers.router import (
     PENDING_FREE_REPORT_IDS_BY_USER,
     PRICES,
     SCENARIO_INTROS,
+    admin_generations_menu,
     admin_menu,
     admin_text,
     free_section_keyboard,
     parse_free_section_callback,
+    pdf_offer_keyboard,
     resolve_pending_free_report,
     store_pending_free_report,
 )
@@ -114,6 +116,43 @@ class RouterUiTests(unittest.TestCase):
         )
         self.assertIn("Лимит бесплатных: ВКЛ", text)
         self.assertIn("не больше одного бесплатного мини-разбора в сутки", text)
+        self.assertIn("admin:generations", callbacks)
+
+    def test_admin_generations_menu_mirrors_products_without_stars(self):
+        markup = admin_generations_menu()
+        texts = [button.text for row in markup.inline_keyboard for button in row]
+        callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
+        self.assertEqual(
+            texts[:4],
+            [
+                "🧠 Личность",
+                "❤️ Любовь и отношения",
+                "💰 Деньги и реализация",
+                "💑 Совместимость",
+            ],
+        )
+        self.assertEqual(
+            callbacks[:4],
+            [
+                "admin_scenario:personality",
+                "admin_scenario:love",
+                "admin_scenario:money",
+                "admin_scenario:compatibility",
+            ],
+        )
+        paid = pdf_offer_keyboard("love", admin_mode=False).inline_keyboard[0][0]
+        admin = pdf_offer_keyboard("love", admin_mode=True).inline_keyboard[0][0]
+        self.assertIn("⭐", paid.text)
+        self.assertEqual(paid.callback_data, "buy:love")
+        self.assertNotIn("⭐", admin.text)
+        self.assertEqual(admin.callback_data, "admin_buy:love")
+        report_id = store_pending_free_report(
+            1,
+            "personality",
+            [{"title": "Твой портрет", "content": "текст"}],
+            admin_mode=True,
+        )
+        self.assertTrue(resolve_pending_free_report(1, report_id)["admin_mode"])
 
 
 if __name__ == "__main__":
