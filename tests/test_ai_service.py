@@ -382,9 +382,13 @@ class AiServiceTests(unittest.TestCase):
 
     def test_system_prompt_asks_to_analyze_chart_before_writing(self):
         self.assertIn("Проанализируй всю карту", SYSTEM_PROMPT)
-        self.assertIn("не упоминай астрологию", SYSTEM_PROMPT)
+        self.assertIn("от 0 до 2 упоминаний", SYSTEM_PROMPT)
+        self.assertIn("Ноль — нормально", SYSTEM_PROMPT)
+        self.assertIn("короткие абзацы", SYSTEM_PROMPT)
         self.assertIn("живые, обычные формулировки", SYSTEM_PROMPT)
         self.assertIn("Если раздел можно было бы отправить человеку с совершенно другой картой", SYSTEM_PROMPT)
+        self.assertIn("Не определяй и не подразумевай пол читателя", SYSTEM_PROMPT)
+        self.assertIn("не назначай пол", SYSTEM_PROMPT)
 
     def test_natal_dump_includes_houses_for_the_model(self):
         text = render_natal_dump(chart(), None, "personality_free")
