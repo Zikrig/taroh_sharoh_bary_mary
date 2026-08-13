@@ -10,10 +10,10 @@ if find_spec("swisseph") is None:
     )
 
 from handlers.router import (
-    FREE_DAILY_LIMIT_TEXT,
     FREE_REPORT_TYPES,
     FREE_UPSELL_TEXTS,
     NAMES,
+    PAID_OFFER_TEXTS,
     PENDING_FREE_REPORTS,
     PENDING_FREE_REPORT_IDS_BY_USER,
     PRICES,
@@ -43,6 +43,15 @@ class RouterUiTests(unittest.TestCase):
     def test_current_scenarios_have_intro(self):
         for scenario in ("personality", "love", "compatibility", "money"):
             self.assertIn(scenario, SCENARIO_INTROS)
+            self.assertNotIn("бесплатный", SCENARIO_INTROS[scenario].lower())
+
+    def test_user_offer_requires_paid_pdf(self):
+        self.assertEqual(set(PAID_OFFER_TEXTS), set(PRICES))
+        for text in PAID_OFFER_TEXTS.values():
+            self.assertIn("индивидуально", text)
+        button = pdf_offer_keyboard("personality", admin_mode=False).inline_keyboard[0][0]
+        self.assertIn("⭐", button.text)
+        self.assertEqual(button.callback_data, "buy:personality")
 
     def test_all_scenarios_have_generated_free_reports(self):
         self.assertEqual(set(FREE_REPORT_TYPES), set(PRICES))
@@ -101,9 +110,7 @@ class RouterUiTests(unittest.TestCase):
         bound = resolve_pending_free_report(7, parsed[0])
         self.assertEqual(bound["sections"][parsed[1]]["content"], "первый разбор")
 
-    def test_free_daily_limit_copy_and_admin_toggle_exist(self):
-        self.assertIn("один персональный разбор в сутки", FREE_DAILY_LIMIT_TEXT)
-        self.assertIn("Полный PDF можно открыть сразу", FREE_DAILY_LIMIT_TEXT)
+    def test_free_daily_limit_admin_toggle_exists(self):
         markup = admin_menu(test_mode=False, free_daily_limit=True)
         texts = [button.text for row in markup.inline_keyboard for button in row]
         callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]

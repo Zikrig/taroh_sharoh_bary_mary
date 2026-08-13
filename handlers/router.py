@@ -30,8 +30,6 @@ from database.repository import (
     get_app_setting,
     get_report_context,
     get_test_mode,
-    has_used_free_today,
-    mark_free_used_today,
     save_free_generation,
     save_profile,
     save_report_context,
@@ -78,37 +76,50 @@ FREE_UPSELL_TEXTS = {
         "навыки, блоки и практические рекомендации глубже."
     ),
 }
-FREE_DAILY_LIMIT_TEXT = (
-    "Сегодня бесплатный мини-разбор уже получен.\n\n"
-    "Бесплатно доступен один персональный разбор в сутки.\n"
-    "Полный PDF можно открыть сразу — он строится индивидуально по вашим данным."
-)
+PAID_OFFER_TEXTS = {
+    "personality": (
+        "Разбор личности строится индивидуально по вашим данным рождения.\n\n"
+        "В полном PDF — психологический портрет, отношения, деньги, "
+        "сценарии, блоки и практические рекомендации."
+    ),
+    "love": (
+        "Любовный разбор строится индивидуально по вашим данным рождения.\n\n"
+        "В полном PDF — близость, притяжение, конфликты, ревность, "
+        "сценарии и итоговый любовный портрет."
+    ),
+    "compatibility": (
+        "Разбор совместимости строится индивидуально по данным вашей пары.\n\n"
+        "В полном PDF — динамика, доверие, границы, конфликты "
+        "и способы улучшить отношения."
+    ),
+    "money": (
+        "Денежный разбор строится индивидуально по вашим данным рождения.\n\n"
+        "В полном PDF — отношение к деньгам, карьера, навыки, "
+        "блоки и точки роста."
+    ),
+}
 REPORT_PROGRESS_TEXT = "🔮 Формирую ваш персональный результат"
 SCENARIO_INTROS = {
     "personality": (
         "🧠 РАЗБОР ЛИЧНОСТИ\n\n"
-        "Сначала подготовлю бесплатный мини-разбор по вашим данным — чтобы вы "
-        "почувствовали персональный подход. Затем можно открыть полный разбор "
-        "личности, отношений, денег и точек роста."
+        "Подготовлю персональный разбор по вашим данным рождения. "
+        "Полный PDF раскроет личность, отношения, деньги и точки роста."
     ),
     "love": (
         "❤️ ЛЮБОВЬ И ОТНОШЕНИЯ\n\n"
-        "Сначала подготовлю бесплатный мини-разбор по вашим данным — чтобы вы "
-        "почувствовали персональный подход. Затем можно открыть полный любовный "
-        "портрет с более глубоким разбором близости, конфликтов и сценариев."
+        "Подготовлю персональный любовный разбор по вашим данным рождения. "
+        "Полный PDF раскроет близость, конфликты, сценарии и портрет в отношениях."
     ),
     "compatibility": (
         "💑 СОВМЕСТИМОСТЬ\n\n"
-        "Сначала подготовлю бесплатный мини-разбор по данным вашей пары. "
-        "Затем можно открыть полный PDF с динамикой, доверием, границами и "
-        "конфликтами.\n\n"
+        "Подготовлю разбор совместимости по данным вашей пары. "
+        "Полный PDF раскроет динамику, доверие, границы и конфликты.\n\n"
         "Для анализа понадобятся данные вас и партнёра."
     ),
     "money": (
         "💰 ДЕНЬГИ И РЕАЛИЗАЦИЯ\n\n"
-        "Сначала подготовлю бесплатный мини-разбор по вашим данным — чтобы вы "
-        "почувствовали персональный подход. Затем можно открыть полный разбор "
-        "денег, карьеры, навыков и точек роста."
+        "Подготовлю персональный денежный разбор по вашим данным рождения. "
+        "Полный PDF раскроет деньги, карьеру, навыки и точки роста."
     ),
 }
 
@@ -1059,18 +1070,19 @@ async def show_teaser(
     PENDING_REPORTS[user_id] = (chart, second_chart)
     offer_markup = pdf_offer_keyboard(scenario_name, admin_mode=admin_mode)
 
+    # Regular users pay for generation; only admin keeps the free mini-report path.
+    if not admin_mode:
+        await message.answer(
+            PAID_OFFER_TEXTS.get(
+                scenario_name,
+                "Персональный разбор строится индивидуально по вашим данным.",
+            ),
+            reply_markup=offer_markup,
+        )
+        return
+
     free_report_type = FREE_REPORT_TYPES.get(scenario_name)
     if free_report_type:
-        if (
-            not admin_mode
-            and await get_free_daily_limit_enabled()
-            and await has_used_free_today(user_id)
-        ):
-            await message.answer(
-                FREE_DAILY_LIMIT_TEXT,
-                reply_markup=offer_markup,
-            )
-            return
         await message.answer("Готовлю ваш бесплатный персональный мини-разбор…")
         free_content = None
         async with report_status_animation(message) as mark_completed:
@@ -1086,7 +1098,7 @@ async def show_teaser(
             if not sections:
                 await message.answer(
                     "Не удалось сформировать бесплатный разбор прямо сейчас. "
-                    "Можно сразу открыть полный PDF — он строится индивидуально по вашим данным.",
+                    "Можно сразу открыть полный PDF.",
                     reply_markup=offer_markup,
                 )
                 return
@@ -1094,11 +1106,9 @@ async def show_teaser(
                 user_id,
                 scenario_name,
                 sections,
-                admin_mode=admin_mode,
+                admin_mode=True,
             )
             await save_free_generation(user_id, scenario_name, sections)
-            if not admin_mode:
-                await mark_free_used_today(user_id)
             await message.answer(
                 f"<b>{free_content['title']}</b>\n{free_content['intro']}",
                 parse_mode=ParseMode.HTML,
@@ -1107,7 +1117,7 @@ async def show_teaser(
             return
         await message.answer(
             "Не удалось сформировать бесплатный разбор прямо сейчас. "
-            "Можно сразу открыть полный PDF — он строится индивидуально по вашим данным.",
+            "Можно сразу открыть полный PDF.",
             reply_markup=offer_markup,
         )
         return
