@@ -432,7 +432,9 @@ class AiServiceTests(unittest.TestCase):
 
     def test_editorial_prompt_sends_full_draft_and_asks_to_cut_repeats(self):
         self.assertIn("лёгкая редактура", EDITOR_SYSTEM_PROMPT)
-        self.assertIn("не переписывай абзацы", EDITOR_SYSTEM_PROMPT)
+        self.assertIn("схожих формулировок", EDITOR_SYSTEM_PROMPT)
+        self.assertIn("странно сформулированные", EDITOR_SYSTEM_PROMPT)
+        self.assertIn("не переписывай", EDITOR_SYSTEM_PROMPT)
         draft = format_delimited_sections(
             [
                 {"title": "Твой главный психологический портрет", "content": "Ты быстро включаешься."},
@@ -448,6 +450,8 @@ class AiServiceTests(unittest.TestCase):
         self.assertIn("ПОЛНЫЙ ЧЕРНОВИК", prompt)
         self.assertIn("Ты быстро включаешься и устаёшь от шума.", prompt)
         self.assertIn("лёгкая редактура одним проходом", prompt)
+        self.assertIn("схожих формулировок", prompt)
+        self.assertIn("странно сформулированные", prompt)
         self.assertIn("Верни весь разбор одним сообщением", prompt)
         self.assertIn("Твой главный психологический портрет", prompt)
         self.assertIn("Твой внутренний мир", prompt)
