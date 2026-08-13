@@ -26,9 +26,6 @@ FAILED_BATCH_RETRIES = 2
 PAYLOAD_SAMPLES_DIR = Path("data/payload_samples")
 MAX_CACHED_REPORTS = 128
 MAX_SECTION_SUMMARY_CHARS = 220
-FREE_REPORT_TYPES = frozenset(
-    {"personality_free", "love_free", "compatibility_free", "money_free"}
-)
 
 # Kept for maintenance scripts that still import these names.
 SECTION_RULES: dict[str, Any] = {}
@@ -397,7 +394,7 @@ def build_user_prompt(
     titles: list[str],
     covered: list[dict[str, str]] | None = None,
 ) -> str:
-    batch = report_type not in FREE_REPORT_TYPES
+    batch = True
     parts = [
         natal_text,
         product_prompt_for_titles(report_type, titles),
@@ -696,7 +693,7 @@ async def _request_delimited_sections(
 async def generate_report_content(
     report_type: str, chart: dict, second_chart: dict | None = None
 ) -> dict[str, Any] | None:
-    """Generate a free report in one request; paid reports in waves of five sections."""
+    """Generate the report in waves of five sections and split each reply by =====."""
     if not settings.ai_api_key:
         return None
     try:
@@ -714,17 +711,13 @@ async def generate_report_content(
             max_retries=0,
         )
         titles = catalog_titles(report_type)
-        batches = (
-            [titles]
-            if report_type in FREE_REPORT_TYPES
-            else section_title_batches(titles, PAID_SECTION_BATCH)
-        )
+        batches = section_title_batches(titles, PAID_SECTION_BATCH)
         allowed_facts = payload["allowed_facts"]
         natal_text = payload["natal_text"]
         collected: list[dict[str, Any]] = []
         covered: list[dict[str, str]] = []
         for index, batch_titles in enumerate(batches, start=1):
-            wave_id = "full" if report_type in FREE_REPORT_TYPES else f"wave{index:02d}"
+            wave_id = f"wave{index:02d}"
             user_prompt = build_user_prompt(
                 report_type,
                 natal_text,

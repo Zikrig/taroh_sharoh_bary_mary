@@ -148,7 +148,7 @@ class AiServiceTests(unittest.TestCase):
         self.assertNotIn("section_role", prompt)
         self.assertNotIn("topic_priorities", prompt)
 
-    def test_personality_free_payload_is_one_shot(self):
+    def test_personality_free_payload_has_all_catalog_sections(self):
         payload = build_prompt_payload("personality_free", chart(), None)
         self.assertEqual(len(payload["sections"]), 11)
         self.assertIn("СОЗДАЙ БЕСПЛАТНЫЙ ПЕРСОНАЛЬНЫЙ РАЗБОР", payload["user_prompt"])
@@ -216,6 +216,14 @@ class AiServiceTests(unittest.TestCase):
         )
         self.assertIsNone(parsed)
         self.assertIn("Какой ты человек", rejection)
+
+    def test_parses_a_single_leftover_section(self):
+        parsed, rejection = parse_delimited_sections(
+            f"{SECTION_DELIMITER}\nЭто только верхний слой\n{SECTION_DELIMITER}\nКороткий финал.",
+            ["Это только верхний слой"],
+        )
+        self.assertIsNone(rejection)
+        self.assertEqual(parsed[0]["content"], "Короткий финал.")
 
     def test_validates_plain_text_and_assigns_application_references(self):
         section = {
@@ -316,9 +324,14 @@ class AiServiceTests(unittest.TestCase):
     def test_paid_sections_are_batched_by_five(self):
         personality = catalog_titles("personality")
         love = catalog_titles("love")
+        free = catalog_titles("personality_free")
         batches = section_title_batches(personality, PAID_SECTION_BATCH)
         self.assertEqual([len(batch) for batch in batches], [5, 5, 5, 5])
         self.assertEqual(section_title_batches(love, PAID_SECTION_BATCH)[-1], love[15:])
+        self.assertEqual(
+            [len(batch) for batch in section_title_batches(free, PAID_SECTION_BATCH)],
+            [5, 5, 1],
+        )
 
     def test_paid_batch_prompt_keeps_only_requested_section_instructions(self):
         titles = catalog_titles("personality")[:5]
@@ -329,6 +342,14 @@ class AiServiceTests(unittest.TestCase):
         self.assertNotIn("ПРАКТИЧЕСКИЕ РЕКОМЕНДАЦИИ", prompt)
         self.assertNotIn("ПРОФЕССИОНАЛЬНЫЕ НАПРАВЛЕНИЯ", prompt)
         self.assertIn("ТОЛЬКО эти разделы", prompt)
+
+    def test_free_batch_prompt_excludes_later_sections(self):
+        titles = catalog_titles("personality_free")[:5]
+        prompt = product_prompt_for_titles("personality_free", titles)
+        self.assertIn("PERSONALITY_FREE", prompt)
+        self.assertIn("ТВОЙ ПОРТРЕТ", prompt)
+        self.assertNotIn("5 ФРАЗ", prompt)
+        self.assertNotIn("ЭТО ТОЛЬКО ВЕРХНИЙ СЛОЙ", prompt)
 
     def test_paid_user_prompt_includes_covered_sections(self):
         titles = catalog_titles("personality")[5:10]
