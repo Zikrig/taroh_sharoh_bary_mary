@@ -28,8 +28,12 @@ from services.ai import (
     catalog_titles,
     parse_delimited_sections,
     planned_generation_steps,
-    progress_percent,
     render_natal_dump,
+)
+from services.generation_progress import (
+    TaskProgress,
+    displayed_percent,
+    format_progress_percent,
 )
 from services.astro import local_time_to_utc
 from services.prompt_guides.career import build_career_hints
@@ -361,14 +365,28 @@ class AiServiceTests(unittest.TestCase):
         self.assertIn("ТОЛЬКО раздел «Твой главный психологический портрет»", one)
         self.assertNotIn("ПРАКТИЧЕСКИЕ РЕКОМЕНДАЦИИ", one)
 
-    def test_progress_tracks_completed_ai_calls(self):
-        # 20 section waves + 1 editorial pass.
+    def test_progress_tracks_active_and_finished_task_weights(self):
         self.assertEqual(planned_generation_steps("personality"), 21)
-        self.assertEqual(progress_percent(0, 21), 0)
-        self.assertEqual(progress_percent(1, 21), 5)
-        self.assertEqual(progress_percent(21, 21), 100)
-        self.assertEqual(planned_generation_steps("personality_free"), 3)
-        self.assertEqual(progress_percent(1, 3), 33)
+        t0 = 1_000.0
+        two_active = [
+            TaskProgress(started_at=t0),
+            TaskProgress(started_at=t0),
+        ]
+        self.assertAlmostEqual(displayed_percent(20, two_active, t0), 0.0)
+        self.assertAlmostEqual(displayed_percent(20, two_active, t0 + 15), 2.5)
+        self.assertAlmostEqual(displayed_percent(20, two_active, t0 + 30), 5.0)
+        self.assertAlmostEqual(displayed_percent(20, two_active, t0 + 60), 5.0)
+
+        one_done_one_active = [
+            TaskProgress(started_at=t0, finishing_at=t0 + 30, finish_from=0.5),
+            TaskProgress(started_at=t0),
+        ]
+        self.assertAlmostEqual(
+            displayed_percent(20, one_done_one_active, t0 + 40),
+            7.5,
+        )
+        self.assertEqual(format_progress_percent(7.5), "7.5%")
+        self.assertEqual(format_progress_percent(5.0), "5%")
 
     def test_aitunnel_503_is_retryable(self):
         error = type("InternalServerError", (Exception,), {})("503 worker")

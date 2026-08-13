@@ -11,7 +11,13 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, FSInputFile, LabeledPrice, Message, User
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from services.ai import generate_report_content, get_aitunnel_balance, progress_percent
+from services.ai import generate_report_content, get_aitunnel_balance
+from services.generation_progress import (
+    TaskProgress,
+    active_fraction,
+    displayed_percent,
+    format_progress_percent,
+)
 from services.astro import (
     calculate_chart,
     geocode,
@@ -1266,7 +1272,7 @@ async def show_teaser(
                 free_report_type,
                 chart,
                 second_chart,
-                on_progress=status.set_progress,
+                progress=status,
             )
             if free_content:
                 status.mark_completed()
@@ -1540,7 +1546,7 @@ async def deliver_report(
             chart,
             second_chart,
             prior_sections=prior_sections,
-            on_progress=status.set_progress,
+            progress=status,
         )
         if content is None:
             await set_order_status(order_id, "report_pending")
@@ -1635,16 +1641,73 @@ class ReportStatusSession:
     def __init__(self, status_message: Message):
         self.status_message = status_message
         self.completed = False
+        self.total = 0
+        self.tasks: list[TaskProgress] = []
+        self._lock = asyncio.Lock()
+        self._stop = asyncio.Event()
         self._last_text: str | None = None
+        self._animation: asyncio.Task | None = None
 
-    async def set_progress(self, done: int, total: int) -> None:
-        percent = progress_percent(done, total)
-        text = f"{REPORT_PROGRESS_TEXT}… {percent}%"
+    async def configure(self, total: int) -> None:
+        async with self._lock:
+            self.total = max(0, int(total))
+            self.tasks.clear()
+
+    async def start_step(self) -> None:
+        async with self._lock:
+            self.tasks.append(TaskProgress(started_at=asyncio.get_running_loop().time()))
+
+    async def finish_step(self) -> None:
+        async with self._lock:
+            now = asyncio.get_running_loop().time()
+            for task in self.tasks:
+                if task.finishing_at is None:
+                    task.finish_from = active_fraction(now - task.started_at)
+                    task.finishing_at = now
+                    break
+
+    async def fail_step(self) -> None:
+        async with self._lock:
+            for index in range(len(self.tasks) - 1, -1, -1):
+                if self.tasks[index].finishing_at is None:
+                    self.tasks.pop(index)
+                    break
+
+    def current_percent(self) -> float:
+        return displayed_percent(
+            self.total,
+            self.tasks,
+            asyncio.get_running_loop().time(),
+        )
+
+    async def _publish(self) -> None:
+        text = f"{REPORT_PROGRESS_TEXT}… {format_progress_percent(self.current_percent())}"
         if text == self._last_text:
             return
         self._last_text = text
         with suppress(Exception):
             await self.status_message.edit_text(text)
+
+    async def _animation_loop(self) -> None:
+        while not self._stop.is_set():
+            await self._publish()
+            try:
+                await asyncio.wait_for(self._stop.wait(), timeout=0.4)
+            except asyncio.TimeoutError:
+                continue
+
+    def start_animation(self) -> None:
+        self._animation = asyncio.create_task(self._animation_loop())
+
+    async def stop_animation(self) -> None:
+        self._stop.set()
+        if self._animation is not None:
+            with suppress(asyncio.CancelledError):
+                await self._animation
+            self._animation = None
+        if self.completed:
+            with suppress(Exception):
+                await self.status_message.edit_text(f"{REPORT_PROGRESS_TEXT}… 100%")
 
     def mark_completed(self) -> None:
         self.completed = True
@@ -1654,9 +1717,11 @@ class ReportStatusSession:
 async def report_status_animation(message: Message):
     status_message = await message.answer(f"{REPORT_PROGRESS_TEXT}… 0%")
     session = ReportStatusSession(status_message)
+    session.start_animation()
     try:
         yield session
     finally:
+        await session.stop_animation()
         with suppress(Exception):
             await status_message.delete()
 

@@ -2,11 +2,10 @@ import asyncio
 import json
 import logging
 import re
-from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
 from hashlib import sha1
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 from uuid import uuid4
 
 from services.astro import SIGNS, calculate_synastry
@@ -34,7 +33,16 @@ RETRYABLE_HTTP_STATUSES = {408, 409, 425, 429, 500, 502, 503, 504}
 PAYLOAD_SAMPLES_DIR = Path("data/payload_samples")
 MAX_CACHED_REPORTS = 128
 MAX_SECTION_SUMMARY_CHARS = 220
-ProgressCallback = Callable[[int, int], Awaitable[None]]
+
+
+class GenerationProgress(Protocol):
+    async def configure(self, total: int) -> None: ...
+
+    async def start_step(self) -> None: ...
+
+    async def finish_step(self) -> None: ...
+
+    async def fail_step(self) -> None: ...
 
 # Kept for maintenance scripts that still import these names.
 SECTION_RULES: dict[str, Any] = {}
@@ -159,12 +167,6 @@ def planned_generation_steps(report_type: str) -> int:
         return waves
     # Paid reports get one editorial pass after all section waves.
     return waves + 1
-
-
-def progress_percent(done: int, total: int) -> int:
-    if total <= 0:
-        return 0
-    return min(100, max(0, round(100 * done / total)))
 
 
 def _safe_path_part(value: str) -> str:
@@ -811,7 +813,7 @@ async def generate_report_content(
     second_chart: dict | None = None,
     *,
     prior_sections: list[dict[str, str]] | None = None,
-    on_progress: ProgressCallback | None = None,
+    progress: GenerationProgress | None = None,
 ) -> dict[str, Any] | None:
     """Generate the report in batches and split each reply by =====."""
     if not settings.ai_api_key:
@@ -833,8 +835,10 @@ async def generate_report_content(
         cache_key = _report_cache_key(report_type, payload["natal_text"] + "\n" + prior_blob)
         cached = _REPORT_CACHE.get(cache_key)
         if cached:
-            if on_progress is not None:
-                await on_progress(1, 1)
+            if progress is not None:
+                await progress.configure(1)
+                await progress.start_step()
+                await progress.finish_step()
             return cached
         client = AsyncOpenAI(
             api_key=settings.ai_api_key,
@@ -844,16 +848,8 @@ async def generate_report_content(
         )
         titles = catalog_titles(report_type)
         batches = section_title_batches(titles, _section_batch_size(report_type))
-        total_steps = planned_generation_steps(report_type)
-        done_steps = 0
-        if on_progress is not None:
-            await on_progress(done_steps, total_steps)
-
-        async def _mark_step_done() -> None:
-            nonlocal done_steps
-            done_steps += 1
-            if on_progress is not None:
-                await on_progress(done_steps, total_steps)
+        if progress is not None:
+            await progress.configure(planned_generation_steps(report_type))
 
         allowed_facts = payload["allowed_facts"]
         natal_text = payload["natal_text"]
@@ -868,6 +864,8 @@ async def generate_report_content(
                 covered,
                 prior_sections,
             )
+            if progress is not None:
+                await progress.start_step()
             validated = await _request_delimited_sections(
                 client,
                 report_type=report_type,
@@ -877,7 +875,11 @@ async def generate_report_content(
                 wave_id=wave_id,
             )
             if validated is None:
+                if progress is not None:
+                    await progress.fail_step()
                 return None
+            if progress is not None:
+                await progress.finish_step()
             collected.extend(validated)
             covered.extend(
                 {
@@ -886,15 +888,17 @@ async def generate_report_content(
                 }
                 for item in validated
             )
-            await _mark_step_done()
         if collected and not str(report_type).endswith("_free"):
+            if progress is not None:
+                await progress.start_step()
             collected = await _edit_paid_sections(
                 client,
                 report_type=report_type,
                 sections=collected,
                 allowed_facts=allowed_facts,
             )
-            await _mark_step_done()
+            if progress is not None:
+                await progress.finish_step()
         title, intro = _report_shell(report_type)
         result = {
             "title": title,
