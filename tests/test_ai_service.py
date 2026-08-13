@@ -17,9 +17,11 @@ from tempfile import TemporaryDirectory
 from services.ai import (
     SYSTEM_PROMPT,
     _is_degenerate_section_text,
+    _is_retryable_api_error,
     _payload_sample_attempt_dir,
     _save_request_transcript,
     _save_response_transcript,
+    _section_batch_size,
     _validate_section,
     build_prompt_payload,
     build_user_prompt,
@@ -30,6 +32,7 @@ from services.ai import (
 from services.astro import local_time_to_utc
 from services.prompt_guides.career import build_career_hints
 from services.report_prompts import (
+    FREE_SECTION_BATCH,
     PAID_SECTION_BATCH,
     PRODUCT_PROMPTS,
     SECTION_DELIMITER,
@@ -334,17 +337,31 @@ class AiServiceTests(unittest.TestCase):
         self.assertEqual(payload["sections"][0]["title"], "Как ты влюбляешься")
         self.assertIn("LOVE_FULL", payload["user_prompt"])
 
-    def test_paid_sections_are_batched_by_five(self):
+    def test_paid_sections_are_generated_one_by_one(self):
         personality = catalog_titles("personality")
         love = catalog_titles("love")
         free = catalog_titles("personality_free")
+        self.assertEqual(_section_batch_size("personality"), 1)
+        self.assertEqual(_section_batch_size("love"), PAID_SECTION_BATCH)
+        self.assertEqual(_section_batch_size("personality_free"), FREE_SECTION_BATCH)
         batches = section_title_batches(personality, PAID_SECTION_BATCH)
-        self.assertEqual([len(batch) for batch in batches], [5, 5, 5, 5])
-        self.assertEqual(section_title_batches(love, PAID_SECTION_BATCH)[-1], love[15:])
+        self.assertEqual(len(batches), 20)
+        self.assertTrue(all(len(batch) == 1 for batch in batches))
+        self.assertEqual(section_title_batches(love, PAID_SECTION_BATCH)[-1], love[-1:])
         self.assertEqual(
-            [len(batch) for batch in section_title_batches(free, PAID_SECTION_BATCH)],
+            [len(batch) for batch in section_title_batches(free, FREE_SECTION_BATCH)],
             [5, 5, 1],
         )
+        one = product_prompt_for_titles("personality", personality[:1])
+        self.assertIn("ТОЛЬКО раздел «Твой главный психологический портрет»", one)
+        self.assertNotIn("ПРАКТИЧЕСКИЕ РЕКОМЕНДАЦИИ", one)
+
+    def test_aitunnel_503_is_retryable(self):
+        error = type("InternalServerError", (Exception,), {})("503 worker")
+        error.status_code = 503
+        self.assertTrue(_is_retryable_api_error(error))
+        self.assertTrue(_is_retryable_api_error(TimeoutError("timed out")))
+        self.assertFalse(_is_retryable_api_error(ValueError("bad json")))
 
     def test_paid_batch_prompt_keeps_only_requested_section_instructions(self):
         titles = catalog_titles("personality")[:5]

@@ -11,7 +11,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, FSInputFile, LabeledPrice, Message, User
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from services.ai import AI_TIMEOUT_SECONDS, generate_report_content, get_aitunnel_balance
+from services.ai import generate_report_content, get_aitunnel_balance
 from services.astro import (
     calculate_chart,
     geocode,
@@ -1173,14 +1173,9 @@ async def get_profile_photo(message: Message, user_id: int):
 
 async def _report_progress(status_message: Message, finished: asyncio.Event) -> None:
     progress = 0.0
-    deadline = asyncio.get_running_loop().time() + AI_TIMEOUT_SECONDS * 1.2
 
     while not finished.is_set():
-        remaining = deadline - asyncio.get_running_loop().time()
-        if remaining <= 0:
-            progress = 99.9
-            break
-        pause = min(uniform(0.4, 15.0), remaining)
+        pause = uniform(0.4, 15.0)
         try:
             await asyncio.wait_for(finished.wait(), timeout=pause)
             break

@@ -3,7 +3,8 @@
 import re
 
 SECTION_DELIMITER = "====="
-PAID_SECTION_BATCH = 5
+FREE_SECTION_BATCH = 5
+PAID_SECTION_BATCH = 1
 FREE_SECTION_MIN_WORDS = 100
 FREE_SECTION_MAX_WORDS = 250
 _HEADER_SPLIT = re.compile(r"(?m)^={5,}\s*$")
@@ -987,10 +988,16 @@ def product_prompt_for_titles(report_type: str, titles: list[str]) -> str:
                 volume + note,
             ]
         )
-    only = (
-        "Сейчас напиши ТОЛЬКО эти разделы. Остальные разделы этого продукта не пиши.\n"
-        "Не переноси общий объём всего отчёта на эту пачку: каждый раздел ограничен своим лимитом слов."
-    )
+    if len(titles) == 1:
+        only = (
+            f"Сейчас напиши ТОЛЬКО раздел «{titles[0]}». Остальные разделы этого продукта не пиши.\n"
+            "Не переноси общий объём всего отчёта на этот раздел: он ограничен своим лимитом слов."
+        )
+    else:
+        only = (
+            "Сейчас напиши ТОЛЬКО эти разделы. Остальные разделы этого продукта не пиши.\n"
+            "Не переноси общий объём всего отчёта на эту пачку: каждый раздел ограничен своим лимитом слов."
+        )
     if len(selected) != len(titles):
         return "\n\n".join([full, only])
     ordered = [selected[title] for title in titles]
@@ -1009,11 +1016,12 @@ def output_format_block(
 ) -> str:
     listed = "\n".join(f"- {title}" for title in titles)
     example = titles[0] if titles else "Название раздела"
-    scope = (
-        "Верни только эти разделы одним сообщением."
-        if batch
-        else "Верни весь разбор одним сообщением."
-    )
+    if len(titles) == 1:
+        scope = "Верни только этот раздел одним сообщением."
+    elif batch:
+        scope = "Верни только эти разделы одним сообщением."
+    else:
+        scope = "Верни весь разбор одним сообщением."
     limits = ""
     if report_type and titles:
         rows = "\n".join(

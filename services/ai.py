@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import re
@@ -10,6 +11,7 @@ from uuid import uuid4
 from services.astro import SIGNS, calculate_synastry
 from config.settings import settings
 from services.report_prompts import (
+    FREE_SECTION_BATCH,
     PAID_SECTION_BATCH,
     PRODUCT_PROMPTS,
     SECTION_DELIMITER,
@@ -23,6 +25,8 @@ from services.reports_new import SECTIONS
 logger = logging.getLogger(__name__)
 AI_TIMEOUT_SECONDS = 360.0
 FAILED_BATCH_RETRIES = 2
+RETRY_BACKOFF_SECONDS = (2.0, 6.0, 12.0)
+RETRYABLE_HTTP_STATUSES = {408, 409, 425, 429, 500, 502, 503, 504}
 PAYLOAD_SAMPLES_DIR = Path("data/payload_samples")
 MAX_CACHED_REPORTS = 128
 MAX_SECTION_SUMMARY_CHARS = 220
@@ -108,6 +112,38 @@ def _is_timeout_error(error: BaseException) -> bool:
     if name in {"TimeoutError", "APITimeoutError", "ReadTimeout", "ConnectTimeout", "WriteTimeout", "PoolTimeout"}:
         return True
     return "timeout" in str(error).lower()
+
+
+def _http_status(error: BaseException) -> int | None:
+    status = getattr(error, "status_code", None)
+    if isinstance(status, int):
+        return status
+    response = getattr(error, "response", None)
+    status = getattr(response, "status_code", None)
+    return status if isinstance(status, int) else None
+
+
+def _is_retryable_api_error(error: BaseException) -> bool:
+    if _is_timeout_error(error) or isinstance(error, (TimeoutError, ConnectionError)):
+        return True
+    name = type(error).__name__
+    if name in {
+        "APIConnectionError",
+        "APITimeoutError",
+        "RateLimitError",
+        "InternalServerError",
+        "APIStatusError",
+    }:
+        status = _http_status(error)
+        if status is None:
+            return True
+        return status in RETRYABLE_HTTP_STATUSES or status >= 500
+    status = _http_status(error)
+    return status in RETRYABLE_HTTP_STATUSES
+
+
+def _section_batch_size(report_type: str) -> int:
+    return FREE_SECTION_BATCH if str(report_type).endswith("_free") else PAID_SECTION_BATCH
 
 
 def _safe_path_part(value: str) -> str:
@@ -640,7 +676,7 @@ async def _request_delimited_sections(
                 frequency_penalty=settings.ai_frequency_penalty,
             )
         except Exception as error:
-            if _is_timeout_error(error) or isinstance(error, (TimeoutError, ValueError)):
+            if _is_retryable_api_error(error) or isinstance(error, ValueError):
                 logger.warning(
                     "Не удалось получить отчёт «%s» (%s), попытка %s: %s",
                     report_type,
@@ -648,7 +684,9 @@ async def _request_delimited_sections(
                     attempt + 1,
                     error,
                 )
-                rejection = str(error)
+                if attempt < FAILED_BATCH_RETRIES:
+                    delay = RETRY_BACKOFF_SECONDS[min(attempt, len(RETRY_BACKOFF_SECONDS) - 1)]
+                    await asyncio.sleep(delay)
                 continue
             logger.exception(
                 "Неожиданная ошибка при генерации отчёта «%s» (%s)",
@@ -693,7 +731,7 @@ async def _request_delimited_sections(
 async def generate_report_content(
     report_type: str, chart: dict, second_chart: dict | None = None
 ) -> dict[str, Any] | None:
-    """Generate the report in waves of five sections and split each reply by =====."""
+    """Generate the report in batches and split each reply by =====."""
     if not settings.ai_api_key:
         return None
     try:
@@ -711,7 +749,7 @@ async def generate_report_content(
             max_retries=0,
         )
         titles = catalog_titles(report_type)
-        batches = section_title_batches(titles, PAID_SECTION_BATCH)
+        batches = section_title_batches(titles, _section_batch_size(report_type))
         allowed_facts = payload["allowed_facts"]
         natal_text = payload["natal_text"]
         collected: list[dict[str, Any]] = []
