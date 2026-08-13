@@ -1,4 +1,5 @@
 import asyncio
+import secrets
 from contextlib import asynccontextmanager, suppress
 from random import uniform
 
@@ -44,8 +45,9 @@ NAMES = {
     "money": "Деньги и реализация",
 }
 PENDING_REPORTS: dict[int, tuple[dict, dict | None]] = {}
-PENDING_FREE_SECTIONS: dict[int, list[dict[str, str]]] = {}
-PENDING_FREE_SCENARIO: dict[int, str] = {}
+MAX_PENDING_FREE_REPORTS_PER_USER = 8
+PENDING_FREE_REPORTS: dict[str, dict] = {}
+PENDING_FREE_REPORT_IDS_BY_USER: dict[int, list[str]] = {}
 FREE_REPORT_TYPES = {
     "personality": "personality_free",
     "love": "love_free",
@@ -160,11 +162,60 @@ def back_to_edit_profile():
     return back_keyboard("edit_profile")
 
 
-def free_section_keyboard(title: str, section_index: int):
+def store_pending_free_report(
+    user_id: int,
+    scenario_name: str,
+    sections: list[dict[str, str]],
+) -> str:
+    report_id = secrets.token_hex(4)
+    PENDING_FREE_REPORTS[report_id] = {
+        "id": report_id,
+        "user_id": user_id,
+        "scenario": scenario_name,
+        "sections": sections,
+    }
+    ids = PENDING_FREE_REPORT_IDS_BY_USER.setdefault(user_id, [])
+    ids.append(report_id)
+    while len(ids) > MAX_PENDING_FREE_REPORTS_PER_USER:
+        PENDING_FREE_REPORTS.pop(ids.pop(0), None)
+    return report_id
+
+
+def get_pending_free_report(user_id: int, report_id: str) -> dict | None:
+    record = PENDING_FREE_REPORTS.get(report_id)
+    if not record or record["user_id"] != user_id:
+        return None
+    return record
+
+
+def parse_free_section_callback(data: str) -> tuple[str | None, int] | None:
+    if not data.startswith("free_section:"):
+        return None
+    parts = data.split(":")
+    try:
+        if len(parts) == 2:
+            return None, int(parts[1])
+        if len(parts) == 3 and parts[1]:
+            return parts[1], int(parts[2])
+    except ValueError:
+        return None
+    return None
+
+
+def resolve_pending_free_report(user_id: int, report_id: str | None) -> dict | None:
+    if report_id:
+        return get_pending_free_report(user_id, report_id)
+    ids = PENDING_FREE_REPORT_IDS_BY_USER.get(user_id) or []
+    if not ids:
+        return None
+    return get_pending_free_report(user_id, ids[-1])
+
+
+def free_section_keyboard(title: str, report_id: str, section_index: int):
     builder = InlineKeyboardBuilder()
     builder.button(
         text=f"Посмотреть раздел «{title}»",
-        callback_data=f"free_section:{section_index}",
+        callback_data=f"free_section:{report_id}:{section_index}",
     )
     return builder.as_markup()
 
@@ -868,12 +919,11 @@ async def show_teaser(
                     reply_markup=builder.as_markup(),
                 )
                 return
-            PENDING_FREE_SECTIONS[user_id] = sections
-            PENDING_FREE_SCENARIO[user_id] = scenario_name
+            report_id = store_pending_free_report(user_id, scenario_name, sections)
             await message.answer(
                 f"<b>{free_content['title']}</b>\n{free_content['intro']}",
                 parse_mode=ParseMode.HTML,
-                reply_markup=free_section_keyboard(sections[0]["title"], 0),
+                reply_markup=free_section_keyboard(sections[0]["title"], report_id, 0),
             )
             return
         await message.answer(
@@ -893,15 +943,14 @@ async def show_teaser(
 
 @router.callback_query(F.data.startswith("free_section:"))
 async def show_free_section(callback: CallbackQuery):
-    _, _, index_text = callback.data.partition(":")
-    try:
-        section_index = int(index_text)
-    except ValueError:
+    parsed = parse_free_section_callback(callback.data or "")
+    if parsed is None:
         await callback.answer("Раздел недоступен", show_alert=True)
         return
-
-    sections = PENDING_FREE_SECTIONS.get(callback.from_user.id)
-    if not sections or not 0 <= section_index < len(sections):
+    report_id, section_index = parsed
+    record = resolve_pending_free_report(callback.from_user.id, report_id)
+    sections = record["sections"] if record else None
+    if not record or not sections or not 0 <= section_index < len(sections):
         await callback.answer("Этот бесплатный разбор больше недоступен. Запустите новый.", show_alert=True)
         return
 
@@ -914,16 +963,18 @@ async def show_free_section(callback: CallbackQuery):
     next_index = section_index + 1
     reply_markup = None
     if next_index < len(sections):
-        reply_markup = free_section_keyboard(sections[next_index]["title"], next_index)
-    else:
-        PENDING_FREE_SECTIONS.pop(callback.from_user.id, None)
-        scenario_name = PENDING_FREE_SCENARIO.pop(callback.from_user.id, "personality")
+        reply_markup = free_section_keyboard(
+            sections[next_index]["title"],
+            record["id"],
+            next_index,
+        )
 
     with suppress(Exception):
         await callback.message.edit_reply_markup(reply_markup=None)
     await callback.message.answer(text, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
 
     if next_index == len(sections):
+        scenario_name = record.get("scenario") or "personality"
         builder = InlineKeyboardBuilder()
         builder.button(
             text=f"🔓 Получить полный PDF · {PRICES[scenario_name]}⭐",
