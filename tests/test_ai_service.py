@@ -403,6 +403,7 @@ class AiServiceTests(unittest.TestCase):
         self.assertIn("Ноль — нормально", SYSTEM_PROMPT)
         self.assertIn("короткие абзацы", SYSTEM_PROMPT)
         self.assertIn("живые, обычные формулировки", SYSTEM_PROMPT)
+        self.assertIn("это не про А — это про Б", SYSTEM_PROMPT)
         self.assertIn("Если раздел можно было бы отправить человеку с совершенно другой картой", SYSTEM_PROMPT)
         self.assertIn("Не определяй и не подразумевай пол читателя", SYSTEM_PROMPT)
         self.assertIn("не назначай пол", SYSTEM_PROMPT)
