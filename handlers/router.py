@@ -598,8 +598,7 @@ async def cancel_price_edit(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.answer("Изменение отменено")
     prices = await get_report_prices()
-    await _edit_or_answer(
-        callback.message,
+    await callback.message.answer(
         prices_settings_message(prices),
         reply_markup=await prices_settings_menu(),
     )
@@ -680,8 +679,7 @@ async def cancel_model_edit(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.answer("Изменение отменено")
     models = await get_ai_models()
-    await _edit_or_answer(
-        callback.message,
+    await callback.message.answer(
         models_settings_message(models),
         reply_markup=await models_settings_menu(),
     )
@@ -733,7 +731,7 @@ async def back_to_admin(callback: CallbackQuery):
         await callback.answer("Нет доступа", show_alert=True)
         return
     await callback.answer()
-    await _refresh_admin_panel(callback.message)
+    await _refresh_admin_panel(callback.message, answer_text="ok")
 
 
 @router.callback_query(F.data == "admin:generations")
@@ -743,8 +741,7 @@ async def open_admin_generations(callback: CallbackQuery, state: FSMContext):
         return
     await state.clear()
     await callback.answer()
-    await _edit_or_answer(
-        callback.message,
+    await callback.message.answer(
         admin_generations_text(),
         reply_markup=admin_generations_menu(),
     )
@@ -843,8 +840,7 @@ async def cancel_main_menu_text_edit(callback: CallbackQuery, state: FSMContext)
         return
     await state.clear()
     await callback.answer("Изменение отменено")
-    await _edit_or_answer(
-        callback.message,
+    await callback.message.answer(
         text_settings_message(),
         reply_markup=text_settings_menu(),
     )
@@ -890,8 +886,7 @@ async def cancel_share_text_edit(callback: CallbackQuery, state: FSMContext):
         return
     await state.clear()
     await callback.answer("Изменение отменено")
-    await _edit_or_answer(
-        callback.message,
+    await callback.message.answer(
         text_settings_message(),
         reply_markup=text_settings_menu(),
     )
@@ -922,8 +917,7 @@ async def cancel_support_text_edit(callback: CallbackQuery, state: FSMContext):
         return
     await state.clear()
     await callback.answer("Изменение отменено")
-    await _edit_or_answer(
-        callback.message,
+    await callback.message.answer(
         text_settings_message(),
         reply_markup=text_settings_menu(),
     )
