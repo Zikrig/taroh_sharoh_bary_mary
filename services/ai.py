@@ -237,12 +237,37 @@ def _section_batch_size(report_type: str) -> int:
     return FREE_SECTION_BATCH if str(report_type).endswith("_free") else PAID_SECTION_BATCH
 
 
+REVIEW_PROGRESS_STEPS = 5
+PAID_REVIEW_WAVES = 3
+
+
 def planned_generation_steps(report_type: str) -> int:
-    """How many successful AI calls are planned for this report type."""
+    """Generation waves plus a heavier final-review weight."""
     titles = catalog_titles(report_type)
     waves = len(section_title_batches(titles, _section_batch_size(report_type)))
-    # Final review pass for both free and paid reports.
-    return waves + 1
+    return waves + REVIEW_PROGRESS_STEPS
+
+
+def split_into_parts(items: list[Any], parts: int) -> list[list[Any]]:
+    if not items:
+        return []
+    count = max(1, min(int(parts), len(items)))
+    size = len(items)
+    base, extra = divmod(size, count)
+    batches: list[list[Any]] = []
+    index = 0
+    for wave in range(count):
+        take = base + (1 if wave < extra else 0)
+        batches.append(items[index:index + take])
+        index += take
+    return [batch for batch in batches if batch]
+
+
+def _review_progress_alloc(wave_count: int, step_count: int = REVIEW_PROGRESS_STEPS) -> list[int]:
+    waves = max(1, int(wave_count))
+    steps = max(waves, int(step_count))
+    base, extra = divmod(steps, waves)
+    return [base + (1 if index < extra else 0) for index in range(waves)]
 
 
 def _safe_path_part(value: str) -> str:
@@ -858,6 +883,55 @@ async def _request_delimited_sections(
     return None
 
 
+def _merge_reviewed_sections(
+    original: list[dict[str, Any]],
+    edited: list[dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    if not edited:
+        return original
+    by_title = _sections_by_title(edited)
+    merged: list[dict[str, Any]] = []
+    for item in original:
+        title = str(item.get("title") or "").strip()
+        merged.append(by_title.get(title, item))
+    return merged
+
+
+async def _review_section_batch(
+    client: Any,
+    *,
+    report_type: str,
+    all_sections: list[dict[str, Any]],
+    batch: list[dict[str, Any]],
+    allowed_facts: list[str],
+    model: str,
+    wave_id: str,
+    usage_ledger: UsageLedger | None = None,
+) -> list[dict[str, Any]] | None:
+    all_titles = [str(item.get("title") or "") for item in all_sections if item.get("title")]
+    batch_titles = [str(item.get("title") or "") for item in batch if item.get("title")]
+    if not batch_titles:
+        return []
+    user_prompt = build_editorial_prompt(
+        format_delimited_sections(all_sections),
+        all_titles,
+        report_type=report_type,
+        edit_titles=batch_titles,
+    )
+    return await _request_delimited_sections(
+        client,
+        report_type=report_type,
+        titles=batch_titles,
+        user_prompt=user_prompt,
+        allowed_facts=allowed_facts,
+        wave_id=wave_id,
+        model=model,
+        system_prompt=EDITOR_SYSTEM_PROMPT,
+        usage_ledger=usage_ledger,
+        usage_phase="review",
+    )
+
+
 async def _review_sections(
     client: Any,
     *,
@@ -866,31 +940,48 @@ async def _review_sections(
     allowed_facts: list[str],
     model: str,
     usage_ledger: UsageLedger | None = None,
+    progress: GenerationProgress | None = None,
 ) -> list[dict[str, Any]]:
     titles = [str(item.get("title") or "") for item in sections if item.get("title")]
     if not titles:
         return sections
-    user_prompt = build_editorial_prompt(
-        format_delimited_sections(sections),
-        titles,
-        report_type=report_type,
-    )
-    edited = await _request_delimited_sections(
-        client,
-        report_type=report_type,
-        titles=titles,
-        user_prompt=user_prompt,
-        allowed_facts=allowed_facts,
-        wave_id="edit",
-        model=model,
-        system_prompt=EDITOR_SYSTEM_PROMPT,
-        usage_ledger=usage_ledger,
-        usage_phase="review",
-    )
-    if edited is None:
-        logger.warning("Редактура «%s» не удалась, оставляю черновик", report_type)
-        return sections
-    return edited
+    is_free = str(report_type).endswith("_free")
+    batches = [sections] if is_free else split_into_parts(sections, PAID_REVIEW_WAVES)
+    step_ids: list[int] = []
+    if progress is not None:
+        for _ in range(REVIEW_PROGRESS_STEPS):
+            step_ids.append(await progress.start_step())
+    alloc = _review_progress_alloc(len(batches))
+    current = list(sections)
+    finished = 0
+    for index, batch in enumerate(batches, start=1):
+        edited = await _review_section_batch(
+            client,
+            report_type=report_type,
+            all_sections=current,
+            batch=batch,
+            allowed_facts=allowed_facts,
+            model=model,
+            wave_id=f"edit{index:02d}",
+            usage_ledger=usage_ledger,
+        )
+        if edited is None:
+            logger.warning(
+                "Редактура «%s» (%s) не удалась, оставляю черновик этой части",
+                report_type,
+                f"edit{index:02d}",
+            )
+        else:
+            current = _merge_reviewed_sections(current, edited)
+        take = alloc[index - 1] if index <= len(alloc) else 0
+        if progress is not None and take:
+            for step_id in step_ids[finished:finished + take]:
+                await progress.finish_step(step_id)
+            finished += take
+    if progress is not None:
+        for step_id in step_ids[finished:]:
+            await progress.finish_step(step_id)
+    return current
 
 
 async def _run_section_wave(
@@ -1053,7 +1144,7 @@ async def generate_report_content(
             if progress is not None:
                 successful_waves = sum(1 for validated in wave_results if validated)
                 await progress.set_total(
-                    successful_waves + len(retry_batches) + 1
+                    successful_waves + len(retry_batches) + REVIEW_PROGRESS_STEPS
                 )
             retry_results = await asyncio.gather(
                 *[
@@ -1080,9 +1171,6 @@ async def generate_report_content(
         if not collected:
             return None
 
-        step_id: int | None = None
-        if progress is not None:
-            step_id = await progress.start_step()
         collected = await _review_sections(
             client,
             report_type=report_type,
@@ -1090,9 +1178,8 @@ async def generate_report_content(
             allowed_facts=allowed_facts,
             model=review_model,
             usage_ledger=usage_ledger,
+            progress=progress,
         )
-        if progress is not None and step_id is not None:
-            await progress.finish_step(step_id)
         title, intro = _report_shell(report_type)
         result = {
             "title": title,

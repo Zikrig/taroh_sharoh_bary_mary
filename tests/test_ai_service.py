@@ -15,12 +15,16 @@ from unittest.mock import patch
 from tempfile import TemporaryDirectory
 
 from services.ai import (
+    PAID_REVIEW_WAVES,
+    REVIEW_PROGRESS_STEPS,
     SYSTEM_PROMPT,
     _is_degenerate_section_text,
     _is_retryable_api_error,
+    _merge_reviewed_sections,
     _missing_titles,
     _ordered_sections,
     _payload_sample_attempt_dir,
+    _review_progress_alloc,
     _save_request_transcript,
     _save_response_transcript,
     _section_batch_size,
@@ -34,6 +38,7 @@ from services.ai import (
     parse_delimited_sections,
     planned_generation_steps,
     render_natal_dump,
+    split_into_parts,
 )
 from services.generation_progress import (
     TaskProgress,
@@ -387,8 +392,9 @@ class AiServiceTests(unittest.TestCase):
         self.assertEqual([item["title"] for item in ordered], titles)
 
     def test_progress_tracks_active_and_finished_task_weights(self):
-        self.assertEqual(planned_generation_steps("personality"), 8)
-        self.assertEqual(planned_generation_steps("personality_free"), 4)
+        self.assertEqual(REVIEW_PROGRESS_STEPS, 5)
+        self.assertEqual(planned_generation_steps("personality"), 12)
+        self.assertEqual(planned_generation_steps("personality_free"), 8)
         t0 = 1_000.0
         two_active = [
             TaskProgress(started_at=t0),
@@ -409,6 +415,25 @@ class AiServiceTests(unittest.TestCase):
         )
         self.assertEqual(format_progress_percent(7.5), "7.5%")
         self.assertEqual(format_progress_percent(5.0), "5%")
+
+    def test_paid_review_splits_into_three_thirds(self):
+        personality = catalog_titles("personality")
+        parts = split_into_parts(personality, PAID_REVIEW_WAVES)
+        self.assertEqual(len(parts), 3)
+        self.assertEqual(sum(len(part) for part in parts), len(personality))
+        self.assertEqual([len(part) for part in parts], [7, 7, 6])
+        self.assertEqual(_review_progress_alloc(3), [2, 2, 1])
+        self.assertEqual(_review_progress_alloc(1), [5])
+        original = [
+            {"title": "A", "content": "старый A"},
+            {"title": "B", "content": "старый B"},
+        ]
+        merged = _merge_reviewed_sections(
+            original,
+            [{"title": "A", "content": "новый A"}],
+        )
+        self.assertEqual(merged[0]["content"], "новый A")
+        self.assertEqual(merged[1]["content"], "старый B")
 
     def test_admin_usage_summary_shows_costs_and_models(self):
         summary = format_admin_usage_summary(
@@ -525,6 +550,15 @@ class AiServiceTests(unittest.TestCase):
         self.assertIn("Верни весь разбор одним сообщением", prompt)
         self.assertIn("Твой главный психологический портрет", prompt)
         self.assertIn("Твой внутренний мир", prompt)
+        third = build_editorial_prompt(
+            draft,
+            ["Твой главный психологический портрет", "Твой внутренний мир"],
+            report_type="personality",
+            edit_titles=["Твой внутренний мир"],
+        )
+        self.assertIn("ТОЛЬКО эти разделы", third)
+        self.assertIn("Твой внутренний мир", third)
+        self.assertNotIn("Верни все разделы", third)
 
     def test_natal_dump_includes_houses_for_the_model(self):
         text = render_natal_dump(chart(), None, "personality_free")

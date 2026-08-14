@@ -1115,12 +1115,31 @@ def build_editorial_prompt(
     titles: list[str],
     *,
     report_type: str | None = None,
+    edit_titles: list[str] | None = None,
 ) -> str:
-    listed = "\n".join(f"- {title}" for title in titles)
+    target = edit_titles or titles
+    listed = "\n".join(f"- {title}" for title in target)
+    subset = bool(edit_titles) and list(edit_titles) != list(titles)
+    if subset:
+        scope = (
+            "Сейчас отредактируй ТОЛЬКО эти разделы. Остальные разделы не пиши "
+            "и не возвращай — они уже есть в черновике и нужны только как контекст."
+        )
+        return_line = (
+            "Верни только запрошенные разделы слегка отредактированными одним сообщением, "
+            "в том же порядке:"
+        )
+        batch = True
+    else:
+        scope = "Нужна лёгкая редактура одним проходом, не переписывай текст заново."
+        return_line = (
+            "Верни все разделы слегка отредактированными одним сообщением, в том же порядке:"
+        )
+        batch = False
     return f"""
 Это полный черновик персонального разбора. Прочитай его целиком.
 
-Нужна лёгкая редактура одним проходом, не переписывай текст заново.
+{scope}
 
 Критерии:
 1. По всему тексту избегай схожих формулировок: одинаковых оборотов, зачинов,
@@ -1137,8 +1156,8 @@ def build_editorial_prompt(
 ПОЛНЫЙ ЧЕРНОВИК:
 {full_draft}
 
-Верни все разделы слегка отредактированными одним сообщением, в том же порядке:
+{return_line}
 {listed}
 
-{output_format_block(titles, report_type=report_type, batch=False)}
+{output_format_block(target, report_type=report_type, batch=batch)}
 """.strip()
