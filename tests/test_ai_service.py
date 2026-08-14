@@ -530,6 +530,10 @@ class AiServiceTests(unittest.TestCase):
         self.assertIn("схожих формулировок", EDITOR_SYSTEM_PROMPT)
         self.assertIn("странно сформулированные", EDITOR_SYSTEM_PROMPT)
         self.assertIn("не переписывай", EDITOR_SYSTEM_PROMPT)
+        self.assertIn("текстовые артефакты", EDITOR_SYSTEM_PROMPT)
+        self.assertIn("без точек, запятых", EDITOR_SYSTEM_PROMPT)
+        self.assertIn("плохо отображаются в PDF", EDITOR_SYSTEM_PROMPT)
+        self.assertIn("\\.", EDITOR_SYSTEM_PROMPT)
         draft = format_delimited_sections(
             [
                 {"title": "Твой главный психологический портрет", "content": "Ты быстро включаешься."},
@@ -547,6 +551,8 @@ class AiServiceTests(unittest.TestCase):
         self.assertIn("лёгкая редактура одним проходом", prompt)
         self.assertIn("схожих формулировок", prompt)
         self.assertIn("странно сформулированные", prompt)
+        self.assertIn("абзацы без пунктуации", prompt)
+        self.assertIn("плохо отображаемые в PDF", prompt)
         self.assertIn("Верни весь разбор одним сообщением", prompt)
         self.assertIn("Твой главный психологический портрет", prompt)
         self.assertIn("Твой внутренний мир", prompt)
