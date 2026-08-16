@@ -47,11 +47,26 @@ class RouterUiTests(unittest.TestCase):
 
     def test_user_offer_requires_paid_pdf(self):
         self.assertEqual(set(PAID_OFFER_TEXTS), set(PRICES))
-        for text in PAID_OFFER_TEXTS.values():
-            self.assertIn("индивидуально", text)
+        for scenario, text in PAID_OFFER_TEXTS.items():
+            self.assertGreater(len(text), 80, scenario)
+            self.assertIn("PDF", text)
         button = pdf_offer_keyboard("personality", admin_mode=False).inline_keyboard[0][0]
         self.assertIn("⭐", button.text)
         self.assertEqual(button.callback_data, "buy:personality")
+
+    def test_upsell_texts_are_scenario_specific(self):
+        self.assertEqual(set(FREE_UPSELL_TEXTS), set(PRICES))
+        markers = {
+            "personality": ("внутренний мир", "точки роста"),
+            "love": ("ревность", "любовный портрет"),
+            "compatibility": ("доверие", "портрет пары"),
+            "money": ("предпринимательский", "денежный профиль"),
+        }
+        for scenario, needles in markers.items():
+            text = FREE_UPSELL_TEXTS[scenario].lower()
+            self.assertGreater(len(text), 200, scenario)
+            for needle in needles:
+                self.assertIn(needle, text, scenario)
 
     def test_all_scenarios_have_generated_free_reports(self):
         self.assertEqual(set(FREE_REPORT_TYPES), set(PRICES))

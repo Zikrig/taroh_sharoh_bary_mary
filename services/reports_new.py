@@ -17,7 +17,15 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
-from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import (
+    CondPageBreak,
+    PageBreak,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
 from reportlab.platypus.flowables import Flowable
 
 PAPER = colors.HexColor("#F3E9D8")
@@ -354,11 +362,20 @@ def generate_report(
         PageBreak(),
     ])
 
+    page_width, page_height = A4
+    top_margin = 20 * mm
+    bottom_margin = 20 * mm
+    usable_height = page_height - top_margin - bottom_margin
+    # If a new heading would land in the last quarter of the page, start a new leaf.
+    heading_min_remaining = usable_height * 0.25
+
     generated_by_title = {section["title"]: section for section in content["sections"]}
     for title_text, _ in SECTIONS[report_type]:
         section = generated_by_title.get(title_text)
         if section is None:
             raise ValueError(f"Отсутствует раздел «{title_text}».")
+        # If less than a quarter of the page remains, start the section on the next leaf.
+        story.append(CondPageBreak(heading_min_remaining))
         story.extend([
             _paragraph(title_text, heading),
             _paragraph(section["content"], body),
@@ -369,8 +386,8 @@ def generate_report(
         pagesize=A4,
         rightMargin=23 * mm,
         leftMargin=23 * mm,
-        topMargin=20 * mm,
-        bottomMargin=20 * mm,
+        topMargin=top_margin,
+        bottomMargin=bottom_margin,
         title=type_titles[report_type],
     )
     document.build(story, onFirstPage=_draw_background, onLaterPages=_draw_background)

@@ -1,5 +1,8 @@
 import unittest
+import unittest.mock
 from pathlib import Path
+
+from reportlab.platypus import CondPageBreak
 
 from services.reports_new import (
     SECTIONS,
@@ -66,6 +69,27 @@ class ReportTests(unittest.TestCase):
         moscow = _format_timezone_ru("Europe/Moscow", "2015-01-15")
         self.assertTrue(moscow.startswith("Москва (UTC"))
         self.assertIn("UTC+", moscow)
+
+    def test_section_flow_uses_conditional_page_break(self):
+        import services.reports_new as reports_new
+
+        captured: list = []
+        original_build = reports_new.SimpleDocTemplate.build
+
+        def capture_build(self, flowables, **kwargs):
+            captured.extend(flowables)
+            return original_build(self, flowables, **kwargs)
+
+        reports_dir = Path("reports")
+        reports_dir.mkdir(exist_ok=True)
+        with unittest.mock.patch.object(
+            reports_new.SimpleDocTemplate, "build", capture_build
+        ):
+            report_path = generate_report(
+                "money", chart(), None, content(), "Fedor", "fgriz"
+            )
+        self.assertTrue(any(isinstance(item, CondPageBreak) for item in captured))
+        report_path.unlink()
 
 
 if __name__ == "__main__":

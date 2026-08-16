@@ -45,13 +45,6 @@ async def init_db() -> None:
                 second_chart_json TEXT,
                 FOREIGN KEY (order_id) REFERENCES orders(id)
             );
-            CREATE TABLE IF NOT EXISTS free_generations (
-                user_id INTEGER NOT NULL,
-                scenario TEXT NOT NULL,
-                sections_json TEXT NOT NULL,
-                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (user_id, scenario)
-            );
             CREATE TABLE IF NOT EXISTS free_daily_usage (
                 user_id INTEGER PRIMARY KEY,
                 last_used_date TEXT NOT NULL
@@ -83,7 +76,79 @@ async def init_db() -> None:
             await db.execute(
                 "ALTER TABLE profiles ADD COLUMN time_is_approximate INTEGER NOT NULL DEFAULT 0"
             )
+        await _ensure_free_generations_schema(db)
         await db.commit()
+
+
+async def _ensure_free_generations_schema(db: aiosqlite.Connection) -> None:
+    """One free report per user, with birth fingerprint for paid continuity."""
+    tables = {
+        row[0]
+        for row in await (
+            await db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='free_generations'"
+            )
+        ).fetchall()
+    }
+    if not tables:
+        await db.execute(
+            """
+            CREATE TABLE free_generations (
+                user_id INTEGER PRIMARY KEY,
+                scenario TEXT NOT NULL,
+                sections_json TEXT NOT NULL,
+                birth_fingerprint TEXT NOT NULL DEFAULT '',
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        return
+
+    columns = {
+        row[1] for row in await (await db.execute("PRAGMA table_info(free_generations)")).fetchall()
+    }
+    pk_cols = [
+        row[1]
+        for row in await (await db.execute("PRAGMA table_info(free_generations)")).fetchall()
+        if row[5]  # pk ordinal > 0
+    ]
+    needs_rebuild = pk_cols != ["user_id"] or "birth_fingerprint" not in columns
+    if not needs_rebuild:
+        return
+
+    await db.execute(
+        """
+        CREATE TABLE free_generations_new (
+            user_id INTEGER PRIMARY KEY,
+            scenario TEXT NOT NULL,
+            sections_json TEXT NOT NULL,
+            birth_fingerprint TEXT NOT NULL DEFAULT '',
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    # Keep the newest row per user from the legacy (user_id, scenario) table.
+    await db.execute(
+        """
+        INSERT INTO free_generations_new (user_id, scenario, sections_json, birth_fingerprint, updated_at)
+        SELECT user_id, scenario, sections_json, '', updated_at
+        FROM (
+            SELECT
+                user_id,
+                scenario,
+                sections_json,
+                COALESCE(updated_at, '') AS updated_at,
+                ROW_NUMBER() OVER (
+                    PARTITION BY user_id
+                    ORDER BY datetime(updated_at) DESC, rowid DESC
+                ) AS rn
+            FROM free_generations
+        )
+        WHERE rn = 1
+        """
+    )
+    await db.execute("DROP TABLE free_generations")
+    await db.execute("ALTER TABLE free_generations_new RENAME TO free_generations")
 
 
 async def get_test_mode() -> bool:
@@ -344,39 +409,79 @@ def _normalize_stored_sections(sections: list[Any]) -> list[dict[str, str]]:
     return stored
 
 
+def _chart_fingerprint_part(chart: dict[str, Any]) -> str:
+    lat = chart.get("latitude")
+    lon = chart.get("longitude")
+    try:
+        lat_s = f"{float(lat):.5f}" if lat is not None else ""
+    except (TypeError, ValueError):
+        lat_s = ""
+    try:
+        lon_s = f"{float(lon):.5f}" if lon is not None else ""
+    except (TypeError, ValueError):
+        lon_s = ""
+    date = str(chart.get("date") or chart.get("birth_date") or "").strip()
+    time = str(chart.get("time") or chart.get("birth_time") or "").strip()
+    return f"{date}|{time}|{lat_s}|{lon_s}"
+
+
+def birth_fingerprint(
+    chart: dict[str, Any],
+    second_chart: dict[str, Any] | None = None,
+) -> str:
+    """Stable identity of natal inputs used for a free/paid report."""
+    primary = _chart_fingerprint_part(chart)
+    if second_chart:
+        return f"{primary}||{_chart_fingerprint_part(second_chart)}"
+    return primary
+
+
 async def save_free_generation(
     user_id: int,
     scenario: str,
     sections: list[dict[str, Any]],
+    birth_fingerprint_value: str,
 ) -> None:
     stored = _normalize_stored_sections(sections)
     if not stored:
         return
+    fingerprint = str(birth_fingerprint_value or "").strip()
     async with aiosqlite.connect(settings.database_path) as db:
         await db.execute(
             """
-            INSERT INTO free_generations (user_id, scenario, sections_json)
-            VALUES (?, ?, ?)
-            ON CONFLICT(user_id, scenario) DO UPDATE SET
+            INSERT INTO free_generations (user_id, scenario, sections_json, birth_fingerprint)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                scenario=excluded.scenario,
                 sections_json=excluded.sections_json,
+                birth_fingerprint=excluded.birth_fingerprint,
                 updated_at=CURRENT_TIMESTAMP
             """,
-            (user_id, scenario, json.dumps(stored, ensure_ascii=False)),
+            (user_id, scenario, json.dumps(stored, ensure_ascii=False), fingerprint),
         )
         await db.commit()
 
 
-async def get_free_generation(user_id: int, scenario: str) -> list[dict[str, str]] | None:
+async def get_free_generation(
+    user_id: int,
+    scenario: str,
+    birth_fingerprint_value: str,
+) -> list[dict[str, str]] | None:
+    fingerprint = str(birth_fingerprint_value or "").strip()
     async with aiosqlite.connect(settings.database_path) as db:
         async with db.execute(
             """
-            SELECT sections_json FROM free_generations
-            WHERE user_id = ? AND scenario = ?
+            SELECT sections_json, scenario, birth_fingerprint FROM free_generations
+            WHERE user_id = ?
             """,
-            (user_id, scenario),
+            (user_id,),
         ) as cur:
             row = await cur.fetchone()
     if not row:
+        return None
+    stored_scenario = str(row[1] or "")
+    stored_fingerprint = str(row[2] or "").strip()
+    if stored_scenario != scenario or stored_fingerprint != fingerprint or not fingerprint:
         return None
     try:
         parsed = json.loads(row[0])
