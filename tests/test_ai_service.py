@@ -522,8 +522,9 @@ class AiServiceTests(unittest.TestCase):
         self.assertIn("живые, обычные формулировки", SYSTEM_PROMPT)
         self.assertIn("это не про А — это про Б", SYSTEM_PROMPT)
         self.assertIn("Если раздел можно было бы отправить человеку с совершенно другой картой", SYSTEM_PROMPT)
-        self.assertIn("Не определяй и не подразумевай пол читателя", SYSTEM_PROMPT)
-        self.assertIn("не назначай пол", SYSTEM_PROMPT)
+        self.assertIn("Пол читателя указан", SYSTEM_PROMPT)
+        self.assertIn("согласованном роде", SYSTEM_PROMPT)
+        self.assertIn("Пол читателя указан", EDITOR_SYSTEM_PROMPT)
 
     def test_editorial_prompt_sends_full_draft_and_asks_to_cut_repeats(self):
         self.assertIn("лёгкая редактура", EDITOR_SYSTEM_PROMPT)
@@ -567,7 +568,13 @@ class AiServiceTests(unittest.TestCase):
         self.assertNotIn("Верни все разделы", third)
 
     def test_natal_dump_includes_houses_for_the_model(self):
-        text = render_natal_dump(chart(), None, "personality_free")
+        text = render_natal_dump(chart(), None, "personality_free", gender="female")
+        self.assertIn("Пол читателя: женщина", text)
+        self.assertIn("Дома (куспиды):", text)
+        self.assertIn("Планеты:", text)
+        self.assertIn("Асцендент:", text)
+        male = render_natal_dump(chart(), None, "personality_free", gender="male")
+        self.assertIn("Пол читателя: мужчина", male)
         self.assertIn("Дома (куспиды):", text)
         self.assertIn("Планеты:", text)
         self.assertIn("Асцендент:", text)

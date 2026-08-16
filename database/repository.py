@@ -10,6 +10,25 @@ from config.settings import settings
 
 FREE_DAILY_TZ = ZoneInfo("Europe/Moscow")
 
+GENDER_FEMALE = "female"
+GENDER_MALE = "male"
+DEFAULT_GENDER = GENDER_FEMALE
+
+
+def normalize_gender(value: Any) -> str:
+    raw = str(value or "").strip().casefold()
+    if raw in {"male", "m", "муж", "мужской", "mars", "♂"}:
+        return GENDER_MALE
+    return GENDER_FEMALE
+
+
+def gender_label_ru(value: Any) -> str:
+    return "мужчина" if normalize_gender(value) == GENDER_MALE else "женщина"
+
+
+def gender_symbol(value: Any) -> str:
+    return "♂" if normalize_gender(value) == GENDER_MALE else "♀"
+
 
 async def init_db() -> None:
     Path(settings.database_path).parent.mkdir(parents=True, exist_ok=True)
@@ -24,6 +43,7 @@ async def init_db() -> None:
                 birth_place TEXT NOT NULL,
                 latitude REAL NOT NULL,
                 longitude REAL NOT NULL,
+                gender TEXT NOT NULL DEFAULT 'female',
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP
             );
             CREATE TABLE IF NOT EXISTS orders (
@@ -76,6 +96,18 @@ async def init_db() -> None:
             await db.execute(
                 "ALTER TABLE profiles ADD COLUMN time_is_approximate INTEGER NOT NULL DEFAULT 0"
             )
+        if "gender" not in columns:
+            await db.execute(
+                "ALTER TABLE profiles ADD COLUMN gender TEXT NOT NULL DEFAULT 'female'"
+            )
+        # Existing users without an explicit choice are treated as female.
+        await db.execute(
+            """
+            UPDATE profiles
+            SET gender = 'female'
+            WHERE gender IS NULL OR TRIM(gender) = ''
+            """
+        )
         await _ensure_free_generations_schema(db)
         await db.commit()
 
@@ -323,23 +355,29 @@ async def get_profile(user_id: int) -> dict[str, Any] | None:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT * FROM profiles WHERE user_id = ?", (user_id,)) as cur:
             row = await cur.fetchone()
-            return dict(row) if row else None
+            if not row:
+                return None
+            profile = dict(row)
+            profile["gender"] = normalize_gender(profile.get("gender"))
+            return profile
 
 
 async def save_profile(user_id: int, profile: dict[str, Any]) -> None:
+    gender = normalize_gender(profile.get("gender"))
     async with aiosqlite.connect(settings.database_path) as db:
         await db.execute(
             """
             INSERT INTO profiles (
                 user_id, birth_date, birth_time, time_is_approximate,
-                birth_place, latitude, longitude
+                birth_place, latitude, longitude, gender
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id) DO UPDATE SET
                 birth_date=excluded.birth_date, birth_time=excluded.birth_time,
                 time_is_approximate=excluded.time_is_approximate,
                 birth_place=excluded.birth_place, latitude=excluded.latitude,
-                longitude=excluded.longitude, updated_at=CURRENT_TIMESTAMP
+                longitude=excluded.longitude, gender=excluded.gender,
+                updated_at=CURRENT_TIMESTAMP
             """,
             (
                 user_id,
@@ -349,6 +387,7 @@ async def save_profile(user_id: int, profile: dict[str, Any]) -> None:
                 profile["birth_place"],
                 profile["latitude"],
                 profile["longitude"],
+                gender,
             ),
         )
         await db.commit()

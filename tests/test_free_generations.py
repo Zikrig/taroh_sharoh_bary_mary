@@ -117,6 +117,56 @@ class FreeGenerationsTests(unittest.TestCase):
 
         asyncio.run(run())
 
+    def test_existing_profiles_default_to_female_gender(self):
+        async def run() -> None:
+            with tempfile.TemporaryDirectory() as tmp:
+                db_path = Path(tmp) / "profiles.db"
+                with patch(
+                    "database.repository.settings",
+                    SimpleNamespace(database_path=db_path),
+                ):
+                    import aiosqlite
+
+                    from database.repository import get_profile, save_profile
+
+                    async with aiosqlite.connect(db_path) as db:
+                        await db.execute(
+                            """
+                            CREATE TABLE profiles (
+                                user_id INTEGER PRIMARY KEY,
+                                birth_date TEXT NOT NULL,
+                                birth_time TEXT NOT NULL,
+                                time_is_approximate INTEGER NOT NULL DEFAULT 0,
+                                birth_place TEXT NOT NULL,
+                                latitude REAL NOT NULL,
+                                longitude REAL NOT NULL,
+                                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                            )
+                            """
+                        )
+                        await db.execute(
+                            """
+                            INSERT INTO profiles (
+                                user_id, birth_date, birth_time, birth_place, latitude, longitude
+                            ) VALUES (9, '1990-01-01', '12:00', 'Moscow', 55.7, 37.6)
+                            """
+                        )
+                        await db.commit()
+                    await init_db()
+                    profile = await get_profile(9)
+                    self.assertEqual(profile["gender"], "female")
+                    await save_profile(
+                        9,
+                        {
+                            **profile,
+                            "gender": "male",
+                        },
+                    )
+                    updated = await get_profile(9)
+                    self.assertEqual(updated["gender"], "male")
+
+        asyncio.run(run())
+
 
 if __name__ == "__main__":
     unittest.main()

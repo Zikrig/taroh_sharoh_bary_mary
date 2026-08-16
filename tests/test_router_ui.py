@@ -21,12 +21,16 @@ from handlers.router import (
     admin_generations_menu,
     admin_menu,
     admin_text,
+    edit_profile_menu,
+    format_gender_line,
     free_section_keyboard,
+    gender_keyboard,
     parse_free_section_callback,
     pdf_offer_keyboard,
     resolve_pending_free_report,
     store_pending_free_report,
 )
+from database.repository import GENDER_FEMALE, GENDER_MALE
 from config.settings import settings
 
 
@@ -181,6 +185,24 @@ class RouterUiTests(unittest.TestCase):
             admin_mode=True,
         )
         self.assertTrue(resolve_pending_free_report(1, report_id)["admin_mode"])
+
+    def test_gender_choice_uses_venus_and_mars(self):
+        markup = gender_keyboard(back_destination="menu")
+        texts = [button.text for row in markup.inline_keyboard for button in row]
+        callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
+        self.assertEqual(texts[:2], ["♀", "♂"])
+        self.assertEqual(
+            callbacks[:2],
+            [f"gender:{GENDER_FEMALE}", f"gender:{GENDER_MALE}"],
+        )
+        edit_texts = [
+            button.text for row in edit_profile_menu().inline_keyboard for button in row
+        ]
+        self.assertIn("♀♂ Пол", edit_texts)
+        self.assertIn("♀", format_gender_line(GENDER_FEMALE))
+        self.assertIn("женщина", format_gender_line(GENDER_FEMALE))
+        self.assertIn("♂", format_gender_line(GENDER_MALE))
+        self.assertIn("мужчина", format_gender_line(GENDER_MALE))
 
 
 if __name__ == "__main__":

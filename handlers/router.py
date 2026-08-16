@@ -33,7 +33,10 @@ from config.settings import settings
 from database.repository import (
     AI_MODEL_ROLE_LABELS,
     DEFAULT_AI_MODELS,
+    DEFAULT_GENDER,
     DEFAULT_REPORT_PRICES,
+    GENDER_FEMALE,
+    GENDER_MALE,
     birth_fingerprint,
     complete_order,
     create_order,
@@ -48,8 +51,11 @@ from database.repository import (
     get_report_price,
     get_report_prices,
     get_test_mode,
+    gender_label_ru,
+    gender_symbol,
     has_used_free_today,
     mark_free_used_today,
+    normalize_gender,
     save_free_generation,
     save_profile,
     save_report_context,
@@ -188,6 +194,7 @@ SCENARIO_INTROS = {
 
 
 class BirthStates(StatesGroup):
+    own_gender = State()
     own_date = State()
     own_time = State()
     own_place = State()
@@ -382,12 +389,27 @@ def free_section_keyboard(title: str, report_id: str, section_index: int):
 
 def edit_profile_menu():
     builder = InlineKeyboardBuilder()
+    builder.button(text="♀♂ Пол", callback_data="edit:gender")
     builder.button(text="📅 Дата рождения", callback_data="edit:date")
     builder.button(text="🕐 Время рождения", callback_data="edit:time")
     builder.button(text="📍 Место рождения", callback_data="edit:place")
     builder.button(text="⬅️ Назад", callback_data="back:menu")
     builder.adjust(1)
     return builder.as_markup()
+
+
+def gender_keyboard(*, back_destination: str):
+    builder = InlineKeyboardBuilder()
+    builder.button(text="♀", callback_data=f"gender:{GENDER_FEMALE}")
+    builder.button(text="♂", callback_data=f"gender:{GENDER_MALE}")
+    builder.button(text="⬅️ Назад", callback_data=f"back:{back_destination}")
+    builder.adjust(2, 1)
+    return builder.as_markup()
+
+
+def format_gender_line(gender: str | None) -> str:
+    value = normalize_gender(gender or DEFAULT_GENDER)
+    return f"{gender_symbol(value)} Пол: {gender_label_ru(value)}"
 
 
 def unknown_time_keyboard(back_destination: str):
@@ -1040,7 +1062,9 @@ async def profile(message: Message, state: FSMContext):
         await start_edit(message, state, message.from_user.id)
         return
     await message.answer(
-        f"Ваш профиль:\n📅 {data['birth_date'][8:10]}.{data['birth_date'][5:7]}.{data['birth_date'][:4]}\n"
+        f"Ваш профиль:\n"
+        f"{format_gender_line(data.get('gender'))}\n"
+        f"📅 {data['birth_date'][8:10]}.{data['birth_date'][5:7]}.{data['birth_date'][:4]}\n"
         f"🕐 {data['birth_time']}\n📍 {data['birth_place']}\n\n/edit — изменить",
         reply_markup=back_to_menu(),
     )
@@ -1055,15 +1079,18 @@ async def start_edit(message: Message, state: FSMContext, user_id: int):
     await state.clear()
     profile = await get_profile(user_id)
     if not profile:
-        await state.set_state(BirthStates.own_date)
+        await state.set_state(BirthStates.own_gender)
         await state.update_data(next_scenario="profile")
         await message.answer(
-            "Укажите дату рождения в формате ДД.ММ.ГГГГ:",
-            reply_markup=back_to_menu(),
+            "♀♂ ШАГ 1 ИЗ 4\n\n"
+            "Выберите пол — это нужно для корректного обращения в разборе.\n"
+            "♀ — женский, ♂ — мужской.",
+            reply_markup=gender_keyboard(back_destination="menu"),
         )
         return
     await message.answer(
         "Ваши текущие данные:\n\n"
+        f"{format_gender_line(profile.get('gender'))}\n"
         f"📅 Дата рождения: {profile['birth_date'][8:10]}."
         f"{profile['birth_date'][5:7]}.{profile['birth_date'][:4]}\n"
         f"🕐 Время рождения: {profile['birth_time']}\n"
@@ -1085,7 +1112,13 @@ async def choose_profile_field(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await state.update_data(edit_field=field)
     await callback.answer()
-    if field == "date":
+    if field == "gender":
+        await state.set_state(BirthStates.own_gender)
+        await callback.message.answer(
+            "Выберите пол:\n♀ — женский, ♂ — мужской.",
+            reply_markup=gender_keyboard(back_destination="edit_profile"),
+        )
+    elif field == "date":
         await state.set_state(BirthStates.own_date)
         await callback.message.answer(
             "Введите дату рождения в формате ДД.ММ.ГГГГ:",
@@ -1105,15 +1138,66 @@ async def choose_profile_field(callback: CallbackQuery, state: FSMContext):
         )
 
 
+@router.callback_query(F.data.startswith("gender:"))
+async def choose_gender(callback: CallbackQuery, state: FSMContext):
+    raw = callback.data.split(":", 1)[1]
+    if raw not in {GENDER_FEMALE, GENDER_MALE}:
+        await callback.answer("Выберите ♀ или ♂", show_alert=True)
+        return
+    gender = normalize_gender(raw)
+    data = await state.get_data()
+    await callback.answer()
+    with suppress(Exception):
+        await callback.message.edit_reply_markup(reply_markup=None)
+
+    if data.get("edit_field") == "gender":
+        profile = await get_profile(callback.from_user.id)
+        if not profile:
+            await state.clear()
+            await state.set_state(BirthStates.own_gender)
+            await state.update_data(next_scenario="profile")
+            await callback.message.answer(
+                "♀♂ ШАГ 1 ИЗ 4\n\n"
+                "Сначала заполните профиль. Выберите пол:\n"
+                "♀ — женский, ♂ — мужской.",
+                reply_markup=gender_keyboard(back_destination="menu"),
+            )
+            return
+        profile["gender"] = gender
+        await save_profile(callback.from_user.id, profile)
+        await state.clear()
+        await callback.message.answer(
+            f"Данные сохранены ✅\n{format_gender_line(gender)}",
+            reply_markup=back_to_edit_profile(),
+        )
+        return
+
+    await state.update_data(own_gender=gender)
+    await state.set_state(BirthStates.own_date)
+    admin_mode = bool(data.get("admin_generation"))
+    if data.get("next_scenario") == "profile":
+        markup = back_keyboard("menu")
+    else:
+        markup = flow_back_keyboard(admin_mode=admin_mode)
+    await callback.message.answer(
+        "📅 ШАГ 2 ИЗ 4\n\n"
+        "Напишите дату своего рождения.\n"
+        "Например: 24.07.1998",
+        reply_markup=markup,
+    )
+
+
 async def save_profile_field(message: Message, field: str, value: str, state: FSMContext) -> None:
     profile = await get_profile(message.from_user.id)
     if not profile:
         await state.clear()
-        await state.set_state(BirthStates.own_date)
+        await state.set_state(BirthStates.own_gender)
         await state.update_data(next_scenario="profile")
         await message.answer(
-            "Укажите дату рождения в формате ДД.ММ.ГГГГ:",
-            reply_markup=back_to_menu(),
+            "♀♂ ШАГ 1 ИЗ 4\n\n"
+            "Выберите пол — это нужно для корректного обращения в разборе.\n"
+            "♀ — женский, ♂ — мужской.",
+            reply_markup=gender_keyboard(back_destination="menu"),
         )
         return
     profile[field] = value
@@ -1171,13 +1255,15 @@ async def ask_own_data(
         )
         return
     await state.clear()
-    await state.set_state(BirthStates.own_date)
+    await state.set_state(BirthStates.own_gender)
     await state.update_data(next_scenario=scenario, admin_generation=admin_mode)
     await message.answer(
-        "📅 ШАГ 1 ИЗ 3\n\n"
-        "Напишите дату своего рождения.\n"
-        "Например: 24.07.1998",
-        reply_markup=flow_back_keyboard(admin_mode=admin_mode),
+        "♀♂ ШАГ 1 ИЗ 4\n\n"
+        "Выберите пол — это нужно для корректного обращения в разборе.\n"
+        "♀ — женский, ♂ — мужской.",
+        reply_markup=gender_keyboard(
+            back_destination="admin_gens" if admin_mode else "menu"
+        ),
     )
 
 
@@ -1207,7 +1293,7 @@ async def own_date(message: Message, state: FSMContext):
     await state.set_state(BirthStates.own_time)
     back_destination = "admin_gens" if data.get("admin_generation") else "menu"
     await message.answer(
-        "🕐 ШАГ 2 ИЗ 3\n\n"
+        "🕐 ШАГ 3 ИЗ 4\n\n"
         "Теперь напишите время рождения.\n"
         "Например: 14:35\n\n"
         "Чем точнее время, тем персональнее получится разбор.",
@@ -1255,13 +1341,13 @@ async def own_time(
             "Ничего страшного ❤️\n"
             "Разбор всё равно можно сделать. Некоторые выводы, связанные с домами "
             "и Асцендентом, будут менее точными.\n\n"
-            "📍 ШАГ 3 ИЗ 3\n\n"
+            "📍 ШАГ 4 ИЗ 4\n\n"
             "Напишите город и страну, где вы родились.\n"
             "Например: Москва, Россия"
         )
     else:
         prompt = (
-            "📍 ШАГ 3 ИЗ 3\n\n"
+            "📍 ШАГ 4 ИЗ 4\n\n"
             "Напишите город и страну, где вы родились.\n"
             "Например: Москва, Россия"
         )
@@ -1280,11 +1366,13 @@ async def own_place(message: Message, state: FSMContext):
         profile = await get_profile(message.from_user.id)
         if not profile:
             await state.clear()
-            await state.set_state(BirthStates.own_date)
+            await state.set_state(BirthStates.own_gender)
             await state.update_data(next_scenario="profile")
             await message.answer(
-                "Укажите дату рождения в формате ДД.ММ.ГГГГ:",
-                reply_markup=back_to_menu(),
+                "♀♂ ШАГ 1 ИЗ 4\n\n"
+                "Выберите пол — это нужно для корректного обращения в разборе.\n"
+                "♀ — женский, ♂ — мужской.",
+                reply_markup=gender_keyboard(back_destination="menu"),
             )
             return
         profile.update(birth_place=message.text.strip(), latitude=latitude, longitude=longitude)
@@ -1299,6 +1387,7 @@ async def own_place(message: Message, state: FSMContext):
         "birth_place": message.text.strip(),
         "latitude": latitude,
         "longitude": longitude,
+        "gender": normalize_gender(data.get("own_gender") or DEFAULT_GENDER),
     }
     await save_profile(message.from_user.id, profile)
     scenario_name = data.get("next_scenario")
@@ -1450,6 +1539,7 @@ async def show_teaser(
                 chart,
                 second_chart,
                 progress=status,
+                gender=(await get_profile(user_id) or {}).get("gender"),
             )
             if free_content:
                 status.mark_completed()
@@ -1734,12 +1824,14 @@ async def deliver_report(
             scenario_name,
             birth_fingerprint(chart, second_chart),
         )
+        profile = await get_profile(user_id)
         content = await generate_report_content(
             scenario_name,
             chart,
             second_chart,
             prior_sections=prior_sections,
             progress=status,
+            gender=(profile or {}).get("gender"),
         )
         if content is None:
             await set_order_status(order_id, "report_pending")

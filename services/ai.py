@@ -11,7 +11,12 @@ from uuid import uuid4
 
 from services.astro import SIGNS, calculate_synastry
 from config.settings import settings
-from database.repository import get_ai_model
+from database.repository import (
+    DEFAULT_GENDER,
+    gender_label_ru,
+    get_ai_model,
+    normalize_gender,
+)
 from services.report_prompts import (
     EDITOR_SYSTEM_PROMPT,
     FREE_SECTION_BATCH,
@@ -495,8 +500,18 @@ def _render_synastry(aspects: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def render_natal_dump(chart: dict, second_chart: dict | None, report_type: str) -> str:
+def render_natal_dump(
+    chart: dict,
+    second_chart: dict | None,
+    report_type: str,
+    *,
+    gender: str | None = None,
+) -> str:
     """Plain-text natal data sent to the model: planets, houses, aspects."""
+    gender_line = (
+        f"Пол читателя: {gender_label_ru(gender)}.\n"
+        "Обращайся к читателю в согласованном грамматическом роде."
+    )
     primary = _chart_for_prompt(chart)
     if report_type in ("compatibility", "compatibility_free"):
         if second_chart is None:
@@ -505,19 +520,31 @@ def render_natal_dump(chart: dict, second_chart: dict | None, report_type: str) 
         synastry = calculate_synastry(chart, second_chart)
         return "\n\n".join(
             [
+                gender_line,
                 _render_chart(primary, "PERSON A — натальная карта"),
                 _render_chart(partner, "PERSON B — натальная карта"),
                 _render_synastry(synastry),
             ]
         )
-    return _render_chart(primary, "Натальная карта")
+    return "\n\n".join(
+        [
+            gender_line,
+            _render_chart(primary, "Натальная карта"),
+        ]
+    )
 
 
 def catalog_titles(report_type: str) -> list[str]:
     return [title for title, _ in SECTIONS[report_type]]
 
 
-def build_prompt_payload(report_type: str, chart: dict, second_chart: dict | None) -> dict[str, Any]:
+def build_prompt_payload(
+    report_type: str,
+    chart: dict,
+    second_chart: dict | None,
+    *,
+    gender: str | None = None,
+) -> dict[str, Any]:
     if report_type not in SECTIONS:
         raise ValueError(f"Неизвестный тип отчёта: {report_type}")
     if report_type in ("compatibility", "compatibility_free") and second_chart is None:
@@ -525,10 +552,14 @@ def build_prompt_payload(report_type: str, chart: dict, second_chart: dict | Non
     if report_type not in PRODUCT_PROMPTS:
         raise ValueError(f"Не задан промпт для типа отчёта: {report_type}")
     titles = catalog_titles(report_type)
-    natal_text = render_natal_dump(chart, second_chart, report_type)
+    resolved_gender = normalize_gender(gender or DEFAULT_GENDER)
+    natal_text = render_natal_dump(
+        chart, second_chart, report_type, gender=resolved_gender
+    )
     return {
         "report_type": report_type,
         "language": "ru",
+        "gender": resolved_gender,
         "sections": [{"title": title, "brief": brief} for title, brief in SECTIONS[report_type]],
         "primary_chart": _chart_for_prompt(chart),
         "partner_chart": _chart_for_prompt(second_chart) if second_chart else None,
@@ -1058,6 +1089,7 @@ async def generate_report_content(
     *,
     prior_sections: list[dict[str, str]] | None = None,
     progress: GenerationProgress | None = None,
+    gender: str | None = None,
 ) -> dict[str, Any] | None:
     """Generate report waves in parallel, then retry only missing sections."""
     if not settings.ai_api_key:
@@ -1067,7 +1099,10 @@ async def generate_report_content(
 
         if str(report_type).endswith("_free"):
             prior_sections = None
-        payload = build_prompt_payload(report_type, chart, second_chart)
+        resolved_gender = normalize_gender(gender or DEFAULT_GENDER)
+        payload = build_prompt_payload(
+            report_type, chart, second_chart, gender=resolved_gender
+        )
         prior_blob = json.dumps(
             [
                 {"title": item.get("title"), "content": item.get("content")}
@@ -1076,7 +1111,10 @@ async def generate_report_content(
             ensure_ascii=False,
             sort_keys=True,
         )
-        cache_key = _report_cache_key(report_type, payload["natal_text"] + "\n" + prior_blob)
+        cache_key = _report_cache_key(
+            report_type,
+            payload["natal_text"] + "\n" + prior_blob + f"\ngender:{resolved_gender}",
+        )
         cached = _REPORT_CACHE.get(cache_key)
         if cached:
             if progress is not None:
