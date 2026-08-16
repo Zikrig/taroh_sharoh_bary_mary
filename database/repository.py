@@ -324,8 +324,8 @@ DEFAULT_AI_MODELS = {
 }
 AI_MODEL_ROLE_LABELS = {
     "free": "Бесплатные (волны)",
-    "expensive": "Дорогая (скелет PDF)",
-    "cheap": "Дешёвая (разделы PDF)",
+    "expensive": "Скелет PDF",
+    "cheap": "Разделы PDF",
 }
 _LEGACY_MODEL_FALLBACKS = {
     "free": ("model_free",),

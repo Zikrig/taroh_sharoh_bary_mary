@@ -453,8 +453,8 @@ class AiServiceTests(unittest.TestCase):
                 "review_model": "deepseek-v4-flash",
             }
         )
-        self.assertIn("Скелет (дорогая): 1.25 ₽ · deepseek-v4-pro-0813", summary)
-        self.assertIn("Разделы (дешёвая): 0.50 ₽ · deepseek-v4-flash", summary)
+        self.assertIn("Скелет PDF: 1.25 ₽ · deepseek-v4-pro-0813", summary)
+        self.assertIn("Разделы PDF: 0.50 ₽ · deepseek-v4-flash", summary)
         self.assertIn("Итого: 1.75 ₽", summary)
         usage = SimpleNamespace(cost_rub=0.42, model_extra=None)
         self.assertAlmostEqual(_usage_cost_rub(SimpleNamespace(usage=usage)), 0.42)

@@ -163,13 +163,13 @@ def format_admin_usage_summary(usage: dict[str, Any] | None) -> str | None:
             usage.get("expensive_model") or usage.get("generation_model") or "—"
         )
         lines.append(
-            f"Скелет (дорогая): {expensive_cost:.2f} ₽ · {expensive_model}"
+            f"Скелет PDF: {expensive_cost:.2f} ₽ · {expensive_model}"
             f" ({expensive_requests} запрос.)"
         )
     if cheap_requests or cheap_cost:
         cheap_model = str(usage.get("cheap_model") or usage.get("review_model") or "—")
         lines.append(
-            f"Разделы (дешёвая): {cheap_cost:.2f} ₽ · {cheap_model}"
+            f"Разделы PDF: {cheap_cost:.2f} ₽ · {cheap_model}"
             f" ({cheap_requests} запрос.)"
         )
     # Fallback when only legacy keys were passed (tests).
@@ -181,11 +181,11 @@ def format_admin_usage_summary(usage: dict[str, Any] | None) -> str | None:
         generation_requests = int(usage.get("generation_requests") or 0)
         review_requests = int(usage.get("review_requests") or 0)
         lines.append(
-            f"Скелет (дорогая): {generation_cost:.2f} ₽ · {generation_model}"
+            f"Скелет PDF: {generation_cost:.2f} ₽ · {generation_model}"
             f" ({generation_requests} запрос.)"
         )
         lines.append(
-            f"Разделы (дешёвая): {review_cost:.2f} ₽ · {review_model}"
+            f"Разделы PDF: {review_cost:.2f} ₽ · {review_model}"
             f" ({review_requests} запрос.)"
         )
         total_cost = float(usage.get("total_cost_rub") or (generation_cost + review_cost))
