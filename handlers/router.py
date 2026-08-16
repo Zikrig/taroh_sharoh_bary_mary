@@ -2109,12 +2109,12 @@ async def deliver_report(
     if admin_mode:
         await message.answer(
             "🧪 Админ-режим.\n"
-            "Начинаю формировать полный PDF без оплаты. Это займёт несколько секунд."
+            "Начинаю формировать полный PDF без оплаты. Это займёт несколько минут."
         )
     else:
         await message.answer(
             "✅ Оплата получена.\n"
-            "Начинаю формировать ваш персональный разбор. Это займёт несколько секунд."
+            "Начинаю формировать ваш персональный разбор. Это займёт несколько минут."
         )
     async with report_status_animation(message) as status:
         prior_sections = await get_free_generation(
