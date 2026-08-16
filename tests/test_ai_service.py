@@ -18,6 +18,7 @@ from services.ai import (
     PAID_REVIEW_WAVES,
     REVIEW_PROGRESS_STEPS,
     SYSTEM_PROMPT,
+    _extract_preamble,
     _is_degenerate_section_text,
     _is_retryable_api_error,
     _merge_reviewed_sections,
@@ -48,7 +49,6 @@ from services.generation_progress import (
 from services.astro import local_time_to_utc
 from services.prompt_guides.career import build_career_hints
 from services.report_prompts import (
-    CONCEPT_TITLE,
     EDITOR_SYSTEM_PROMPT,
     FREE_SECTION_BATCH,
     PAID_SECTION_BATCH,
@@ -57,7 +57,6 @@ from services.report_prompts import (
     SECTION_MAX_WORDS,
     SKELETON_WAVE_SIZE,
     SYSTEM_PROMPT,
-    build_concept_prompt,
     build_editorial_prompt,
     build_expand_prompt,
     build_skeleton_prompt,
@@ -399,9 +398,9 @@ class AiServiceTests(unittest.TestCase):
 
     def test_progress_tracks_active_and_finished_task_weights(self):
         self.assertEqual(REVIEW_PROGRESS_STEPS, 5)
-        # 1 concept + ceil(sections/4) skeleton waves + 1 expand per section
-        self.assertEqual(planned_generation_steps("personality"), 1 + 5 + 20)
-        self.assertEqual(planned_generation_steps("personality_free"), 1 + 3 + 11)
+        # Paid: skeleton waves + expand per section. Free: parallel text waves only.
+        self.assertEqual(planned_generation_steps("personality"), 5 + 20)
+        self.assertEqual(planned_generation_steps("personality_free"), 3)
         t0 = 1_000.0
         two_active = [
             TaskProgress(started_at=t0),
@@ -651,20 +650,23 @@ class AiServiceTests(unittest.TestCase):
 
     def test_skeleton_pipeline_prompts(self):
         titles = catalog_titles("personality_free")[:3]
-        concept = build_concept_prompt(
-            "personality_free", "Натальная карта", titles
-        )
-        self.assertIn(CONCEPT_TITLE, concept)
-        self.assertIn("ОБЩУЮ ЗАДУМКУ", concept)
         skeleton = build_skeleton_prompt(
+            "personality_free",
+            "Натальная карта",
+            titles,
+            ask_concept=True,
+        )
+        self.assertIn("СКЕЛЕТ", skeleton)
+        self.assertIn("2–3 коротких пункта", skeleton)
+        self.assertIn("общей задумки", skeleton)
+        self.assertNotIn("=====\nОбщая задумка\n=====", skeleton)
+        with_concept = build_skeleton_prompt(
             "personality_free",
             "Натальная карта",
             titles,
             concept="Сквозная тема: внутреннее противоречие.",
         )
-        self.assertIn("СКЕЛЕТ", skeleton)
-        self.assertIn("2–3 коротких пункта", skeleton)
-        self.assertIn("Сквозная тема", skeleton)
+        self.assertIn("Сквозная тема", with_concept)
         expand = build_expand_prompt(
             "personality_free",
             "Натальная карта",
@@ -675,6 +677,10 @@ class AiServiceTests(unittest.TestCase):
         self.assertIn("ГОТОВЫЙ текст", expand)
         self.assertIn("РЕКОМЕНДАЦИИ СКЕЛЕТА", expand)
         self.assertEqual(SKELETON_WAVE_SIZE, 4)
+        self.assertEqual(
+            _extract_preamble("Короткий план.\n\n=====\nТвой портрет\n=====\nпункт"),
+            "Короткий план.",
+        )
 
 
 if __name__ == "__main__":

@@ -318,16 +318,19 @@ async def set_report_price(scenario: str, amount: int) -> None:
 
 
 DEFAULT_AI_MODELS = {
+    "free": "deepseek-v4-flash",
     "expensive": "deepseek-v4-pro-0813",
     "cheap": "deepseek-v4-flash",
 }
 AI_MODEL_ROLE_LABELS = {
-    "expensive": "Дорогая модель (скелет)",
-    "cheap": "Дешёвая модель (разделы)",
+    "free": "Бесплатные (волны)",
+    "expensive": "Дорогая (скелет PDF)",
+    "cheap": "Дешёвая (разделы PDF)",
 }
 _LEGACY_MODEL_FALLBACKS = {
+    "free": ("model_free",),
     "expensive": ("model_review", "model_pdf"),
-    "cheap": ("model_free", "model_pdf"),
+    "cheap": ("model_pdf", "model_free"),
 }
 
 
