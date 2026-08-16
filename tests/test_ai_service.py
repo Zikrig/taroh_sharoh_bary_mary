@@ -48,13 +48,19 @@ from services.generation_progress import (
 from services.astro import local_time_to_utc
 from services.prompt_guides.career import build_career_hints
 from services.report_prompts import (
+    CONCEPT_TITLE,
     EDITOR_SYSTEM_PROMPT,
     FREE_SECTION_BATCH,
     PAID_SECTION_BATCH,
     PRODUCT_PROMPTS,
     SECTION_DELIMITER,
     SECTION_MAX_WORDS,
+    SKELETON_WAVE_SIZE,
+    SYSTEM_PROMPT,
+    build_concept_prompt,
     build_editorial_prompt,
+    build_expand_prompt,
+    build_skeleton_prompt,
     format_delimited_sections,
     product_prompt_for_titles,
     section_max_words,
@@ -393,8 +399,9 @@ class AiServiceTests(unittest.TestCase):
 
     def test_progress_tracks_active_and_finished_task_weights(self):
         self.assertEqual(REVIEW_PROGRESS_STEPS, 5)
-        self.assertEqual(planned_generation_steps("personality"), 12)
-        self.assertEqual(planned_generation_steps("personality_free"), 8)
+        # 1 concept + ceil(sections/4) skeleton waves + 1 expand per section
+        self.assertEqual(planned_generation_steps("personality"), 1 + 5 + 20)
+        self.assertEqual(planned_generation_steps("personality_free"), 1 + 3 + 11)
         t0 = 1_000.0
         two_active = [
             TaskProgress(started_at=t0),
@@ -443,12 +450,12 @@ class AiServiceTests(unittest.TestCase):
                 "total_cost_rub": 1.75,
                 "generation_requests": 3,
                 "review_requests": 1,
-                "generation_model": "deepseek-v4-flash",
-                "review_model": "deepseek-v4-pro-0813",
+                "generation_model": "deepseek-v4-pro-0813",
+                "review_model": "deepseek-v4-flash",
             }
         )
-        self.assertIn("Отчёт: 1.25 ₽ · deepseek-v4-flash", summary)
-        self.assertIn("Ревью: 0.50 ₽ · deepseek-v4-pro-0813", summary)
+        self.assertIn("Скелет (дорогая): 1.25 ₽ · deepseek-v4-pro-0813", summary)
+        self.assertIn("Разделы (дешёвая): 0.50 ₽ · deepseek-v4-flash", summary)
         self.assertIn("Итого: 1.75 ₽", summary)
         usage = SimpleNamespace(cost_rub=0.42, model_extra=None)
         self.assertAlmostEqual(_usage_cost_rub(SimpleNamespace(usage=usage)), 0.42)
@@ -632,9 +639,42 @@ class AiServiceTests(unittest.TestCase):
 
     def test_one_shot_sample_covers_all_free_titles(self):
         titles = catalog_titles("personality_free")
-        parsed, rejection = parse_delimited_sections(_sample_report(titles), titles)
+        sample = (
+            "=====\n"
+            + "\n=====\n".join(
+                f"{title}\n=====\nТекст про {title.lower()}." for title in titles
+            )
+        )
+        parsed, rejection = parse_delimited_sections(sample, titles)
         self.assertIsNone(rejection)
-        self.assertEqual(len(parsed), 11)
+        self.assertEqual([item["title"] for item in parsed], titles)
+
+    def test_skeleton_pipeline_prompts(self):
+        titles = catalog_titles("personality_free")[:3]
+        concept = build_concept_prompt(
+            "personality_free", "Натальная карта", titles
+        )
+        self.assertIn(CONCEPT_TITLE, concept)
+        self.assertIn("ОБЩУЮ ЗАДУМКУ", concept)
+        skeleton = build_skeleton_prompt(
+            "personality_free",
+            "Натальная карта",
+            titles,
+            concept="Сквозная тема: внутреннее противоречие.",
+        )
+        self.assertIn("СКЕЛЕТ", skeleton)
+        self.assertIn("2–3 коротких пункта", skeleton)
+        self.assertIn("Сквозная тема", skeleton)
+        expand = build_expand_prompt(
+            "personality_free",
+            "Натальная карта",
+            titles[0],
+            concept="Сквозная тема",
+            skeleton="1. Угол А\n2. Угол Б",
+        )
+        self.assertIn("ГОТОВЫЙ текст", expand)
+        self.assertIn("РЕКОМЕНДАЦИИ СКЕЛЕТА", expand)
+        self.assertEqual(SKELETON_WAVE_SIZE, 4)
 
 
 if __name__ == "__main__":

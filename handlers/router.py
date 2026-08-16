@@ -441,7 +441,7 @@ def admin_menu(*, test_mode: bool, free_daily_limit: bool):
 async def models_settings_menu():
     models = await get_ai_models()
     builder = InlineKeyboardBuilder()
-    for role in ("free", "pdf", "review"):
+    for role in ("expensive", "cheap"):
         builder.button(
             text=f"{AI_MODEL_ROLE_LABELS[role]}",
             callback_data=f"admin:model:{role}",
@@ -455,15 +455,14 @@ def models_settings_message(models: dict[str, str] | None = None) -> str:
     lines = [
         "Управление моделями",
         "",
-        "• Бесплатные сообщения — мини-разбор",
-        "• PDF — платные разделы полного отчёта",
-        "• Финальная проверка — ревью и бесплатного, и платного текста",
+        "• Дорогая — общая задумка и скелет разделов (2–3 пункта на раздел)",
+        "• Дешёвая — готовый текст каждого раздела по скелету",
         "",
         "Выберите роль, чтобы сменить id модели AITUNNEL.",
     ]
     if models:
         lines.append("")
-        for role in ("free", "pdf", "review"):
+        for role in ("expensive", "cheap"):
             lines.append(f"• {AI_MODEL_ROLE_LABELS[role]}: {models[role]}")
     return "\n".join(lines)
 
@@ -537,7 +536,7 @@ def admin_text(
         "на пользователя. При исчерпании лимита остаётся кнопка полного PDF.\n\n"
         "Раздел «Генерации» — проверка разборов без оплаты и без лимита.\n"
         "Раздел «Цены» — стоимость полного PDF в Stars.\n"
-        "Раздел «Модели» — модели для бесплатных, PDF и финальной проверки."
+        "Раздел «Модели» — дорогая модель для скелета и дешёвая для текста разделов."
     )
 
 

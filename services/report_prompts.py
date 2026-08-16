@@ -5,6 +5,8 @@ import re
 SECTION_DELIMITER = "====="
 FREE_SECTION_BATCH = 5
 PAID_SECTION_BATCH = 3
+SKELETON_WAVE_SIZE = 4
+CONCEPT_TITLE = "Общая задумка"
 FREE_SECTION_MIN_WORDS = 100
 FREE_SECTION_MAX_WORDS = 250
 _HEADER_SPLIT = re.compile(r"(?m)^={5,}\s*$")
@@ -1124,6 +1126,141 @@ def format_delimited_sections(sections: list[dict[str, str]]) -> str:
             continue
         parts.extend([SECTION_DELIMITER, title, SECTION_DELIMITER, content, ""])
     return "\n".join(parts).strip()
+
+
+def build_concept_prompt(
+    report_type: str,
+    natal_text: str,
+    titles: list[str],
+    prior_sections: list[dict[str, str]] | None = None,
+) -> str:
+    listed = "\n".join(f"- {title}" for title in titles)
+    prior = ""
+    if prior_sections:
+        chunks = [
+            f"--- {item.get('title')} ---\n{item.get('content')}"
+            for item in prior_sections
+            if item.get("title") and item.get("content")
+        ]
+        if chunks:
+            prior = (
+                "\n\nУже показанный бесплатный мини-разбор — учти как смысловую основу, "
+                "не копируй:\n" + "\n\n".join(chunks)
+            )
+    return f"""
+{natal_text}
+
+Составь ОБЩУЮ ЗАДУМКУ персонального разбора типа «{report_type}».
+
+Разделы, которые потом будут написаны:
+{listed}
+
+Задумка — короткий план всего разбора (8–14 предложений или плотный маркированный список):
+- главная тема и тон;
+- 3–5 сквозных линий, которые должны проходить через разделы;
+- 2–3 внутренних противоречия, которые стоит раскрыть;
+- чего избегать (повторы, общие гороскопы, вода);
+- как разделы должны усиливать друг друга, а не дублировать.
+
+Не пиши сами разделы. Не пересказывай всю карту.
+{prior}
+
+{SECTION_DELIMITER}
+{CONCEPT_TITLE}
+{SECTION_DELIMITER}
+
+текст задумки без заголовка внутри.
+
+Не пиши преамбулу до разделителя. Без Markdown и **.
+""".strip()
+
+
+def build_skeleton_prompt(
+    report_type: str,
+    natal_text: str,
+    titles: list[str],
+    *,
+    concept: str,
+    prior_sections: list[dict[str, str]] | None = None,
+    covered_skeletons: list[dict[str, str]] | None = None,
+) -> str:
+    product = product_prompt_for_titles(report_type, titles)
+    prior = ""
+    if prior_sections:
+        chunks = [
+            f"- {item.get('title')}: {item.get('content')}"
+            for item in prior_sections
+            if item.get("title") and item.get("content")
+        ]
+        if chunks:
+            prior = "Бесплатный мини-разбор (основа, не копировать):\n" + "\n".join(chunks)
+    covered = ""
+    if covered_skeletons:
+        lines = [
+            f"- {item['title']}: {item['content']}"
+            for item in covered_skeletons
+            if item.get("title") and item.get("content")
+        ]
+        if lines:
+            covered = "Уже готовые скелеты других разделов — не повторяй их углы:\n" + "\n".join(lines)
+    parts = [
+        natal_text,
+        f"ОБЩАЯ ЗАДУМКА РАЗБОРА:\n{concept}",
+        product,
+        (
+            "Сейчас нужен только СКЕЛЕТ (черновик-рекомендации), не готовый текст для читателя.\n"
+            "Для каждого запрошенного раздела дай ровно 2–3 коротких пункта:\n"
+            "• что сказать / какой угол взять;\n"
+            "• на какое противоречие или деталь опереться;\n"
+            "• чего избегать в этом разделе.\n"
+            "Каждый пункт — 1–2 предложения. Без художественной прозы."
+        ),
+    ]
+    if prior:
+        parts.append(prior)
+    if covered:
+        parts.append(covered)
+    parts.append(output_format_block(titles, report_type=None, batch=True))
+    return "\n\n".join(parts)
+
+
+def build_expand_prompt(
+    report_type: str,
+    natal_text: str,
+    title: str,
+    *,
+    concept: str,
+    skeleton: str,
+    prior_sections: list[dict[str, str]] | None = None,
+) -> str:
+    product = product_prompt_for_titles(report_type, [title])
+    prior_block = ""
+    if prior_sections:
+        chunks = [
+            f"--- {item.get('title')} ---\n{item.get('content')}"
+            for item in prior_sections
+            if item.get("title") and item.get("content")
+        ]
+        if chunks:
+            prior_block = (
+                "Бесплатный мини-разбор — смысловая основа, расширяй, не пересказывай:\n"
+                + "\n\n".join(chunks)
+            )
+    parts = [
+        natal_text,
+        f"ОБЩАЯ ЗАДУМКА РАЗБОРА:\n{concept}",
+        f"РЕКОМЕНДАЦИИ СКЕЛЕТА ДЛЯ РАЗДЕЛА «{title}»:\n{skeleton}",
+        product,
+        (
+            "Напиши ГОТОВЫЙ текст раздела для читателя на «ты».\n"
+            "Опирайся на общую задумку и рекомендации скелета.\n"
+            "Не копируй скелет дословно — разверни в живой текст раздела."
+        ),
+    ]
+    if prior_block:
+        parts.append(prior_block)
+    parts.append(output_format_block([title], report_type=report_type, batch=True))
+    return "\n\n".join(parts)
 
 
 def build_editorial_prompt(

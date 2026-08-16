@@ -18,13 +18,18 @@ from database.repository import (
     normalize_gender,
 )
 from services.report_prompts import (
+    CONCEPT_TITLE,
     EDITOR_SYSTEM_PROMPT,
     FREE_SECTION_BATCH,
     PAID_SECTION_BATCH,
     PRODUCT_PROMPTS,
     SECTION_DELIMITER,
+    SKELETON_WAVE_SIZE,
     SYSTEM_PROMPT,
+    build_concept_prompt,
     build_editorial_prompt,
+    build_expand_prompt,
+    build_skeleton_prompt,
     format_delimited_sections,
     output_format_block,
     product_prompt_for_titles,
@@ -56,38 +61,45 @@ class GenerationProgress(Protocol):
 
 @dataclass
 class UsageLedger:
-    generation_cost_rub: float = 0.0
-    review_cost_rub: float = 0.0
-    generation_requests: int = 0
-    review_requests: int = 0
-    generation_model: str = ""
-    review_model: str = ""
+    expensive_cost_rub: float = 0.0
+    cheap_cost_rub: float = 0.0
+    expensive_requests: int = 0
+    cheap_requests: int = 0
+    expensive_model: str = ""
+    cheap_model: str = ""
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
 
     async def add(self, phase: str, cost_rub: float, model: str) -> None:
         amount = max(0.0, float(cost_rub or 0.0))
         async with self._lock:
-            if phase == "review":
-                self.review_cost_rub += amount
-                self.review_requests += 1
+            if phase in {"cheap", "expand"}:
+                self.cheap_cost_rub += amount
+                self.cheap_requests += 1
                 if model:
-                    self.review_model = model
+                    self.cheap_model = model
             else:
-                self.generation_cost_rub += amount
-                self.generation_requests += 1
+                self.expensive_cost_rub += amount
+                self.expensive_requests += 1
                 if model:
-                    self.generation_model = model
+                    self.expensive_model = model
 
     def as_dict(self) -> dict[str, Any]:
-        total = self.generation_cost_rub + self.review_cost_rub
+        total = self.expensive_cost_rub + self.cheap_cost_rub
         return {
-            "generation_cost_rub": round(self.generation_cost_rub, 4),
-            "review_cost_rub": round(self.review_cost_rub, 4),
+            "expensive_cost_rub": round(self.expensive_cost_rub, 4),
+            "cheap_cost_rub": round(self.cheap_cost_rub, 4),
+            # Backward-compatible aliases for older admin summaries/tests.
+            "generation_cost_rub": round(self.expensive_cost_rub, 4),
+            "review_cost_rub": round(self.cheap_cost_rub, 4),
             "total_cost_rub": round(total, 4),
-            "generation_requests": self.generation_requests,
-            "review_requests": self.review_requests,
-            "generation_model": self.generation_model,
-            "review_model": self.review_model,
+            "expensive_requests": self.expensive_requests,
+            "cheap_requests": self.cheap_requests,
+            "generation_requests": self.expensive_requests,
+            "review_requests": self.cheap_requests,
+            "expensive_model": self.expensive_model,
+            "cheap_model": self.cheap_model,
+            "generation_model": self.expensive_model,
+            "review_model": self.cheap_model,
         }
 
 
@@ -111,19 +123,29 @@ def _usage_cost_rub(response: Any) -> float:
 def format_admin_usage_summary(usage: dict[str, Any] | None) -> str | None:
     if not usage:
         return None
-    generation_model = str(usage.get("generation_model") or "—")
-    review_model = str(usage.get("review_model") or "—")
-    generation_cost = float(usage.get("generation_cost_rub") or 0.0)
-    review_cost = float(usage.get("review_cost_rub") or 0.0)
-    total_cost = float(usage.get("total_cost_rub") or (generation_cost + review_cost))
-    generation_requests = int(usage.get("generation_requests") or 0)
-    review_requests = int(usage.get("review_requests") or 0)
+    expensive_model = str(
+        usage.get("expensive_model") or usage.get("generation_model") or "—"
+    )
+    cheap_model = str(usage.get("cheap_model") or usage.get("review_model") or "—")
+    expensive_cost = float(
+        usage.get("expensive_cost_rub") or usage.get("generation_cost_rub") or 0.0
+    )
+    cheap_cost = float(
+        usage.get("cheap_cost_rub") or usage.get("review_cost_rub") or 0.0
+    )
+    total_cost = float(usage.get("total_cost_rub") or (expensive_cost + cheap_cost))
+    expensive_requests = int(
+        usage.get("expensive_requests") or usage.get("generation_requests") or 0
+    )
+    cheap_requests = int(
+        usage.get("cheap_requests") or usage.get("review_requests") or 0
+    )
     return (
         "📊 Сводка расходов AITUNNEL\n\n"
-        f"Отчёт: {generation_cost:.2f} ₽ · {generation_model}"
-        f" ({generation_requests} запрос.)\n"
-        f"Ревью: {review_cost:.2f} ₽ · {review_model}"
-        f" ({review_requests} запрос.)\n"
+        f"Скелет (дорогая): {expensive_cost:.2f} ₽ · {expensive_model}"
+        f" ({expensive_requests} запрос.)\n"
+        f"Разделы (дешёвая): {cheap_cost:.2f} ₽ · {cheap_model}"
+        f" ({cheap_requests} запрос.)\n"
         f"Итого: {total_cost:.2f} ₽"
     )
 
@@ -242,15 +264,16 @@ def _section_batch_size(report_type: str) -> int:
     return FREE_SECTION_BATCH if str(report_type).endswith("_free") else PAID_SECTION_BATCH
 
 
+def planned_generation_steps(report_type: str) -> int:
+    """Concept + skeleton waves + one expand call per section."""
+    titles = catalog_titles(report_type)
+    skeleton_waves = len(section_title_batches(titles, SKELETON_WAVE_SIZE))
+    return 1 + skeleton_waves + len(titles)
+
+
+# Kept for older helpers/tests that still reference review progress.
 REVIEW_PROGRESS_STEPS = 5
 PAID_REVIEW_WAVES = 3
-
-
-def planned_generation_steps(report_type: str) -> int:
-    """Generation waves plus a heavier final-review weight."""
-    titles = catalog_titles(report_type)
-    waves = len(section_title_batches(titles, _section_batch_size(report_type)))
-    return waves + REVIEW_PROGRESS_STEPS
 
 
 def split_into_parts(items: list[Any], parts: int) -> list[list[Any]]:
@@ -1031,6 +1054,7 @@ async def _run_section_wave(
     progress: GenerationProgress | None,
     usage_ledger: UsageLedger | None = None,
 ) -> list[dict[str, Any]]:
+    """Legacy full-text wave (unused by the skeleton pipeline)."""
     step_id: int | None = None
     if progress is not None:
         step_id = await progress.start_step()
@@ -1050,7 +1074,7 @@ async def _run_section_wave(
         wave_id=wave_id,
         model=model,
         usage_ledger=usage_ledger,
-        usage_phase="generation",
+        usage_phase="expensive",
     )
     if validated is None:
         if progress is not None and step_id is not None:
@@ -1059,6 +1083,137 @@ async def _run_section_wave(
     if progress is not None and step_id is not None:
         await progress.finish_step(step_id)
     return validated
+
+
+async def _run_concept(
+    client: Any,
+    *,
+    report_type: str,
+    natal_text: str,
+    titles: list[str],
+    prior_sections: list[dict[str, str]] | None,
+    model: str,
+    allowed_facts: list[str],
+    progress: GenerationProgress | None,
+    usage_ledger: UsageLedger | None = None,
+) -> str | None:
+    step_id: int | None = None
+    if progress is not None:
+        step_id = await progress.start_step()
+    user_prompt = build_concept_prompt(
+        report_type, natal_text, titles, prior_sections
+    )
+    validated = await _request_delimited_sections(
+        client,
+        report_type=report_type,
+        titles=[CONCEPT_TITLE],
+        user_prompt=user_prompt,
+        allowed_facts=allowed_facts,
+        wave_id="concept",
+        model=model,
+        usage_ledger=usage_ledger,
+        usage_phase="expensive",
+    )
+    if not validated:
+        if progress is not None and step_id is not None:
+            await progress.fail_step(step_id)
+        return None
+    if progress is not None and step_id is not None:
+        await progress.finish_step(step_id)
+    return str(validated[0].get("content") or "").strip() or None
+
+
+async def _run_skeleton_wave(
+    client: Any,
+    *,
+    report_type: str,
+    batch_titles: list[str],
+    natal_text: str,
+    concept: str,
+    allowed_facts: list[str],
+    wave_id: str,
+    model: str,
+    prior_sections: list[dict[str, str]] | None,
+    covered_skeletons: list[dict[str, str]] | None,
+    progress: GenerationProgress | None,
+    usage_ledger: UsageLedger | None = None,
+) -> list[dict[str, Any]]:
+    step_id: int | None = None
+    if progress is not None:
+        step_id = await progress.start_step()
+    user_prompt = build_skeleton_prompt(
+        report_type,
+        natal_text,
+        batch_titles,
+        concept=concept,
+        prior_sections=prior_sections,
+        covered_skeletons=covered_skeletons,
+    )
+    validated = await _request_delimited_sections(
+        client,
+        report_type=report_type,
+        titles=batch_titles,
+        user_prompt=user_prompt,
+        allowed_facts=allowed_facts,
+        wave_id=wave_id,
+        model=model,
+        usage_ledger=usage_ledger,
+        usage_phase="expensive",
+    )
+    if validated is None:
+        if progress is not None and step_id is not None:
+            await progress.fail_step(step_id)
+        return []
+    if progress is not None and step_id is not None:
+        await progress.finish_step(step_id)
+    return validated
+
+
+async def _run_expand_section(
+    client: Any,
+    *,
+    report_type: str,
+    title: str,
+    natal_text: str,
+    concept: str,
+    skeleton: str,
+    allowed_facts: list[str],
+    model: str,
+    prior_sections: list[dict[str, str]] | None,
+    progress: GenerationProgress | None,
+    usage_ledger: UsageLedger | None = None,
+    wave_id: str | None = None,
+) -> dict[str, Any] | None:
+    step_id: int | None = None
+    if progress is not None:
+        step_id = await progress.start_step()
+    user_prompt = build_expand_prompt(
+        report_type,
+        natal_text,
+        title,
+        concept=concept,
+        skeleton=skeleton,
+        prior_sections=prior_sections,
+    )
+    validated = await _request_delimited_sections(
+        client,
+        report_type=report_type,
+        titles=[title],
+        user_prompt=user_prompt,
+        allowed_facts=allowed_facts,
+        wave_id=wave_id or f"expand_{_safe_path_part(title)[:40]}",
+        model=model,
+        usage_ledger=usage_ledger,
+        usage_phase="cheap",
+    )
+    if not validated:
+        if progress is not None and step_id is not None:
+            await progress.fail_step(step_id)
+        return None
+    if progress is not None and step_id is not None:
+        await progress.finish_step(step_id)
+    return validated[0]
+
 
 def _sections_by_title(sections: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     by_title: dict[str, dict[str, Any]] = {}
@@ -1091,7 +1246,7 @@ async def generate_report_content(
     progress: GenerationProgress | None = None,
     gender: str | None = None,
 ) -> dict[str, Any] | None:
-    """Generate report waves in parallel, then retry only missing sections."""
+    """Expensive skeleton + concept, then cheap per-section expansion."""
     if not settings.ai_api_key:
         return None
     try:
@@ -1113,7 +1268,10 @@ async def generate_report_content(
         )
         cache_key = _report_cache_key(
             report_type,
-            payload["natal_text"] + "\n" + prior_blob + f"\ngender:{resolved_gender}",
+            payload["natal_text"]
+            + "\n"
+            + prior_blob
+            + f"\ngender:{resolved_gender}\npipeline:skeleton-v1",
         )
         cached = _REPORT_CACHE.get(cache_key)
         if cached:
@@ -1129,14 +1287,12 @@ async def generate_report_content(
             max_retries=0,
         )
         titles = catalog_titles(report_type)
-        batch_size = _section_batch_size(report_type)
-        batches = section_title_batches(titles, batch_size)
-        is_free = str(report_type).endswith("_free")
-        generation_model = await get_ai_model("free" if is_free else "pdf")
-        review_model = await get_ai_model("review")
+        skeleton_batches = section_title_batches(titles, SKELETON_WAVE_SIZE)
+        expensive_model = await get_ai_model("expensive")
+        cheap_model = await get_ai_model("cheap")
         usage_ledger = UsageLedger(
-            generation_model=generation_model,
-            review_model=review_model,
+            expensive_model=expensive_model,
+            cheap_model=cheap_model,
         )
         if progress is not None:
             await progress.configure(planned_generation_steps(report_type))
@@ -1144,60 +1300,78 @@ async def generate_report_content(
         allowed_facts = payload["allowed_facts"]
         natal_text = payload["natal_text"]
 
-        wave_results = await asyncio.gather(
+        concept = await _run_concept(
+            client,
+            report_type=report_type,
+            natal_text=natal_text,
+            titles=titles,
+            prior_sections=prior_sections,
+            model=expensive_model,
+            allowed_facts=allowed_facts,
+            progress=progress,
+            usage_ledger=usage_ledger,
+        )
+        if not concept:
+            return None
+
+        skeleton_results = await asyncio.gather(
             *[
-                _run_section_wave(
+                _run_skeleton_wave(
                     client,
                     report_type=report_type,
                     batch_titles=batch_titles,
                     natal_text=natal_text,
+                    concept=concept,
                     allowed_facts=allowed_facts,
-                    wave_id=f"wave{index:02d}",
-                    model=generation_model,
+                    wave_id=f"skel{index:02d}",
+                    model=expensive_model,
                     prior_sections=prior_sections,
-                    covered=None,
+                    covered_skeletons=None,
                     progress=progress,
                     usage_ledger=usage_ledger,
                 )
-                for index, batch_titles in enumerate(batches, start=1)
+                for index, batch_titles in enumerate(skeleton_batches, start=1)
             ]
         )
-        by_title: dict[str, dict[str, Any]] = {}
-        for validated in wave_results:
-            by_title.update(_sections_by_title(validated))
+        skeleton_by_title: dict[str, dict[str, Any]] = {}
+        for validated in skeleton_results:
+            skeleton_by_title.update(_sections_by_title(validated))
 
-        missing = _missing_titles(titles, by_title)
-        if missing:
+        missing_skeletons = _missing_titles(titles, skeleton_by_title)
+        if missing_skeletons:
             logger.warning(
-                "После параллельных волн «%s» не хватает разделов: %s",
+                "После скелет-волн «%s» не хватает разделов: %s",
                 report_type,
-                ", ".join(missing),
+                ", ".join(missing_skeletons),
             )
             covered = [
                 {
                     "title": item["title"],
-                    "summary": _section_summary(item["content"]),
+                    "content": _section_summary(item["content"]),
                 }
-                for item in (by_title[title] for title in titles if title in by_title)
-            ]
-            retry_batches = section_title_batches(missing, batch_size)
-            if progress is not None:
-                successful_waves = sum(1 for validated in wave_results if validated)
-                await progress.set_total(
-                    successful_waves + len(retry_batches) + REVIEW_PROGRESS_STEPS
+                for item in (
+                    skeleton_by_title[title]
+                    for title in titles
+                    if title in skeleton_by_title
                 )
+            ]
+            retry_batches = section_title_batches(missing_skeletons, SKELETON_WAVE_SIZE)
+            if progress is not None:
+                done = 1 + sum(1 for validated in skeleton_results if validated)
+                await progress.set_total(done + len(retry_batches) + len(titles))
             retry_results = await asyncio.gather(
                 *[
-                    _run_section_wave(
+                    _run_skeleton_wave(
                         client,
                         report_type=report_type,
                         batch_titles=batch_titles,
                         natal_text=natal_text,
+                        concept=concept,
                         allowed_facts=allowed_facts,
-                        wave_id=f"retry{index:02d}",
-                        model=generation_model,
+                        wave_id=f"skel_retry{index:02d}",
+                        model=expensive_model,
                         prior_sections=prior_sections,
-                        covered=covered,
+                        covered_skeletons=covered,
                         progress=progress,
                         usage_ledger=usage_ledger,
                     )
@@ -1205,26 +1379,79 @@ async def generate_report_content(
                 ]
             )
             for validated in retry_results:
-                by_title.update(_sections_by_title(validated))
+                skeleton_by_title.update(_sections_by_title(validated))
+
+        if _missing_titles(titles, skeleton_by_title):
+            return None
+
+        expand_results = await asyncio.gather(
+            *[
+                _run_expand_section(
+                    client,
+                    report_type=report_type,
+                    title=title,
+                    natal_text=natal_text,
+                    concept=concept,
+                    skeleton=str(skeleton_by_title[title].get("content") or ""),
+                    allowed_facts=allowed_facts,
+                    model=cheap_model,
+                    prior_sections=prior_sections,
+                    progress=progress,
+                    usage_ledger=usage_ledger,
+                    wave_id=f"exp{index:02d}",
+                )
+                for index, title in enumerate(titles, start=1)
+            ]
+        )
+        by_title: dict[str, dict[str, Any]] = {}
+        for item in expand_results:
+            if item:
+                by_title.update(_sections_by_title([item]))
+
+        missing = _missing_titles(titles, by_title)
+        if missing:
+            logger.warning(
+                "После раскрытия «%s» не хватает разделов: %s",
+                report_type,
+                ", ".join(missing),
+            )
+            if progress is not None:
+                await progress.set_total(
+                    planned_generation_steps(report_type) + len(missing)
+                )
+            retry_expand = await asyncio.gather(
+                *[
+                    _run_expand_section(
+                        client,
+                        report_type=report_type,
+                        title=title,
+                        natal_text=natal_text,
+                        concept=concept,
+                        skeleton=str(skeleton_by_title[title].get("content") or ""),
+                        allowed_facts=allowed_facts,
+                        model=cheap_model,
+                        prior_sections=prior_sections,
+                        progress=progress,
+                        usage_ledger=usage_ledger,
+                        wave_id=f"exp_retry_{_safe_path_part(title)[:24]}",
+                    )
+                    for title in missing
+                ]
+            )
+            for item in retry_expand:
+                if item:
+                    by_title.update(_sections_by_title([item]))
 
         collected = _ordered_sections(titles, by_title)
         if not collected:
             return None
 
-        collected = await _review_sections(
-            client,
-            report_type=report_type,
-            sections=collected,
-            allowed_facts=allowed_facts,
-            model=review_model,
-            usage_ledger=usage_ledger,
-            progress=progress,
-        )
         title, intro = _report_shell(report_type)
         result = {
             "title": title,
             "intro": intro,
             "sections": collected,
+            "concept": concept,
             "disclaimer": (
                 "Материал носит символический и развлекательный характер и "
                 "предназначен для саморефлексии."

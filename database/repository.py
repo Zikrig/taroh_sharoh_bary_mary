@@ -87,6 +87,10 @@ async def init_db() -> None:
             VALUES ('model_pdf', 'deepseek-v4-flash');
             INSERT OR IGNORE INTO app_settings (key, value)
             VALUES ('model_review', 'deepseek-v4-pro-0813');
+            INSERT OR IGNORE INTO app_settings (key, value)
+            VALUES ('model_expensive', 'deepseek-v4-pro-0813');
+            INSERT OR IGNORE INTO app_settings (key, value)
+            VALUES ('model_cheap', 'deepseek-v4-flash');
             """
         )
         columns = {
@@ -314,14 +318,16 @@ async def set_report_price(scenario: str, amount: int) -> None:
 
 
 DEFAULT_AI_MODELS = {
-    "free": "deepseek-v4-flash",
-    "pdf": "deepseek-v4-flash",
-    "review": "deepseek-v4-pro-0813",
+    "expensive": "deepseek-v4-pro-0813",
+    "cheap": "deepseek-v4-flash",
 }
 AI_MODEL_ROLE_LABELS = {
-    "free": "Модель бесплатных сообщений",
-    "pdf": "Модель PDF",
-    "review": "Модель финальной проверки",
+    "expensive": "Дорогая модель (скелет)",
+    "cheap": "Дешёвая модель (разделы)",
+}
+_LEGACY_MODEL_FALLBACKS = {
+    "expensive": ("model_review", "model_pdf"),
+    "cheap": ("model_free", "model_pdf"),
 }
 
 
@@ -330,6 +336,12 @@ async def get_ai_models() -> dict[str, str]:
     for role, default in DEFAULT_AI_MODELS.items():
         raw = await get_app_setting(f"model_{role}")
         value = str(raw).strip() if raw is not None else ""
+        if not value:
+            for legacy_key in _LEGACY_MODEL_FALLBACKS.get(role, ()):
+                legacy = await get_app_setting(legacy_key)
+                if legacy and str(legacy).strip():
+                    value = str(legacy).strip()
+                    break
         models[role] = value or default
     return models
 
