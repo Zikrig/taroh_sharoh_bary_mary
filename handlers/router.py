@@ -12,9 +12,12 @@ from aiogram.types import CallbackQuery, FSInputFile, LabeledPrice, Message, Use
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from services.ai import (
+    MODELS_PAGE_SIZE,
+    MAX_OUTPUT_COST_RUB,
     format_admin_usage_summary,
     generate_report_content,
     get_aitunnel_balance,
+    list_affordable_chat_models,
 )
 from services.generation_progress import (
     TaskProgress,
@@ -37,6 +40,7 @@ from database.repository import (
     DEFAULT_REPORT_PRICES,
     GENDER_FEMALE,
     GENDER_MALE,
+    PDF_SELL_TEXT_KINDS,
     birth_fingerprint,
     complete_order,
     create_order,
@@ -45,6 +49,7 @@ from database.repository import (
     get_free_daily_limit_enabled,
     get_free_generation,
     get_order,
+    get_pdf_sell_text,
     get_profile,
     get_app_setting,
     get_report_context,
@@ -63,6 +68,7 @@ from database.repository import (
     set_free_daily_limit_enabled,
     set_order_status,
     set_app_setting,
+    set_pdf_sell_text,
     set_report_price,
     set_test_mode,
 )
@@ -209,7 +215,21 @@ class AdminStates(StatesGroup):
     main_menu_text = State()
     price_value = State()
     model_value = State()
+    pdf_sell_text = State()
 
+
+PDF_SELL_KIND_LABELS = {
+    "upsell": "После мини-разбора",
+    "offer": "Прямой оффер PDF",
+}
+
+
+async def get_paid_offer_text(scenario: str) -> str:
+    return await get_pdf_sell_text("offer", scenario, PAID_OFFER_TEXTS)
+
+
+async def get_free_upsell_text(scenario: str) -> str:
+    return await get_pdf_sell_text("upsell", scenario, FREE_UPSELL_TEXTS)
 
 async def menu(user_id: int):
     share_text = await get_app_setting("share_text") or "Узнай себя по звёздам →"
@@ -459,7 +479,8 @@ def models_settings_message(models: dict[str, str] | None = None) -> str:
         "• Дорогая — скелет разделов PDF (2–3 пункта) и короткая задумка",
         "• Дешёвая — готовый текст каждого раздела PDF по скелету",
         "",
-        "Выберите роль, чтобы сменить id модели AITUNNEL.",
+        f"Выбор из каталога AITUNNEL (выход < {int(MAX_OUTPUT_COST_RUB)} ₽/1M) "
+        "или ввод id вручную.",
     ]
     if models:
         lines.append("")
@@ -500,6 +521,7 @@ def text_settings_menu():
     builder.button(text="🏠 Описание главного меню", callback_data="admin:main_menu_text")
     builder.button(text="🆘 Текст поддержки", callback_data="admin:support_text")
     builder.button(text="📤 Текст «Поделиться»", callback_data="admin:share_text")
+    builder.button(text="📄 Продающие тексты PDF", callback_data="admin:pdf_texts")
     builder.button(text="⬅️ Назад", callback_data="admin:back")
     builder.adjust(1)
     return builder.as_markup()
@@ -512,6 +534,107 @@ def text_settings_message() -> str:
         "Для описания главного меню поддерживается Telegram HTML-разметка: "
         "<b>жирный</b>, <i>курсив</i>, <a href=\"https://example.com\">ссылка</a>."
     )
+
+
+def pdf_texts_menu():
+    builder = InlineKeyboardBuilder()
+    for scenario in ("personality", "love", "money", "compatibility"):
+        builder.button(
+            text=NAMES[scenario],
+            callback_data=f"admin:pdf_text_scenario:{scenario}",
+        )
+    builder.button(text="⬅️ Назад", callback_data="admin:texts")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def pdf_texts_message() -> str:
+    return (
+        "Продающие тексты PDF\n\n"
+        "• После мини-разбора — текст после бесплатных разделов.\n"
+        "• Прямой оффер — когда мини-разбор недоступен или уже использован.\n\n"
+        "Выберите сценарий."
+    )
+
+
+def pdf_text_kind_menu(scenario: str):
+    builder = InlineKeyboardBuilder()
+    for kind in PDF_SELL_TEXT_KINDS:
+        builder.button(
+            text=PDF_SELL_KIND_LABELS[kind],
+            callback_data=f"admin:pdf_text:{kind}:{scenario}",
+        )
+    builder.button(text="⬅️ Назад", callback_data="admin:pdf_texts")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def pdf_text_kind_message(scenario: str) -> str:
+    return (
+        f"Продающие тексты · {NAMES[scenario]}\n\n"
+        "Выберите, какой текст изменить."
+    )
+
+
+def _model_button_label(model_id: str, completion_cost: float, *, selected: bool) -> str:
+    mark = "✓ " if selected else ""
+    cost = f"{completion_cost:.0f}" if completion_cost == int(completion_cost) else f"{completion_cost:.1f}"
+    suffix = f" · {cost}₽"
+    max_id = max(8, 48 - len(mark) - len(suffix))
+    short = model_id if len(model_id) <= max_id else model_id[: max_id - 1] + "…"
+    return f"{mark}{short}{suffix}"
+
+
+async def model_picker_menu(role: str, page: int = 0):
+    models = await list_affordable_chat_models()
+    current = await get_ai_model(role)
+    total = len(models)
+    pages = max(1, (total + MODELS_PAGE_SIZE - 1) // MODELS_PAGE_SIZE) if total else 1
+    page = max(0, min(int(page), pages - 1))
+    start = page * MODELS_PAGE_SIZE
+    chunk = models[start : start + MODELS_PAGE_SIZE]
+    builder = InlineKeyboardBuilder()
+    for index, item in enumerate(chunk):
+        builder.button(
+            text=_model_button_label(
+                item.id, item.completion_cost, selected=item.id == current
+            ),
+            callback_data=f"admin:msel:{role}:{page}:{index}",
+        )
+    nav: list[tuple[str, str]] = []
+    if page > 0:
+        nav.append(("⬅️", f"admin:mpage:{role}:{page - 1}"))
+    if page < pages - 1:
+        nav.append(("➡️", f"admin:mpage:{role}:{page + 1}"))
+    for text, data in nav:
+        builder.button(text=text, callback_data=data)
+    builder.button(text="⌨️ Ввести вручную", callback_data=f"admin:mmanual:{role}")
+    builder.button(text="⬅️ К ролям", callback_data="admin:models")
+    builder.adjust(1)
+    return builder.as_markup(), page, pages, total, current
+
+
+def model_picker_message(
+    role: str,
+    *,
+    page: int,
+    pages: int,
+    total: int,
+    current: str,
+) -> str:
+    lines = [
+        AI_MODEL_ROLE_LABELS[role],
+        f"Сейчас: {current}",
+        "",
+        f"Каталог AITUNNEL: выход < {int(MAX_OUTPUT_COST_RUB)} ₽ за 1M токенов.",
+    ]
+    if total:
+        lines.append(f"Модели: {total} · страница {page + 1}/{pages}")
+    else:
+        lines.append(
+            "Не удалось загрузить каталог. Можно ввести id модели вручную."
+        )
+    return "\n".join(lines)
 
 
 def admin_text(
@@ -537,7 +660,8 @@ def admin_text(
         "на пользователя. При исчерпании лимита остаётся кнопка полного PDF.\n\n"
         "Раздел «Генерации» — проверка разборов без оплаты и без лимита.\n"
         "Раздел «Цены» — стоимость полного PDF в Stars.\n"
-        "Раздел «Модели» — дорогая модель для скелета и дешёвая для текста разделов."
+        "Раздел «Модели» — бесплатная / дорогая / дешёвая (каталог AITUNNEL "
+        f"с ценой выхода < {int(MAX_OUTPUT_COST_RUB)} ₽/1M)."
     )
 
 
@@ -721,12 +845,100 @@ async def edit_ai_model(callback: CallbackQuery, state: FSMContext):
     if role not in DEFAULT_AI_MODELS:
         await callback.answer("Неизвестная роль модели.", show_alert=True)
         return
+    await state.clear()
+    await callback.answer()
+    markup, page, pages, total, current = await model_picker_menu(role, 0)
+    await _edit_or_answer(
+        callback.message,
+        model_picker_message(
+            role, page=page, pages=pages, total=total, current=current
+        ),
+        reply_markup=markup,
+    )
+
+
+@router.callback_query(F.data.startswith("admin:mpage:"))
+async def model_picker_page(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    parts = (callback.data or "").split(":")
+    if len(parts) != 4:
+        await callback.answer("Некорректная страница.", show_alert=True)
+        return
+    role, page_raw = parts[2], parts[3]
+    if role not in DEFAULT_AI_MODELS:
+        await callback.answer("Неизвестная роль модели.", show_alert=True)
+        return
+    try:
+        page = int(page_raw)
+    except ValueError:
+        await callback.answer("Некорректная страница.", show_alert=True)
+        return
+    await state.clear()
+    await callback.answer()
+    markup, page, pages, total, current = await model_picker_menu(role, page)
+    await _edit_or_answer(
+        callback.message,
+        model_picker_message(
+            role, page=page, pages=pages, total=total, current=current
+        ),
+        reply_markup=markup,
+    )
+
+
+@router.callback_query(F.data.startswith("admin:msel:"))
+async def select_ai_model_from_list(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    parts = (callback.data or "").split(":")
+    if len(parts) != 5:
+        await callback.answer("Некорректный выбор.", show_alert=True)
+        return
+    role, page_raw, index_raw = parts[2], parts[3], parts[4]
+    if role not in DEFAULT_AI_MODELS:
+        await callback.answer("Неизвестная роль модели.", show_alert=True)
+        return
+    try:
+        page = int(page_raw)
+        index = int(index_raw)
+    except ValueError:
+        await callback.answer("Некорректный выбор.", show_alert=True)
+        return
+    models = await list_affordable_chat_models()
+    offset = page * MODELS_PAGE_SIZE + index
+    if not 0 <= offset < len(models):
+        await callback.answer("Модель не найдена, обновите список.", show_alert=True)
+        return
+    model_name = models[offset].id
+    await set_ai_model(role, model_name)
+    await state.clear()
+    await callback.answer("Сохранено")
+    models_map = await get_ai_models()
+    await _edit_or_answer(
+        callback.message,
+        f"{AI_MODEL_ROLE_LABELS[role]} обновлена: {model_name} ✅\n\n"
+        + models_settings_message(models_map),
+        reply_markup=await models_settings_menu(),
+    )
+
+
+@router.callback_query(F.data.startswith("admin:mmanual:"))
+async def edit_ai_model_manual(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    role = callback.data.rsplit(":", 1)[-1]
+    if role not in DEFAULT_AI_MODELS:
+        await callback.answer("Неизвестная роль модели.", show_alert=True)
+        return
     current = await get_ai_model(role)
     await callback.answer()
     await state.set_state(AdminStates.model_value)
     await state.update_data(model_role=role)
     builder = InlineKeyboardBuilder()
-    builder.button(text="⬅️ Назад", callback_data="admin:cancel_model_edit")
+    builder.button(text="⬅️ Назад", callback_data=f"admin:model:{role}")
     await callback.message.answer(
         f"{AI_MODEL_ROLE_LABELS[role]}\n"
         f"Сейчас: {current}\n\n"
@@ -786,6 +998,96 @@ async def open_text_settings(callback: CallbackQuery):
         callback.message,
         text_settings_message(),
         reply_markup=text_settings_menu(),
+    )
+
+
+@router.callback_query(F.data == "admin:pdf_texts")
+async def open_pdf_texts(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    await state.clear()
+    await callback.answer()
+    await _edit_or_answer(
+        callback.message,
+        pdf_texts_message(),
+        reply_markup=pdf_texts_menu(),
+    )
+
+
+@router.callback_query(F.data.startswith("admin:pdf_text_scenario:"))
+async def open_pdf_text_scenario(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    scenario = callback.data.rsplit(":", 1)[-1]
+    if scenario not in PRICES:
+        await callback.answer("Неизвестный сценарий.", show_alert=True)
+        return
+    await state.clear()
+    await callback.answer()
+    await _edit_or_answer(
+        callback.message,
+        pdf_text_kind_message(scenario),
+        reply_markup=pdf_text_kind_menu(scenario),
+    )
+
+
+@router.callback_query(F.data.startswith("admin:pdf_text:"))
+async def edit_pdf_sell_text(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    parts = (callback.data or "").split(":")
+    # admin:pdf_text:{kind}:{scenario}
+    if len(parts) != 4:
+        await callback.answer("Некорректный пункт.", show_alert=True)
+        return
+    kind, scenario = parts[2], parts[3]
+    if kind not in PDF_SELL_TEXT_KINDS or scenario not in PRICES:
+        await callback.answer("Некорректный пункт.", show_alert=True)
+        return
+    defaults = FREE_UPSELL_TEXTS if kind == "upsell" else PAID_OFFER_TEXTS
+    current = await get_pdf_sell_text(kind, scenario, defaults)
+    preview = current if len(current) <= 900 else current[:890] + "…"
+    await callback.answer()
+    await state.set_state(AdminStates.pdf_sell_text)
+    await state.update_data(pdf_sell_kind=kind, pdf_sell_scenario=scenario)
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="⬅️ Назад",
+        callback_data=f"admin:pdf_text_scenario:{scenario}",
+    )
+    await callback.message.answer(
+        f"{PDF_SELL_KIND_LABELS[kind]} · {NAMES[scenario]}\n\n"
+        f"Сейчас:\n{preview}\n\n"
+        "Отправьте новый текст целиком.",
+        reply_markup=builder.as_markup(),
+    )
+
+
+@router.message(AdminStates.pdf_sell_text)
+async def save_pdf_sell_text(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        await message.answer("Команда доступна только администраторам.")
+        return
+    data = await state.get_data()
+    kind = data.get("pdf_sell_kind")
+    scenario = data.get("pdf_sell_scenario")
+    if kind not in PDF_SELL_TEXT_KINDS or scenario not in PRICES:
+        await state.clear()
+        await message.answer("Откройте настройку текстов PDF заново.")
+        return
+    text = (message.text or "").strip()
+    if not text:
+        await message.answer("Текст не должен быть пустым. Попробуйте ещё раз.")
+        return
+    await set_pdf_sell_text(kind, scenario, text)
+    await state.clear()
+    await message.answer(
+        f"{PDF_SELL_KIND_LABELS[kind]} · {NAMES[scenario]} обновлён ✅",
+        reply_markup=pdf_text_kind_menu(scenario),
     )
 
 
@@ -850,6 +1152,8 @@ async def navigate_back(callback: CallbackQuery, state: FSMContext):
         await start_edit(callback.message, state, callback.from_user.id)
     elif destination == "text_settings" and is_admin(callback.from_user.id):
         await callback.message.answer(text_settings_message(), reply_markup=text_settings_menu())
+    elif destination == "pdf_texts" and is_admin(callback.from_user.id):
+        await callback.message.answer(pdf_texts_message(), reply_markup=pdf_texts_menu())
     elif destination == "prices" and is_admin(callback.from_user.id):
         prices = await get_report_prices()
         await callback.message.answer(
@@ -1521,10 +1825,7 @@ async def show_teaser(
     ):
         await message.answer(
             "На сегодня бесплатный мини-разбор уже использован.\n\n"
-            + PAID_OFFER_TEXTS.get(
-                scenario_name,
-                "Можно сразу открыть полный персональный PDF.",
-            ),
+            + await get_paid_offer_text(scenario_name),
             reply_markup=offer_markup,
         )
         return
@@ -1549,7 +1850,7 @@ async def show_teaser(
                 await message.answer(
                     "Не удалось сформировать бесплатный разбор прямо сейчас. "
                     "Можно сразу открыть полный PDF.\n\n"
-                    + PAID_OFFER_TEXTS.get(scenario_name, ""),
+                    + await get_paid_offer_text(scenario_name),
                     reply_markup=offer_markup,
                 )
                 return
@@ -1578,7 +1879,7 @@ async def show_teaser(
         await message.answer(
             "Не удалось сформировать бесплатный разбор прямо сейчас. "
             "Можно сразу открыть полный PDF.\n\n"
-            + PAID_OFFER_TEXTS.get(scenario_name, ""),
+            + await get_paid_offer_text(scenario_name),
             reply_markup=offer_markup,
         )
         return
@@ -1586,7 +1887,7 @@ async def show_teaser(
     await message.answer(
         "Не удалось подготовить бесплатный разбор для этого сценария. "
         "Можно сразу открыть полный PDF.\n\n"
-        + PAID_OFFER_TEXTS.get(scenario_name, ""),
+        + await get_paid_offer_text(scenario_name),
         reply_markup=offer_markup,
     )
 
@@ -1629,10 +1930,7 @@ async def show_free_section(callback: CallbackQuery):
         admin_mode = bool(record.get("admin_mode"))
         price = None if admin_mode else await get_report_price(scenario_name)
         await callback.message.answer(
-            FREE_UPSELL_TEXTS.get(
-                scenario_name,
-                "Это бесплатный мини-разбор. Полный PDF раскрывает тему глубже.",
-            ),
+            await get_free_upsell_text(scenario_name),
             reply_markup=pdf_offer_keyboard(
                 scenario_name, admin_mode=admin_mode, price=price
             ),

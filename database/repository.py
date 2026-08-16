@@ -365,6 +365,27 @@ async def set_ai_model(role: str, model_name: str) -> None:
     await set_app_setting(f"model_{role}", cleaned)
 
 
+PDF_SELL_TEXT_KINDS = ("upsell", "offer")
+
+
+async def get_pdf_sell_text(kind: str, scenario: str, defaults: dict[str, str]) -> str:
+    if kind not in PDF_SELL_TEXT_KINDS:
+        raise KeyError(kind)
+    raw = await get_app_setting(f"pdf_{kind}_{scenario}")
+    if raw is not None and str(raw).strip():
+        return str(raw).strip()
+    return defaults.get(scenario, "")
+
+
+async def set_pdf_sell_text(kind: str, scenario: str, text: str) -> None:
+    if kind not in PDF_SELL_TEXT_KINDS:
+        raise KeyError(kind)
+    cleaned = text.strip()
+    if not cleaned:
+        raise ValueError("text must not be empty")
+    await set_app_setting(f"pdf_{kind}_{scenario}", cleaned)
+
+
 async def get_profile(user_id: int) -> dict[str, Any] | None:
     async with aiosqlite.connect(settings.database_path) as db:
         db.row_factory = aiosqlite.Row

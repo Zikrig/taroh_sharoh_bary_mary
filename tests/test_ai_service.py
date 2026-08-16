@@ -460,6 +460,49 @@ class AiServiceTests(unittest.TestCase):
         self.assertAlmostEqual(_usage_cost_rub(SimpleNamespace(usage=usage)), 0.42)
         self.assertEqual(_usage_cost_rub(SimpleNamespace(usage={"cost_rub": 0.1})), 0.1)
 
+    def test_filter_chat_models_by_output_cost(self):
+        from services.ai import filter_chat_models_by_output_cost
+
+        catalog = {
+            "cheap-a": {
+                "provider": "x",
+                "completion_cost": 36,
+                "prompt_cost": 18,
+                "modalities": {"output": ["text"]},
+            },
+            "expensive-b": {
+                "provider": "x",
+                "completion_cost": 6000,
+                "prompt_cost": 1000,
+                "modalities": {"output": ["text"]},
+            },
+            "hidden-c": {
+                "hidden": True,
+                "completion_cost": 10,
+                "prompt_cost": 1,
+                "modalities": {"output": ["text"]},
+            },
+            "image-only": {
+                "completion_cost": 10,
+                "prompt_cost": 1,
+                "modalities": {"output": ["image"]},
+            },
+            "borderline": {
+                "completion_cost": 300,
+                "prompt_cost": 1,
+                "modalities": {"output": ["text"]},
+            },
+            "ok-299": {
+                "completion_cost": 299,
+                "prompt_cost": 1,
+                "modalities": {"output": ["text"]},
+            },
+        }
+        models = filter_chat_models_by_output_cost(catalog, max_completion_cost_rub=300)
+        ids = [item.id for item in models]
+        self.assertEqual(ids, ["cheap-a", "ok-299"])
+        self.assertAlmostEqual(models[0].completion_cost, 36)
+
     def test_aitunnel_503_is_retryable(self):
         error = type("InternalServerError", (Exception,), {})("503 worker")
         error.status_code = 503

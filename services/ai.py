@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import re
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from hashlib import sha1
@@ -1611,3 +1612,112 @@ async def get_aitunnel_balance() -> dict[str, float] | None:
     except Exception:
         logger.exception("Не удалось получить баланс AITUNNEL")
         return None
+
+
+# AITUNNEL prices are ₽ per 1M tokens; we keep only chat models under this output cost.
+MAX_OUTPUT_COST_RUB = 300.0
+MODELS_PAGE_SIZE = 8
+_CHAT_MODELS_CACHE: tuple[float, list["AitunnelChatModel"]] | None = None
+_CHAT_MODELS_CACHE_TTL = 300.0
+
+
+@dataclass(frozen=True)
+class AitunnelChatModel:
+    id: str
+    completion_cost: float
+    prompt_cost: float
+    provider: str = ""
+
+
+def _aitunnel_public_root() -> str:
+    base = settings.ai_base_url.rstrip("/")
+    if base.endswith("/v1"):
+        base = base[:-3]
+    return base.rstrip("/")
+
+
+def filter_chat_models_by_output_cost(
+    catalog: dict[str, Any],
+    *,
+    max_completion_cost_rub: float = MAX_OUTPUT_COST_RUB,
+) -> list[AitunnelChatModel]:
+    """Keep visible chat models with completion_cost < threshold (₽ / 1M tokens)."""
+    models: list[AitunnelChatModel] = []
+    for model_id, meta in catalog.items():
+        if not isinstance(model_id, str) or not model_id.strip():
+            continue
+        if not isinstance(meta, dict):
+            continue
+        if meta.get("hidden"):
+            continue
+        modalities = meta.get("modalities")
+        if isinstance(modalities, dict):
+            outputs = modalities.get("output") or []
+            if outputs and "text" not in outputs:
+                continue
+        try:
+            completion_cost = float(meta.get("completion_cost"))
+            prompt_cost = float(meta.get("prompt_cost") or 0.0)
+        except (TypeError, ValueError):
+            continue
+        if completion_cost >= max_completion_cost_rub:
+            continue
+        models.append(
+            AitunnelChatModel(
+                id=model_id.strip(),
+                completion_cost=completion_cost,
+                prompt_cost=prompt_cost,
+                provider=str(meta.get("provider") or ""),
+            )
+        )
+    models.sort(key=lambda item: (item.completion_cost, item.id))
+    return models
+
+
+async def list_affordable_chat_models(
+    *,
+    max_completion_cost_rub: float = MAX_OUTPUT_COST_RUB,
+    force_refresh: bool = False,
+) -> list[AitunnelChatModel]:
+    """Public AITUNNEL chat catalog filtered by output token price."""
+    global _CHAT_MODELS_CACHE
+    now = time.monotonic()
+    if (
+        not force_refresh
+        and _CHAT_MODELS_CACHE is not None
+        and now - _CHAT_MODELS_CACHE[0] < _CHAT_MODELS_CACHE_TTL
+    ):
+        cached = _CHAT_MODELS_CACHE[1]
+        return [
+            item
+            for item in cached
+            if item.completion_cost < max_completion_cost_rub
+        ]
+    try:
+        import httpx
+
+        url = f"{_aitunnel_public_root()}/public/aitunnel/models/chat"
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+        data = response.json()
+        if not isinstance(data, dict):
+            return []
+        models = filter_chat_models_by_output_cost(
+            data, max_completion_cost_rub=MAX_OUTPUT_COST_RUB
+        )
+        _CHAT_MODELS_CACHE = (now, models)
+        return [
+            item
+            for item in models
+            if item.completion_cost < max_completion_cost_rub
+        ]
+    except Exception:
+        logger.exception("Не удалось получить каталог моделей AITUNNEL")
+        if _CHAT_MODELS_CACHE is not None:
+            return [
+                item
+                for item in _CHAT_MODELS_CACHE[1]
+                if item.completion_cost < max_completion_cost_rub
+            ]
+        return []

@@ -72,6 +72,14 @@ class RouterUiTests(unittest.TestCase):
             for needle in needles:
                 self.assertIn(needle, text, scenario)
 
+    def test_text_settings_include_pdf_sell_entry(self):
+        from handlers.router import pdf_texts_menu, text_settings_menu
+
+        texts = [btn.text for row in text_settings_menu().inline_keyboard for btn in row]
+        self.assertIn("📄 Продающие тексты PDF", texts)
+        scenarios = [btn.callback_data for row in pdf_texts_menu().inline_keyboard for btn in row]
+        self.assertIn("admin:pdf_text_scenario:personality", scenarios)
+
     def test_all_scenarios_have_generated_free_reports(self):
         self.assertEqual(set(FREE_REPORT_TYPES), set(PRICES))
         for scenario, free_type in FREE_REPORT_TYPES.items():
