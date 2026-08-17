@@ -583,6 +583,13 @@
       "card_count": 357
     },
     {
+      "section_id": "compatibility.19",
+      "report_type": "compatibility",
+      "title_ru": "Какой партнёр тебе подходит",
+      "path": "compatibility/19.json",
+      "card_count": 0
+    },
+    {
       "section_id": "compatibility.18",
       "report_type": "compatibility",
       "title_ru": "Итоговый портрет пары",

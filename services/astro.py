@@ -92,6 +92,7 @@ def calculate_chart(
     for position in positions.values():
         position["house"] = _house_for_longitude(position["longitude"], house_cusps)
     ascendant = houses[0] % 360
+    descendant = (ascendant + 180) % 360
     return {
         "date": date,
         "time": time,
@@ -102,6 +103,7 @@ def calculate_chart(
         "longitude": longitude,
         "planets": positions,
         "ascendant": {"longitude": round(ascendant, 2), "sign": SIGNS[int(ascendant // 30)]},
+        "descendant": {"longitude": round(descendant, 2), "sign": SIGNS[int(descendant // 30)]},
         "houses": house_cusps,
         "aspects": _calculate_aspects(positions),
     }

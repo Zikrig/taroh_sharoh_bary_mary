@@ -145,7 +145,7 @@ class AiServiceTests(unittest.TestCase):
         self.assertEqual(len(SECTIONS["personality"]), 20)
         self.assertEqual(len(SECTIONS["love"]), 18)
         self.assertEqual(len(SECTIONS["money"]), 18)
-        self.assertEqual(len(SECTIONS["compatibility"]), 18)
+        self.assertEqual(len(SECTIONS["compatibility"]), 19)
         self.assertIn(
             ("Отношение к деньгам", "как воспринимаешь деньги и ресурсы"),
             SECTIONS["money"],
@@ -627,6 +627,16 @@ class AiServiceTests(unittest.TestCase):
         self.assertIn("Дома (куспиды):", text)
         self.assertIn("Планеты:", text)
         self.assertIn("Асцендент:", text)
+        self.assertIn("Десцендент:", text)
+        self.assertIn("Десцендент: Весы", text)
+
+    def test_compatibility_partner_section_asks_for_meeting_and_portrait(self):
+        prompt = product_prompt_for_titles("compatibility", ["Какой партнёр тебе подходит"])
+        self.assertIn("PERSON A", prompt)
+        self.assertIn("Где возможна встреча", prompt)
+        self.assertIn("Внешние черты", prompt)
+        self.assertIn("Внутренние черты", prompt)
+        self.assertIn("Максимум 380 слов", prompt)
 
     def test_payload_transcript_saves_system_and_user_in_report_folder(self):
         messages = [

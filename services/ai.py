@@ -466,6 +466,7 @@ def _chart_for_prompt(chart: dict) -> dict[str, Any]:
         "latitude": chart.get("latitude"),
         "longitude": chart.get("longitude"),
         "ascendant": chart["ascendant"],
+        "descendant": chart.get("descendant"),
         "houses": chart["houses"],
         "planets": chart["planets"],
         "aspects": chart["aspects"],
@@ -492,6 +493,15 @@ def _render_chart(chart: dict[str, Any], heading: str) -> str:
         sign = ascendant.get("sign") or (_sign_at(longitude) if longitude is not None else "")
         degree = f", {_degree_in_sign(float(longitude))}°" if longitude is not None else ""
         lines.append(f"Асцендент: {sign}{degree}")
+    descendant = chart.get("descendant") or {}
+    if not descendant and ascendant.get("longitude") is not None:
+        dsc_longitude = (float(ascendant["longitude"]) + 180) % 360
+        descendant = {"longitude": dsc_longitude, "sign": _sign_at(dsc_longitude)}
+    if descendant:
+        longitude = descendant.get("longitude")
+        sign = descendant.get("sign") or (_sign_at(longitude) if longitude is not None else "")
+        degree = f", {_degree_in_sign(float(longitude))}°" if longitude is not None else ""
+        lines.append(f"Десцендент: {sign}{degree}")
     lines.append("")
     lines.append("Планеты:")
     for name, position in (chart.get("planets") or {}).items():

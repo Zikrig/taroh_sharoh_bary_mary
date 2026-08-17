@@ -1,0 +1,17 @@
+{
+  "schema_version": "section-hint.v1",
+  "section_id": "compatibility.19",
+  "report_type": "compatibility",
+  "title_ru": "Какой партнёр тебе подходит",
+  "brief": "встреча, внешность и внутренний портрет партнёра",
+  "prompt_requirements": {
+    "min_words": 100,
+    "max_words": 253,
+    "style_notes": [
+      "Тема раздела: встреча, внешность и внутренний портрет партнёра по карте PERSON A.",
+      "Минимум воды. Только наблюдения, связанные с фактами карты."
+    ],
+    "avoid_repeating_sections": []
+  },
+  "hint_cards": []
+}
