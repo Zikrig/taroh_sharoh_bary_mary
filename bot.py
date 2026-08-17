@@ -6,6 +6,7 @@ from aiogram import Bot, Dispatcher
 from config.settings import settings
 from database.repository import init_db
 from handlers.router import router
+from handlers.admin_prompts import router as prompt_admin_router
 
 
 async def main() -> None:
@@ -14,6 +15,7 @@ async def main() -> None:
     await init_db()
     bot = Bot(settings.bot_token)
     dispatcher = Dispatcher()
+    dispatcher.include_router(prompt_admin_router)
     dispatcher.include_router(router)
     try:
         await dispatcher.start_polling(bot)

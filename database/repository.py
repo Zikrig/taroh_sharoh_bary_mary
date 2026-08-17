@@ -114,6 +114,7 @@ async def init_db() -> None:
         )
         await _ensure_free_generations_schema(db)
         await db.commit()
+    await ensure_prompt_defaults()
 
 
 async def _ensure_free_generations_schema(db: aiosqlite.Connection) -> None:
@@ -384,6 +385,112 @@ async def set_pdf_sell_text(kind: str, scenario: str, text: str) -> None:
     if not cleaned:
         raise ValueError("text must not be empty")
     await set_app_setting(f"pdf_{kind}_{scenario}", cleaned)
+
+
+PROMPT_SETTING_PREFIX = "prompt:"
+PROMPT_DEFAULT_PREFIX = "promptdef:"
+
+
+async def get_all_prompt_overrides() -> dict[str, str]:
+    async with aiosqlite.connect(settings.database_path) as db:
+        async with db.execute(
+            "SELECT key, value FROM app_settings WHERE key LIKE ?",
+            (f"{PROMPT_SETTING_PREFIX}%",),
+        ) as cur:
+            rows = await cur.fetchall()
+    overrides: dict[str, str] = {}
+    prefix_len = len(PROMPT_SETTING_PREFIX)
+    for key, value in rows:
+        prompt_key = str(key)[prefix_len:]
+        text = str(value).strip() if value is not None else ""
+        if prompt_key and text:
+            overrides[prompt_key] = text
+    return overrides
+
+
+async def get_all_prompt_defaults() -> dict[str, str]:
+    async with aiosqlite.connect(settings.database_path) as db:
+        async with db.execute(
+            "SELECT key, value FROM app_settings WHERE key LIKE ?",
+            (f"{PROMPT_DEFAULT_PREFIX}%",),
+        ) as cur:
+            rows = await cur.fetchall()
+    defaults: dict[str, str] = {}
+    prefix_len = len(PROMPT_DEFAULT_PREFIX)
+    for key, value in rows:
+        prompt_key = str(key)[prefix_len:]
+        text = str(value).strip() if value is not None else ""
+        if prompt_key and text:
+            defaults[prompt_key] = text
+    return defaults
+
+
+async def get_prompt_override(key: str) -> str | None:
+    raw = await get_app_setting(f"{PROMPT_SETTING_PREFIX}{key}")
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    return text or None
+
+
+async def get_prompt_default(key: str) -> str | None:
+    raw = await get_app_setting(f"{PROMPT_DEFAULT_PREFIX}{key}")
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    return text or None
+
+
+async def set_prompt_override(key: str, text: str) -> None:
+    cleaned = text.strip()
+    if not cleaned:
+        raise ValueError("prompt must not be empty")
+    await set_app_setting(f"{PROMPT_SETTING_PREFIX}{key}", cleaned)
+
+
+async def delete_prompt_override(key: str) -> None:
+    await delete_app_setting(f"{PROMPT_SETTING_PREFIX}{key}")
+
+
+async def ensure_prompt_defaults() -> None:
+    from services.prompt_catalog import all_prompt_keys, default_prompt_text
+
+    async with aiosqlite.connect(settings.database_path) as db:
+        for key in all_prompt_keys():
+            await db.execute(
+                "INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)",
+                (f"{PROMPT_DEFAULT_PREFIX}{key}", default_prompt_text(key)),
+            )
+        await db.commit()
+
+
+async def restore_prompt_default(key: str) -> str:
+    from services.prompt_catalog import default_prompt_text, is_known_prompt_key
+
+    if not is_known_prompt_key(key):
+        raise KeyError(key)
+    stored = await get_prompt_default(key)
+    text = stored or default_prompt_text(key)
+    if not stored:
+        await set_app_setting(f"{PROMPT_DEFAULT_PREFIX}{key}", text)
+    await delete_prompt_override(key)
+    return text
+
+
+async def get_active_prompts() -> dict[str, str]:
+    from services.prompt_catalog import all_prompt_keys, default_prompt_text
+
+    await ensure_prompt_defaults()
+    active = {key: default_prompt_text(key) for key in all_prompt_keys()}
+    active.update(await get_all_prompt_defaults())
+    active.update(await get_all_prompt_overrides())
+    return active
+
+
+async def delete_app_setting(key: str) -> None:
+    async with aiosqlite.connect(settings.database_path) as db:
+        await db.execute("DELETE FROM app_settings WHERE key = ?", (key,))
+        await db.commit()
 
 
 async def get_profile(user_id: int) -> dict[str, Any] | None:

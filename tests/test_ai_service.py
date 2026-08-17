@@ -638,6 +638,14 @@ class AiServiceTests(unittest.TestCase):
         self.assertIn("Внутренние черты", prompt)
         self.assertIn("Максимум 380 слов", prompt)
 
+    def test_love_partner_section_asks_for_meeting_and_portrait(self):
+        prompt = product_prompt_for_titles("love", ["Какой партнёр тебе подходит"])
+        self.assertNotIn("PERSON A", prompt)
+        self.assertIn("Где возможна встреча", prompt)
+        self.assertIn("Внешние черты", prompt)
+        self.assertIn("Внутренние черты", prompt)
+        self.assertIn("Максимум 380 слов", prompt)
+
     def test_payload_transcript_saves_system_and_user_in_report_folder(self):
         messages = [
             {"role": "system", "content": "SYSTEM BODY"},

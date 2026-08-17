@@ -16,16 +16,19 @@ from database.repository import (
     DEFAULT_GENDER,
     gender_label_ru,
     get_ai_model,
+    get_active_prompts,
     normalize_gender,
 )
 from services.report_prompts import (
-    EDITOR_SYSTEM_PROMPT,
     FREE_SECTION_BATCH,
     PAID_SECTION_BATCH,
     PRODUCT_PROMPTS,
     SECTION_DELIMITER,
     SKELETON_WAVE_SIZE,
     SYSTEM_PROMPT,
+    active_editor_prompt,
+    active_system_prompt,
+    apply_prompt_overrides,
     build_editorial_prompt,
     build_expand_prompt,
     build_skeleton_prompt,
@@ -900,7 +903,7 @@ async def _request_delimited_sections(
     rejection: str | None = None
     for attempt in range(FAILED_BATCH_RETRIES + 1):
         messages = [
-            {"role": "system", "content": system_prompt or SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt or active_system_prompt()},
             {"role": "user", "content": user_prompt},
         ]
         if rejection:
@@ -1048,7 +1051,7 @@ async def _review_section_batch(
         allowed_facts=allowed_facts,
         wave_id=wave_id,
         model=model,
-        system_prompt=EDITOR_SYSTEM_PROMPT,
+        system_prompt=active_editor_prompt(),
         usage_ledger=usage_ledger,
         usage_phase="review",
     )[0]
@@ -1361,6 +1364,7 @@ async def generate_report_content(
     try:
         from openai import AsyncOpenAI
 
+        apply_prompt_overrides(await get_active_prompts())
         is_free = str(report_type).endswith("_free")
         if is_free:
             prior_sections = None

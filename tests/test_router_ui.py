@@ -157,6 +157,9 @@ class RouterUiTests(unittest.TestCase):
         self.assertIn("🤖 Модели", texts)
         self.assertIn("admin:models", callbacks)
         self.assertIn("Модели", text)
+        self.assertIn("🧠 Промпты", texts)
+        self.assertIn("admin:prompts", callbacks)
+        self.assertIn("Промпты", text)
 
     def test_admin_generations_menu_mirrors_products_without_stars(self):
         markup = admin_generations_menu()

@@ -85,7 +85,7 @@ SECTION_MAX_WORDS: dict[str, dict[str, int]] = {
         "Как ты переживаешь расставание": 200,
         "Возвращение к прошлому": 180,
         "Повторяющиеся сценарии отношений": 260,
-        "Какой партнёр тебе подходит": 220,
+        "Какой партнёр тебе подходит": 380,
         "С кем может быть сложно": 200,
         "Что усиливает отношения": 180,
         "Что может разрушать отношения": 200,
@@ -285,6 +285,185 @@ EDITOR_SYSTEM_PROMPT = """
 Можно чуть сократить воду. Удачные абзацы не переписывай. Смысл сохрани.
 Живой тон и короткие абзацы с пустой строкой между ними оставь.
 """.strip()
+
+_PROMPT_OVERRIDES: dict[str, str] = {}
+
+PIPELINE_CONCEPT = """
+Составь ОБЩУЮ ЗАДУМКУ персонального разбора типа «{report_type}».
+
+Разделы, которые потом будут написаны:
+{listed}
+
+Задумка — короткий план всего разбора (8–14 предложений или плотный маркированный список):
+- главная тема и тон;
+- 3–5 сквозных линий, которые должны проходить через разделы;
+- 2–3 внутренних противоречия, которые стоит раскрыть;
+- чего избегать (повторы, общие гороскопы, вода);
+- как разделы должны усиливать друг друга, а не дублировать.
+
+Не пиши сами разделы. Не пересказывай всю карту.
+{prior}
+""".strip()
+
+PIPELINE_ASK_CONCEPT = (
+    "Сначала 3–5 предложений общей задумки всего разбора "
+    "(тема, тон, сквозные линии). Без разделителей =====.\n"
+    "Потом — скелеты запрошенных разделов."
+)
+
+PIPELINE_SKELETON = """
+Сейчас нужен только СКЕЛЕТ (черновик-рекомендации), не готовый текст для читателя.
+Для каждого запрошенного раздела дай ровно 2–3 коротких пункта:
+• что сказать / какой угол взять;
+• на какое противоречие или деталь опереться;
+• чего избегать в этом разделе.
+Каждый пункт — 1–2 предложения. Без художественной прозы.
+""".strip()
+
+PIPELINE_EXPAND = """
+Напиши ГОТОВЫЙ текст раздела для читателя на «ты».
+Опирайся на рекомендации скелета{concept_clause}.
+Не копируй скелет дословно — разверни в живой текст раздела.
+""".strip()
+
+PIPELINE_EDITORIAL = """
+Это полный черновик персонального разбора. Прочитай его целиком.
+
+{scope}
+
+Критерии:
+1. По всему тексту избегай схожих формулировок: одинаковых оборотов, зачинов,
+   метафор и связок в разных разделах.
+2. Избегай одной и той же структуры абзаца или списка, повторённой по разбору.
+   Если мысль нужна в другом месте — скажи её иначе и короче.
+3. Исправь странно сформулированные предложения: ломаный синтаксис, склеенные мысли,
+   неестественный порядок слов, канцелярит, фразы, которые человек так не скажет.
+4. Обязательно почини артефакты: абзацы без пунктуации; слеши перед знаками
+   вроде \\. \\, \\!; Markdown/HTML; невидимые и плохо отображаемые в PDF символы.
+   В ответе должен остаться обычный читаемый русский текст.
+5. Можно чуть сократить воду. Удачные абзацы не трогай.
+6. Сохрани смысл, нейтральность обращения и живой тон.
+7. Не добавляй факты и астрологию, которых не было в черновике.
+   Без Markdown, без капса, без «это не А, это Б».
+
+ПОЛНЫЙ ЧЕРНОВИК:
+{full_draft}
+
+{return_line}
+{listed}
+""".strip()
+
+PIPELINE_FORMAT = """
+==================================================
+ФОРМАТ ОТВЕТА
+==================================================
+
+{scope}
+Каждый раздел отделяй строго так:
+
+{delimiter}
+{example}
+{delimiter}
+
+текст раздела без заголовка внутри.
+
+Внутри раздела:
+- короткие абзацы по 2–4 предложения, между ними пустая строка;
+- нумерованный список, если раздел про несколько качеств, сложностей, сценариев или фраз;
+- не пиши одну сплошную простыню.
+
+Названия разделов используй ТОЧНО такими и в этом порядке:
+{listed}
+{limits}
+Не пиши преамбулу до первого разделителя.
+Не используй Markdown и символы **.
+Не повторяй название раздела внутри текста.
+""".strip()
+
+PIPELINE_TEMPLATES = {
+    "concept": PIPELINE_CONCEPT,
+    "ask_concept": PIPELINE_ASK_CONCEPT,
+    "skeleton": PIPELINE_SKELETON,
+    "expand": PIPELINE_EXPAND,
+    "editorial": PIPELINE_EDITORIAL,
+    "format": PIPELINE_FORMAT,
+}
+
+PIPELINE_PLACEHOLDERS = {
+    "concept": ("report_type", "listed", "prior"),
+    "ask_concept": (),
+    "skeleton": (),
+    "expand": ("concept_clause",),
+    "editorial": ("scope", "full_draft", "return_line", "listed"),
+    "format": ("scope", "delimiter", "example", "listed", "limits"),
+}
+
+
+def apply_prompt_overrides(mapping: dict[str, str] | None) -> None:
+    global _PROMPT_OVERRIDES
+    _PROMPT_OVERRIDES = {
+        str(key): str(value).strip()
+        for key, value in (mapping or {}).items()
+        if str(key).strip() and str(value).strip()
+    }
+
+
+def prompt_override(key: str) -> str | None:
+    value = _PROMPT_OVERRIDES.get(key)
+    return value if value else None
+
+
+def active_system_prompt() -> str:
+    return prompt_override("sys") or SYSTEM_PROMPT
+
+
+def active_editor_prompt() -> str:
+    return prompt_override("ed") or EDITOR_SYSTEM_PROMPT
+
+
+def _pipeline_template(name: str) -> str:
+    default = PIPELINE_TEMPLATES[name]
+    return prompt_override(f"p.{name}") or default
+
+
+def _render_pipeline(name: str, **kwargs: str) -> str:
+    template = _pipeline_template(name)
+    try:
+        return template.format(**kwargs)
+    except (KeyError, IndexError, ValueError):
+        return PIPELINE_TEMPLATES[name].format(**kwargs)
+
+
+def default_product_parts(report_type: str) -> tuple[str, list[tuple[str, str]]]:
+    return _split_product_blocks(PRODUCT_PROMPTS[report_type])
+
+
+def product_prompt_parts(report_type: str) -> tuple[str, list[tuple[str, str]]]:
+    intro, blocks = default_product_parts(report_type)
+    intro_override = prompt_override(f"i.{report_type}")
+    if intro_override:
+        intro = intro_override
+    patched: list[tuple[str, str]] = []
+    for index, (header, body) in enumerate(blocks):
+        override = prompt_override(f"s.{report_type}.{index}")
+        patched.append((header, override if override else body))
+    return intro, patched
+
+
+def assembled_product_prompt(report_type: str) -> str:
+    intro, blocks = product_prompt_parts(report_type)
+    chunks = [intro]
+    for header, body in blocks:
+        chunks.extend(
+            [
+                "==================================================",
+                header,
+                "==================================================",
+                body,
+            ]
+        )
+    return "\n".join(chunks)
+
 
 PRODUCT_PROMPTS: dict[str, str] = {
     "personality_free": """
@@ -750,7 +929,30 @@ PRODUCT_PROMPTS: dict[str, str] = {
 ==================================================
 КАКОЙ ПАРТНЁР ТЕБЕ ПОДХОДИТ
 ==================================================
-Какой партнёр подходит. Не своди ответ к перечню знаков.
+Опирайся на натальную карту читателя. Не своди ответ к перечню знаков.
+Составь подробный портрет типа партнёра, который подходит.
+Для рассуждения используй 7-й дом, десцендент, планеты в 7-м, Венеру и Марс;
+места знакомства — 5-й, 7-й, 9-й, 11-й дома и дом Венеры. В тексте для читателя
+не называй дома, аспекты и расчёты — переводи в жизненные ситуации.
+Не назначай партнёру пол. Не обещай встречу и не называй дату.
+
+Раздели раздел на три блока с короткими подзаголовками:
+
+Где возможна встреча.
+2–3 конкретные сферы и ситуации, где знакомство вероятнее: работа, учёба, поездки,
+друзья, хобби, онлайн, через семью, случайные места — только то, что следует из карты.
+Без «ты точно встретишь». Если время рождения приблизительное — пиши мягче
+и сильнее опирайся на Венеру, Марс и Луну, чем на дома.
+
+Внешние черты.
+Как такой человек выглядит и держится: телосложение и осанка в общих чертах,
+манера двигаться, стиль, голос, первое впечатление. Не фоторобот и не точный рост
+или цвет глаз — живой узнаваемый силуэт.
+
+Внутренние черты.
+Характер, эмоциональный стиль, как говорит и слушает, отношение к свободе, деньгам
+и близости, способность давать поддержку, темп жизни. Чем такой партнёр отличается
+от того, кто только цепляет, но не подходит надолго.
 
 ==================================================
 С КЕМ МОЖЕТ БЫТЬ СЛОЖНО
@@ -1040,10 +1242,10 @@ def _header_matches(header: str, wanted: dict[str, str]) -> str | None:
 
 def product_prompt_for_titles(report_type: str, titles: list[str]) -> str:
     """Keep the product intro and only the requested section instructions."""
-    full = PRODUCT_PROMPTS[report_type]
+    full = assembled_product_prompt(report_type)
     if not titles:
         return full
-    intro, blocks = _split_product_blocks(full)
+    intro, blocks = product_prompt_parts(report_type)
     wanted = {_normalize_prompt_title(title): title for title in titles}
     selected: dict[str, str] = {}
     for header, body in blocks:
@@ -1119,32 +1321,14 @@ def output_format_block(
 
 Не превышай лимит. Если раздел можно сказать короче без потери точности — скажи короче.
 """
-    return f"""
-==================================================
-ФОРМАТ ОТВЕТА
-==================================================
-
-{scope}
-Каждый раздел отделяй строго так:
-
-{SECTION_DELIMITER}
-{example}
-{SECTION_DELIMITER}
-
-текст раздела без заголовка внутри.
-
-Внутри раздела:
-- короткие абзацы по 2–4 предложения, между ними пустая строка;
-- нумерованный список, если раздел про несколько качеств, сложностей, сценариев или фраз;
-- не пиши одну сплошную простыню.
-
-Названия разделов используй ТОЧНО такими и в этом порядке:
-{listed}
-{limits}
-Не пиши преамбулу до первого разделителя.
-Не используй Markdown и символы **.
-Не повторяй название раздела внутри текста.
-""".strip()
+    return _render_pipeline(
+        "format",
+        scope=scope,
+        delimiter=SECTION_DELIMITER,
+        example=example,
+        listed=listed,
+        limits=limits,
+    ).strip()
 
 
 def format_delimited_sections(sections: list[dict[str, str]]) -> str:
@@ -1177,23 +1361,16 @@ def build_concept_prompt(
                 "\n\nУже показанный бесплатный мини-разбор — учти как смысловую основу, "
                 "не копируй:\n" + "\n\n".join(chunks)
             )
+    instruction = _render_pipeline(
+        "concept",
+        report_type=report_type,
+        listed=listed,
+        prior=prior,
+    )
     return f"""
 {natal_text}
 
-Составь ОБЩУЮ ЗАДУМКУ персонального разбора типа «{report_type}».
-
-Разделы, которые потом будут написаны:
-{listed}
-
-Задумка — короткий план всего разбора (8–14 предложений или плотный маркированный список):
-- главная тема и тон;
-- 3–5 сквозных линий, которые должны проходить через разделы;
-- 2–3 внутренних противоречия, которые стоит раскрыть;
-- чего избегать (повторы, общие гороскопы, вода);
-- как разделы должны усиливать друг друга, а не дублировать.
-
-Не пиши сами разделы. Не пересказывай всю карту.
-{prior}
+{instruction}
 
 {SECTION_DELIMITER}
 {CONCEPT_TITLE}
@@ -1238,20 +1415,9 @@ def build_skeleton_prompt(
     if concept.strip():
         parts.append(f"ОБЩАЯ ЗАДУМКА РАЗБОРА:\n{concept.strip()}")
     elif ask_concept:
-        parts.append(
-            "Сначала 3–5 предложений общей задумки всего разбора "
-            "(тема, тон, сквозные линии). Без разделителей =====.\n"
-            "Потом — скелеты запрошенных разделов."
-        )
+        parts.append(_pipeline_template("ask_concept"))
     parts.append(product)
-    parts.append(
-        "Сейчас нужен только СКЕЛЕТ (черновик-рекомендации), не готовый текст для читателя.\n"
-        "Для каждого запрошенного раздела дай ровно 2–3 коротких пункта:\n"
-        "• что сказать / какой угол взять;\n"
-        "• на какое противоречие или деталь опереться;\n"
-        "• чего избегать в этом разделе.\n"
-        "Каждый пункт — 1–2 предложения. Без художественной прозы."
-    )
+    parts.append(_pipeline_template("skeleton"))
     if prior:
         parts.append(prior)
     if covered:
@@ -1289,12 +1455,9 @@ def build_expand_prompt(
         [
             f"РЕКОМЕНДАЦИИ СКЕЛЕТА ДЛЯ РАЗДЕЛА «{title}»:\n{skeleton}",
             product,
-            (
-                "Напиши ГОТОВЫЙ текст раздела для читателя на «ты».\n"
-                "Опирайся на рекомендации скелета"
-                + (" и общую задумку" if concept.strip() else "")
-                + ".\n"
-                "Не копируй скелет дословно — разверни в живой текст раздела."
+            _render_pipeline(
+                "expand",
+                concept_clause=(" и общую задумку" if concept.strip() else ""),
             ),
         ]
     )
@@ -1330,31 +1493,11 @@ def build_editorial_prompt(
             "Верни все разделы слегка отредактированными одним сообщением, в том же порядке:"
         )
         batch = False
-    return f"""
-Это полный черновик персонального разбора. Прочитай его целиком.
-
-{scope}
-
-Критерии:
-1. По всему тексту избегай схожих формулировок: одинаковых оборотов, зачинов,
-   метафор и связок в разных разделах.
-2. Избегай одной и той же структуры абзаца или списка, повторённой по разбору.
-   Если мысль нужна в другом месте — скажи её иначе и короче.
-3. Исправь странно сформулированные предложения: ломаный синтаксис, склеенные мысли,
-   неестественный порядок слов, канцелярит, фразы, которые человек так не скажет.
-4. Обязательно почини артефакты: абзацы без пунктуации; слеши перед знаками
-   вроде \\. \\, \\!; Markdown/HTML; невидимые и плохо отображаемые в PDF символы.
-   В ответе должен остаться обычный читаемый русский текст.
-5. Можно чуть сократить воду. Удачные абзацы не трогай.
-6. Сохрани смысл, нейтральность обращения и живой тон.
-7. Не добавляй факты и астрологию, которых не было в черновике.
-   Без Markdown, без капса, без «это не А, это Б».
-
-ПОЛНЫЙ ЧЕРНОВИК:
-{full_draft}
-
-{return_line}
-{listed}
-
-{output_format_block(target, report_type=report_type, batch=batch)}
-""".strip()
+    body = _render_pipeline(
+        "editorial",
+        scope=scope,
+        full_draft=full_draft,
+        return_line=return_line,
+        listed=listed,
+    )
+    return f"{body}\n\n{output_format_block(target, report_type=report_type, batch=batch)}"
