@@ -8,7 +8,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, FSInputFile, LabeledPrice, Message, User
+from aiogram.types import BotCommand, CallbackQuery, FSInputFile, LabeledPrice, Message, User
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from services.ai import (
@@ -275,6 +275,22 @@ def back_to_menu():
     return back_keyboard("menu")
 
 
+def bot_commands() -> list[BotCommand]:
+    return [
+        BotCommand(command="start", description="Главное меню"),
+        BotCommand(command="help", description="Инструкция"),
+        BotCommand(command="support", description="Поддержка"),
+    ]
+
+
+def stars_pay_keyboard(amount: int):
+    builder = InlineKeyboardBuilder()
+    builder.button(text=f"Оплатить {amount}⭐", pay=True)
+    builder.button(text="⬅️ В меню", callback_data="back:menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def back_to_edit_profile():
     return back_keyboard("edit_profile")
 
@@ -327,6 +343,49 @@ def pdf_offer_keyboard(
         builder.button(text="⬅️ Назад", callback_data="back:menu")
     builder.adjust(1)
     return builder.as_markup()
+
+
+async def send_paid_pdf_offer(
+    message: Message,
+    scenario_name: str,
+    text: str,
+    *,
+    user_id: int,
+    admin_mode: bool = False,
+) -> None:
+    """Show the paid PDF offer: Stars invoice immediately, or admin/test callback."""
+    if admin_mode:
+        await message.answer(
+            text,
+            reply_markup=pdf_offer_keyboard(scenario_name, admin_mode=True),
+        )
+        return
+    if await get_test_mode():
+        price = await get_report_price(scenario_name)
+        await message.answer(
+            text,
+            reply_markup=pdf_offer_keyboard(scenario_name, price=price),
+        )
+        return
+    await message.answer(text, reply_markup=back_to_menu())
+    await send_stars_invoice(message, scenario_name, user_id)
+
+
+async def send_stars_invoice(message: Message, scenario_name: str, user_id: int) -> None:
+    amount = await get_report_price(scenario_name)
+    order_id = await create_order(user_id, scenario_name, amount)
+    charts = PENDING_REPORTS.get(user_id)
+    if charts:
+        await save_report_context(order_id, *charts)
+    await message.answer_invoice(
+        title=NAMES[scenario_name],
+        description="Персональный PDF-отчёт ASTRO MARY",
+        payload=f"report:{scenario_name}:{order_id}",
+        currency="XTR",
+        prices=[LabeledPrice(label=NAMES[scenario_name], amount=amount)],
+        provider_token="",
+        reply_markup=stars_pay_keyboard(amount),
+    )
 
 
 def admin_generations_menu():
@@ -407,6 +466,8 @@ def free_section_keyboard(title: str, report_id: str, section_index: int):
         text=f"Посмотреть раздел «{title}»",
         callback_data=f"free_section:{report_id}:{section_index}",
     )
+    builder.button(text="⬅️ В меню", callback_data="back:menu")
+    builder.adjust(1)
     return builder.as_markup()
 
 
@@ -1818,8 +1879,6 @@ async def show_teaser(
     admin_mode: bool = False,
 ):
     PENDING_REPORTS[user_id] = (chart, second_chart)
-    price = None if admin_mode else await get_report_price(scenario_name)
-    offer_markup = pdf_offer_keyboard(scenario_name, admin_mode=admin_mode, price=price)
     fingerprint = birth_fingerprint(chart, second_chart)
 
     # Daily free limit applies to regular users only; admin gens stay unlimited for testing.
@@ -1828,10 +1887,13 @@ async def show_teaser(
         and await get_free_daily_limit_enabled()
         and await has_used_free_today(user_id)
     ):
-        await message.answer(
+        await send_paid_pdf_offer(
+            message,
+            scenario_name,
             "На сегодня бесплатный мини-разбор уже использован.\n\n"
             + await get_paid_offer_text(scenario_name),
-            reply_markup=offer_markup,
+            user_id=user_id,
+            admin_mode=admin_mode,
         )
         return
 
@@ -1852,11 +1914,14 @@ async def show_teaser(
         if free_content:
             sections = free_content["sections"]
             if not sections:
-                await message.answer(
+                await send_paid_pdf_offer(
+                    message,
+                    scenario_name,
                     "Не удалось сформировать бесплатный разбор прямо сейчас. "
                     "Можно сразу открыть полный PDF.\n\n"
                     + await get_paid_offer_text(scenario_name),
-                    reply_markup=offer_markup,
+                    user_id=user_id,
+                    admin_mode=admin_mode,
                 )
                 return
             report_id = store_pending_free_report(
@@ -1881,19 +1946,25 @@ async def show_teaser(
                 reply_markup=free_section_keyboard(sections[0]["title"], report_id, 0),
             )
             return
-        await message.answer(
+        await send_paid_pdf_offer(
+            message,
+            scenario_name,
             "Не удалось сформировать бесплатный разбор прямо сейчас. "
             "Можно сразу открыть полный PDF.\n\n"
             + await get_paid_offer_text(scenario_name),
-            reply_markup=offer_markup,
+            user_id=user_id,
+            admin_mode=admin_mode,
         )
         return
 
-    await message.answer(
+    await send_paid_pdf_offer(
+        message,
+        scenario_name,
         "Не удалось подготовить бесплатный разбор для этого сценария. "
         "Можно сразу открыть полный PDF.\n\n"
         + await get_paid_offer_text(scenario_name),
-        reply_markup=offer_markup,
+        user_id=user_id,
+        admin_mode=admin_mode,
     )
 
 
@@ -1933,12 +2004,13 @@ async def show_free_section(callback: CallbackQuery):
     if next_index == len(sections):
         scenario_name = record.get("scenario") or "personality"
         admin_mode = bool(record.get("admin_mode"))
-        price = None if admin_mode else await get_report_price(scenario_name)
-        await callback.message.answer(
+        user_id = callback.from_user.id
+        await send_paid_pdf_offer(
+            callback.message,
+            scenario_name,
             await get_free_upsell_text(scenario_name),
-            reply_markup=pdf_offer_keyboard(
-                scenario_name, admin_mode=admin_mode, price=price
-            ),
+            user_id=user_id,
+            admin_mode=admin_mode,
         )
 
 
@@ -1954,6 +2026,7 @@ async def back_menu(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("buy:"))
 async def buy(callback: CallbackQuery):
+    """Fallback for test-mode: the button is shown only when test mode is active."""
     scenario_name = callback.data.split(":", 1)[1]
     if scenario_name not in PRICES:
         await callback.answer("Этот сценарий пока недоступен.", show_alert=True)
@@ -1963,44 +2036,23 @@ async def buy(callback: CallbackQuery):
         await callback.answer("PDF уже формируется, подождите.", show_alert=True)
         return
     await _clear_callback_keyboard(callback)
-    hold_lock = True
     try:
         amount = await get_report_price(scenario_name)
         order_id = await create_order(user_id, scenario_name, amount)
         charts = PENDING_REPORTS.get(user_id)
         if charts:
             await save_report_context(order_id, *charts)
-        if await get_test_mode():
-            await callback.answer("Тестовый заказ принят")
-            await deliver_report(
-                callback.message,
-                user_id,
-                callback.from_user,
-                scenario_name,
-                order_id,
-                "TEST",
-            )
-            return
-        # Invoice path: unlock until payment succeeds and deliver_report runs again.
-        await _end_report(user_id)
-        hold_lock = False
-        payload = f"report:{scenario_name}:{order_id}"
-        await callback.answer()
-        await callback.message.answer(
-            f"Ваш «{NAMES[scenario_name]}» будет сформирован индивидуально по вашим данным.\n\n"
-            "Это не готовый текст для вашего знака — содержание зависит от даты, "
-            "времени и места рождения.\n"
-            "После оплаты вы получите полный персональный результат прямо здесь, в Telegram."
-        )
-        await callback.message.answer_invoice(
-            title=NAMES[scenario_name], description="Персональный PDF-отчёт ASTRO MARY",
-            payload=payload, currency="XTR",
-            prices=[LabeledPrice(label=NAMES[scenario_name], amount=amount)],
-            provider_token="",
+        await callback.answer("Тестовый заказ принят")
+        await deliver_report(
+            callback.message,
+            user_id,
+            callback.from_user,
+            scenario_name,
+            order_id,
+            "TEST",
         )
     finally:
-        if hold_lock:
-            await _end_report(user_id)
+        await _end_report(user_id)
 
 
 @router.callback_query(F.data.startswith("admin_buy:"))
