@@ -46,7 +46,7 @@ from services.prompt_catalog import (
     product_section_nodes,
     section_enabled_key,
     section_title_key,
-    section_titles_for_product,
+    item_titles_for_product,
 )
 from services.report_prompts import apply_prompt_overrides
 
@@ -105,11 +105,7 @@ def products_menu():
 
 
 def products_message() -> str:
-    return (
-        "Продукты\n\n"
-        "Сначала выберите тип разбора. "
-        "Вступление и разделы будут на одном экране."
-    )
+    return "Продукты"
 
 
 async def general_menu():
@@ -160,6 +156,14 @@ def _button_text(label: str, limit: int = 64) -> str:
     return label[: limit - 1] + "…"
 
 
+def _status_dot(enabled: bool) -> str:
+    return "🟢" if enabled else "🔴"
+
+
+def _list_button_text(label: str, key: str, custom: set[str], enabled: bool) -> str:
+    return _button_text(f"{_status_dot(enabled)} {_marked(label, key, custom)}")
+
+
 def build_product_keyboard(
     report_type: str,
     *,
@@ -174,9 +178,11 @@ def build_product_keyboard(
     start = page * SECTIONS_PAGE_SIZE
     chunk = nodes[start:start + SECTIONS_PAGE_SIZE]
     builder = InlineKeyboardBuilder()
+    intro_title = overrides.get(section_title_key(report_type, "intro")) or intro.label
+    intro_enabled = overrides.get(section_enabled_key(report_type, "intro")) != "0"
     builder.row(
         InlineKeyboardButton(
-            text=_button_text(_marked(intro.label, intro.key, custom)),
+            text=_list_button_text(intro_title, intro.key, custom, intro_enabled),
             callback_data=f"admin:predit:{intro.key}",
         )
     )
@@ -185,13 +191,9 @@ def build_product_keyboard(
         enabled = overrides.get(section_enabled_key(report_type, index)) != "0"
         builder.row(
             InlineKeyboardButton(
-                text=_button_text(_marked(f"{index + 1}. {title}", node.key, custom)),
+                text=_list_button_text(f"{index + 1}. {title}", node.key, custom, enabled),
                 callback_data=f"admin:predit:{node.key}",
-            ),
-            InlineKeyboardButton(
-                text="🟢" if enabled else "🔴",
-                callback_data=f"admin:prsw:{node.key}",
-            ),
+            )
         )
     nav: list[InlineKeyboardButton] = []
     if page > 0:
@@ -227,23 +229,17 @@ async def product_menu(report_type: str, page: int = 0):
 
 
 def product_message(report_type: str, page: int = 0, pages: int = 1, total: int = 0) -> str:
-    extra = ""
+    label = REPORT_TYPE_LABELS[report_type]
     if pages > 1:
-        extra = f"\nСтраница {page + 1}/{pages} · разделов {total}."
-    return (
-        f"{REPORT_TYPE_LABELS[report_type]}\n\n"
-        "Вступление и разделы на одном экране. "
-        "🟢 раздел идёт в генерацию, 🔴 — выключен. "
-        "Название раздела открывает его настройки."
-        f"{extra}"
-    )
+        return f"{label}\n{page + 1}/{pages}"
+    return label
 
 
 def edit_keyboard(key: str, *, custom: bool, enabled: bool | None = None):
     builder = InlineKeyboardBuilder()
     builder.button(text="📥 Скачать текущий", callback_data=f"admin:prfile:{key}")
     parsed = parse_prompt_key(key) or {}
-    if parsed.get("kind") == "section":
+    if parsed.get("kind") in {"section", "intro"}:
         builder.button(text="✏️ Переименовать", callback_data=f"admin:prren:{key}")
         if enabled:
             builder.button(text="🟢 Включён", callback_data=f"admin:prwe:{key}")
@@ -307,14 +303,15 @@ def edit_message(
 
 async def _editor_extras(key: str) -> tuple[str | None, bool | None]:
     parsed = parse_prompt_key(key)
-    if not parsed or parsed.get("kind") != "section":
+    if not parsed or parsed.get("kind") not in {"section", "intro"}:
         return None, None
     node = node_for_key(key)
+    index = parsed["index"] if parsed["kind"] == "section" else "intro"
     title = await get_prompt_override(
-        section_title_key(parsed["report_type"], parsed["index"])
+        section_title_key(parsed["report_type"], index)
     )
     flag = await get_prompt_override(
-        section_enabled_key(parsed["report_type"], parsed["index"])
+        section_enabled_key(parsed["report_type"], index)
     )
     return title or (node.label if node else None), flag != "0"
 
@@ -496,50 +493,33 @@ async def reset_prompt(callback: CallbackQuery, state: FSMContext):
     await _show_prompt_editor(callback.message, state, key)
 
 
-def _section_parsed(key: str) -> dict[str, str] | None:
+def _item_parsed(key: str) -> dict[str, str] | None:
     parsed = parse_prompt_key(key)
-    if parsed is None or parsed.get("kind") != "section":
+    if parsed is None or parsed.get("kind") not in {"section", "intro"}:
         return None
     return parsed
 
 
 async def _toggle_section_flag(key: str) -> tuple[bool | None, str | None]:
-    parsed = _section_parsed(key)
+    parsed = _item_parsed(key)
     if parsed is None:
         return None, "Это не раздел."
     report_type = parsed["report_type"]
-    index = parsed["index"]
+    index = parsed["index"] if parsed["kind"] == "section" else "intro"
     flag_key = section_enabled_key(report_type, index)
     currently_enabled = (await get_prompt_override(flag_key)) != "0"
     if currently_enabled:
-        overrides = await get_all_prompt_overrides()
-        overrides[flag_key] = "0"
-        if count_enabled_sections(report_type, overrides) < 1:
-            return None, "Нужен хотя бы один включённый раздел."
+        if parsed["kind"] == "section":
+            overrides = await get_all_prompt_overrides()
+            overrides[flag_key] = "0"
+            if count_enabled_sections(report_type, overrides) < 1:
+                return None, "Нужен хотя бы один включённый раздел."
         await set_prompt_override(flag_key, "0")
         await _refresh_overrides()
         return False, None
     await delete_prompt_override(flag_key)
     await _refresh_overrides()
     return True, None
-
-
-@router.callback_query(F.data.startswith("admin:prsw:"))
-async def toggle_section_from_list(callback: CallbackQuery, state: FSMContext):
-    if not await _guard_admin(callback):
-        return
-    key = (callback.data or "").split(":", 2)[-1]
-    enabled, error = await _toggle_section_flag(key)
-    if error:
-        await callback.answer(error, show_alert=True)
-        return
-    parsed = _section_parsed(key)
-    await callback.answer("Раздел включён" if enabled else "Раздел выключен")
-    if parsed is None:
-        return
-    page = int(parsed["index"]) // SECTIONS_PAGE_SIZE
-    await state.clear()
-    await _show_product_screen(callback.message, parsed["report_type"], page)
 
 
 @router.callback_query(F.data.startswith("admin:prwe:"))
@@ -560,7 +540,7 @@ async def start_rename_section(callback: CallbackQuery, state: FSMContext):
     if not await _guard_admin(callback):
         return
     key = (callback.data or "").split(":", 2)[-1]
-    parsed = _section_parsed(key)
+    parsed = _item_parsed(key)
     if parsed is None or not is_known_prompt_key(key):
         await callback.answer("Это не раздел.", show_alert=True)
         return
@@ -572,7 +552,7 @@ async def start_rename_section(callback: CallbackQuery, state: FSMContext):
         callback.message,
         (
             f"{title or key}\n\n"
-            f"Пришлите новое название раздела одним сообщением "
+            f"Пришлите новое название одним сообщением "
             f"(до {MAX_SECTION_TITLE_CHARS} символов)."
         ),
         reply_markup=rename_keyboard(key),
@@ -587,7 +567,7 @@ async def save_section_title(message: Message, state: FSMContext):
         return
     data = await state.get_data()
     key = str(data.get("prompt_key") or "")
-    parsed = _section_parsed(key)
+    parsed = _item_parsed(key)
     if parsed is None or not is_known_prompt_key(key):
         await state.clear()
         await message.answer("Откройте раздел заново через админку.")
@@ -605,18 +585,17 @@ async def save_section_title(message: Message, state: FSMContext):
         )
         return
     report_type = parsed["report_type"]
-    index = int(parsed["index"])
     overrides = await get_all_prompt_overrides()
-    current_titles = section_titles_for_product(report_type, overrides)
     wanted = title.casefold()
-    for other_index, other_title in enumerate(current_titles):
-        if other_index != index and other_title.casefold() == wanted:
+    for other_key, other_title in item_titles_for_product(report_type, overrides):
+        if other_key != key and other_title.casefold() == wanted:
             await message.answer(
                 f"Название «{other_title}» уже есть у другого раздела этого продукта."
             )
             return
     node = node_for_key(key)
     default_title = node.label if node else title
+    index = parsed["index"] if parsed["kind"] == "section" else "intro"
     title_key = section_title_key(report_type, index)
     if title == default_title:
         await delete_prompt_override(title_key)

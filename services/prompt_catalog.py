@@ -101,8 +101,8 @@ def _section_nodes(report_type: str) -> list[PromptNode]:
 def product_intro_node(report_type: str) -> PromptNode:
     return PromptNode(
         key=f"i.{report_type}",
-        label="Вступление продукта",
-        hint="Общая задача и тон до списка разделов.",
+        label="Введение",
+        hint="Общая задача и тон до списка разделов. Название меняется кнопкой «Переименовать».",
     )
 
 
@@ -224,11 +224,22 @@ def count_enabled_sections(report_type: str, overrides: dict[str, str]) -> int:
     )
 
 
-def section_titles_for_product(report_type: str, overrides: dict[str, str]) -> list[str]:
-    return [
-        (overrides.get(section_title_key(report_type, index)) or node.label).strip()
-        for index, node in enumerate(product_section_nodes(report_type))
+def item_titles_for_product(report_type: str, overrides: dict[str, str]) -> list[tuple[str, str]]:
+    intro = product_intro_node(report_type)
+    titles = [
+        (
+            intro.key,
+            (overrides.get(section_title_key(report_type, "intro")) or intro.label).strip(),
+        )
     ]
+    for index, node in enumerate(product_section_nodes(report_type)):
+        titles.append(
+            (
+                node.key,
+                (overrides.get(section_title_key(report_type, index)) or node.label).strip(),
+            )
+        )
+    return titles
 
 
 def missing_placeholders(key: str, text: str) -> list[str]:

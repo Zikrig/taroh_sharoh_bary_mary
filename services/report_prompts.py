@@ -437,6 +437,10 @@ def _render_pipeline(name: str, **kwargs: str) -> str:
         return PIPELINE_TEMPLATES[name].format(**kwargs)
 
 
+def is_intro_enabled(report_type: str) -> bool:
+    return prompt_override(f"on.{report_type}.intro") != "0"
+
+
 def is_section_enabled(report_type: str, index: int) -> bool:
     return prompt_override(f"on.{report_type}.{index}") != "0"
 
@@ -490,6 +494,8 @@ def product_prompt_parts(report_type: str) -> tuple[str, list[tuple[str, str]]]:
     intro_override = prompt_override(f"i.{report_type}")
     if intro_override:
         intro = intro_override
+    if not is_intro_enabled(report_type):
+        intro = ""
     patched: list[tuple[str, str]] = []
     for index, (header, body) in enumerate(blocks):
         override = prompt_override(f"s.{report_type}.{index}")
@@ -502,7 +508,7 @@ def product_prompt_parts(report_type: str) -> tuple[str, list[tuple[str, str]]]:
 
 def assembled_product_prompt(report_type: str) -> str:
     intro, blocks = product_prompt_parts(report_type)
-    chunks = [intro]
+    chunks = [intro] if intro.strip() else []
     for header, body in blocks:
         chunks.extend(
             [
@@ -1330,7 +1336,8 @@ def product_prompt_for_titles(report_type: str, titles: list[str]) -> str:
     if len(selected) != len(titles):
         return "\n\n".join([full, only])
     ordered = [selected[title] for title in titles]
-    return "\n\n".join([intro, only, *ordered])
+    parts = [intro, only, *ordered] if intro.strip() else [only, *ordered]
+    return "\n\n".join(parts)
 
 
 def section_title_batches(titles: list[str], size: int = PAID_SECTION_BATCH) -> list[list[str]]:

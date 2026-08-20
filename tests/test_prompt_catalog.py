@@ -65,7 +65,6 @@ class PromptCatalogTests(unittest.TestCase):
                 "admin:predit:",
                 "admin:prreset:",
                 "admin:prfile:",
-                "admin:prsw:",
                 "admin:prwe:",
                 "admin:prren:",
             ):
@@ -132,6 +131,13 @@ class PromptCatalogTests(unittest.TestCase):
         ]
         self.assertIn("✏️ Переименовать", section_on)
         self.assertIn("🟢 Включён", section_on)
+        intro_on = [
+            btn.text
+            for row in edit_keyboard("i.love", custom=False, enabled=True).inline_keyboard
+            for btn in row
+        ]
+        self.assertIn("✏️ Переименовать", intro_on)
+        self.assertIn("🟢 Включён", intro_on)
         section_off = [
             btn.text
             for row in edit_keyboard("s.love.0", custom=True, enabled=False).inline_keyboard
@@ -150,20 +156,28 @@ class PromptCatalogTests(unittest.TestCase):
         self.assertEqual(total, len(SECTIONS["love_free"]))
         rows = markup.inline_keyboard
         self.assertEqual(len(rows[0]), 1)
+        self.assertTrue(rows[0][0].text.startswith("🟢"))
         self.assertEqual(rows[0][0].callback_data, "admin:predit:i.love_free")
-        self.assertEqual(len(rows[1]), 2)
+        self.assertEqual(len(rows[1]), 1)
+        self.assertTrue(rows[1][0].text.startswith("🟢"))
         self.assertEqual(rows[1][0].callback_data, "admin:predit:s.love_free.0")
-        self.assertEqual(rows[1][1].text, "🟢")
-        self.assertEqual(rows[1][1].callback_data, "admin:prsw:s.love_free.0")
         texts = [btn.text for row in rows for btn in row]
         self.assertFalse(any(text.startswith("Разделы") for text in texts))
+        self.assertFalse(any(btn.callback_data and btn.callback_data.startswith("admin:prsw:") for row in rows for btn in row))
         disabled, _, _, _ = build_product_keyboard(
             "love_free",
             custom=set(),
-            overrides={"on.love_free.0": "0", "t.love_free.0": "Новое имя"},
+            overrides={
+                "on.love_free.0": "0",
+                "t.love_free.0": "Новое имя",
+                "on.love_free.intro": "0",
+                "t.love_free.intro": "Старт",
+            },
             page=0,
         )
-        self.assertEqual(disabled.inline_keyboard[1][1].text, "🔴")
+        self.assertTrue(disabled.inline_keyboard[0][0].text.startswith("🔴"))
+        self.assertIn("Старт", disabled.inline_keyboard[0][0].text)
+        self.assertTrue(disabled.inline_keyboard[1][0].text.startswith("🔴"))
         self.assertIn("Новое имя", disabled.inline_keyboard[1][0].text)
 
     def test_section_disable_and_rename_change_generation_catalog(self):
@@ -183,6 +197,11 @@ class PromptCatalogTests(unittest.TestCase):
             section_max_words("love", "Другое имя"),
             SECTION_MAX_WORDS["love"][SECTIONS["love"][1][0]],
         )
+        apply_prompt_overrides({"on.love.intro": "0"})
+        intro, _blocks = product_prompt_parts("love")
+        self.assertEqual(intro, "")
+        assembled = assembled_product_prompt("love")
+        self.assertFalse(assembled.startswith("СОЗДАЙ ПОЛНЫЙ ЛЮБОВНЫЙ РАЗБОР"))
 
     def test_current_prompts_are_stored_as_defaults_and_can_be_restored(self):
         import asyncio
