@@ -370,7 +370,9 @@ def generate_report(
     heading_min_remaining = usable_height * 0.25
 
     generated_by_title = {section["title"]: section for section in content["sections"]}
-    for title_text, _ in SECTIONS[report_type]:
+    from services.report_prompts import apply_section_meta
+
+    for title_text, _ in apply_section_meta(report_type, SECTIONS[report_type]):
         section = generated_by_title.get(title_text)
         if section is None:
             raise ValueError(f"Отсутствует раздел «{title_text}».")

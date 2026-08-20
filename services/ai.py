@@ -29,6 +29,7 @@ from services.report_prompts import (
     active_editor_prompt,
     active_system_prompt,
     apply_prompt_overrides,
+    apply_section_meta,
     build_editorial_prompt,
     build_expand_prompt,
     build_skeleton_prompt,
@@ -615,7 +616,7 @@ def render_natal_dump(
 
 
 def catalog_titles(report_type: str) -> list[str]:
-    return [title for title, _ in SECTIONS[report_type]]
+    return [title for title, _ in apply_section_meta(report_type, SECTIONS[report_type])]
 
 
 def build_prompt_payload(
@@ -636,11 +637,12 @@ def build_prompt_payload(
     natal_text = render_natal_dump(
         chart, second_chart, report_type, gender=resolved_gender
     )
+    active_sections = apply_section_meta(report_type, SECTIONS[report_type])
     return {
         "report_type": report_type,
         "language": "ru",
         "gender": resolved_gender,
-        "sections": [{"title": title, "brief": brief} for title, brief in SECTIONS[report_type]],
+        "sections": [{"title": title, "brief": brief} for title, brief in active_sections],
         "primary_chart": _chart_for_prompt(chart),
         "partner_chart": _chart_for_prompt(second_chart) if second_chart else None,
         "synastry_aspects": calculate_synastry(chart, second_chart) if second_chart else [],
@@ -850,8 +852,17 @@ def _validate_parsed_report(
     return validated, None
 
 
+def _prompts_fingerprint(prompts: dict[str, str] | None) -> str:
+    blob = json.dumps(prompts or {}, ensure_ascii=False, sort_keys=True)
+    return sha1(blob.encode("utf-8")).hexdigest()[:16]
+
+
 def _report_cache_key(report_type: str, user_prompt: str) -> str:
     return sha1(f"{report_type}\n{user_prompt}".encode("utf-8")).hexdigest()
+
+
+def clear_report_cache() -> None:
+    _REPORT_CACHE.clear()
 
 
 def _remember_report(key: str, report: dict[str, Any]) -> None:
@@ -1364,7 +1375,8 @@ async def generate_report_content(
     try:
         from openai import AsyncOpenAI
 
-        apply_prompt_overrides(await get_active_prompts())
+        active_prompts = await get_active_prompts()
+        apply_prompt_overrides(active_prompts)
         is_free = str(report_type).endswith("_free")
         if is_free:
             prior_sections = None
@@ -1386,7 +1398,8 @@ async def generate_report_content(
             payload["natal_text"]
             + "\n"
             + prior_blob
-            + f"\ngender:{resolved_gender}\npipeline:{pipeline_tag}",
+            + f"\ngender:{resolved_gender}\npipeline:{pipeline_tag}"
+            + f"\nprompts:{_prompts_fingerprint(active_prompts)}",
         )
         cached = _REPORT_CACHE.get(cache_key)
         if cached:

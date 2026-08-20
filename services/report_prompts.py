@@ -139,6 +139,9 @@ def section_max_words(report_type: str, title: str) -> int:
     limits = SECTION_MAX_WORDS.get(report_type) or {}
     if title in limits:
         return limits[title]
+    original = _original_catalog_title(report_type, title)
+    if original in limits:
+        return limits[original]
     return FREE_SECTION_MAX_WORDS if report_type.endswith("_free") else 260
 
 
@@ -434,6 +437,50 @@ def _render_pipeline(name: str, **kwargs: str) -> str:
         return PIPELINE_TEMPLATES[name].format(**kwargs)
 
 
+def is_section_enabled(report_type: str, index: int) -> bool:
+    return prompt_override(f"on.{report_type}.{index}") != "0"
+
+
+def section_runtime_title(report_type: str, index: int, default: str) -> str:
+    return prompt_override(f"t.{report_type}.{index}") or default
+
+
+def apply_section_meta(
+    report_type: str,
+    sections: list[tuple[str, str]],
+) -> list[tuple[str, str]]:
+    """Drop disabled sections and apply admin title overrides."""
+    result: list[tuple[str, str]] = []
+    for index, (title, brief) in enumerate(sections):
+        if not is_section_enabled(report_type, index):
+            continue
+        result.append((section_runtime_title(report_type, index, title), brief))
+    return result
+
+
+def _original_catalog_title(report_type: str, title: str) -> str:
+    from services.reports_new import SECTIONS
+
+    wanted = _normalize_prompt_title(title)
+    for index, (original, _brief) in enumerate(SECTIONS.get(report_type) or ()):
+        display = section_runtime_title(report_type, index, original)
+        if _normalize_prompt_title(display) == wanted:
+            return original
+        if _normalize_prompt_title(original) == wanted:
+            return original
+    return title
+
+
+def _header_with_title(header: str, title: str, index: int) -> str:
+    lines = [line.strip() for line in header.splitlines() if line.strip()]
+    number = f"РАЗДЕЛ {index + 1}"
+    for line in lines:
+        if re.match(r"(?i)^раздел\s*\d+", line):
+            number = line
+            break
+    return f"{number}\n{title}"
+
+
 def default_product_parts(report_type: str) -> tuple[str, list[tuple[str, str]]]:
     return _split_product_blocks(PRODUCT_PROMPTS[report_type])
 
@@ -446,6 +493,9 @@ def product_prompt_parts(report_type: str) -> tuple[str, list[tuple[str, str]]]:
     patched: list[tuple[str, str]] = []
     for index, (header, body) in enumerate(blocks):
         override = prompt_override(f"s.{report_type}.{index}")
+        renamed = prompt_override(f"t.{report_type}.{index}")
+        if renamed:
+            header = _header_with_title(header, renamed, index)
         patched.append((header, override if override else body))
     return intro, patched
 

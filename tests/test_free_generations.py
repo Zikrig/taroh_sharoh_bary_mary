@@ -1,12 +1,21 @@
 import asyncio
 import tempfile
 import unittest
+from importlib.util import find_spec
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
+import sys
+
+if find_spec("swisseph") is None:
+    sys.modules["swisseph"] = SimpleNamespace(
+        SUN=0, MOON=1, MERCURY=2, VENUS=3, MARS=4, JUPITER=5,
+        SATURN=6, URANUS=7, NEPTUNE=8, PLUTO=9,
+    )
 
 from database.repository import (
     birth_fingerprint,
+    delete_free_generations_for_users,
     get_free_generation,
     init_db,
     save_free_generation,
@@ -68,6 +77,36 @@ class FreeGenerationsTests(unittest.TestCase):
                     # Birth data mismatch drops prior free context.
                     self.assertIsNone(await get_free_generation(42, "love", fp_b))
                     self.assertIsNone(await get_free_generation(42, "love", ""))
+
+        asyncio.run(run())
+
+    def test_delete_free_generations_only_for_given_users(self):
+        async def run() -> None:
+            with tempfile.TemporaryDirectory() as tmp:
+                db_path = Path(tmp) / "test.db"
+                with patch(
+                    "database.repository.settings",
+                    SimpleNamespace(database_path=db_path),
+                ):
+                    await init_db()
+                    fp = birth_fingerprint(_chart())
+                    await save_free_generation(
+                        11,
+                        "love",
+                        [{"title": "Как ты влюбляешься", "content": "админ"}],
+                        fp,
+                    )
+                    await save_free_generation(
+                        22,
+                        "love",
+                        [{"title": "Как ты влюбляешься", "content": "пользователь"}],
+                        fp,
+                    )
+                    await delete_free_generations_for_users([11])
+                    self.assertIsNone(await get_free_generation(11, "love", fp))
+                    kept = await get_free_generation(22, "love", fp)
+                    self.assertIsNotNone(kept)
+                    self.assertEqual(kept[0]["content"], "пользователь")
 
         asyncio.run(run())
 

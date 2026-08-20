@@ -18,6 +18,7 @@ from services.ai import (
     PAID_REVIEW_WAVES,
     REVIEW_PROGRESS_STEPS,
     SYSTEM_PROMPT,
+    _REPORT_CACHE,
     _extract_preamble,
     _is_degenerate_section_text,
     _is_retryable_api_error,
@@ -25,6 +26,9 @@ from services.ai import (
     _missing_titles,
     _ordered_sections,
     _payload_sample_attempt_dir,
+    _prompts_fingerprint,
+    _remember_report,
+    _report_cache_key,
     _review_progress_alloc,
     _save_request_transcript,
     _save_response_transcript,
@@ -35,6 +39,7 @@ from services.ai import (
     build_prompt_payload,
     build_user_prompt,
     catalog_titles,
+    clear_report_cache,
     format_admin_usage_summary,
     parse_delimited_sections,
     planned_generation_steps,
@@ -742,6 +747,22 @@ class AiServiceTests(unittest.TestCase):
             _extract_preamble("Короткий план.\n\n=====\nТвой портрет\n=====\nпункт"),
             "Короткий план.",
         )
+
+    def test_report_cache_depends_on_prompts_and_can_be_cleared(self):
+        natal = "Натальная карта"
+        first = _report_cache_key(
+            "love_free",
+            natal + f"\nprompts:{_prompts_fingerprint({'sys': 'старый'})}",
+        )
+        second = _report_cache_key(
+            "love_free",
+            natal + f"\nprompts:{_prompts_fingerprint({'sys': 'новый'})}",
+        )
+        self.assertNotEqual(first, second)
+        _remember_report(first, {"title": "старый разбор"})
+        self.assertEqual(_REPORT_CACHE[first]["title"], "старый разбор")
+        clear_report_cache()
+        self.assertEqual(_REPORT_CACHE, {})
 
 
 if __name__ == "__main__":

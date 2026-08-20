@@ -21,6 +21,7 @@ from handlers.router import (
     admin_generations_menu,
     admin_menu,
     admin_text,
+    clear_pending_free_reports_for_users,
     edit_profile_menu,
     format_gender_line,
     free_section_keyboard,
@@ -136,6 +137,24 @@ class RouterUiTests(unittest.TestCase):
         parsed = parse_free_section_callback(first_button.callback_data)
         bound = resolve_pending_free_report(7, parsed[0])
         self.assertEqual(bound["sections"][parsed[1]]["content"], "первый разбор")
+
+    def test_clear_pending_free_reports_only_for_given_users(self):
+        admin_id = store_pending_free_report(
+            11,
+            "personality",
+            [{"title": "Твой портрет", "content": "админ"}],
+            admin_mode=True,
+        )
+        user_id = store_pending_free_report(
+            22,
+            "personality",
+            [{"title": "Твой портрет", "content": "пользователь"}],
+        )
+        clear_pending_free_reports_for_users([11])
+        self.assertIsNone(resolve_pending_free_report(11, admin_id))
+        kept = resolve_pending_free_report(22, user_id)
+        self.assertIsNotNone(kept)
+        self.assertEqual(kept["sections"][0]["content"], "пользователь")
 
     def test_free_daily_limit_admin_toggle_exists(self):
         markup = admin_menu(test_mode=False, free_daily_limit=True)

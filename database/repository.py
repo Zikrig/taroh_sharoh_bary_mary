@@ -644,6 +644,19 @@ async def save_free_generation(
         await db.commit()
 
 
+async def delete_free_generations_for_users(user_ids: tuple[int, ...] | list[int]) -> None:
+    ids = [int(user_id) for user_id in user_ids]
+    if not ids:
+        return
+    placeholders = ",".join("?" * len(ids))
+    async with aiosqlite.connect(settings.database_path) as db:
+        await db.execute(
+            f"DELETE FROM free_generations WHERE user_id IN ({placeholders})",
+            ids,
+        )
+        await db.commit()
+
+
 async def get_free_generation(
     user_id: int,
     scenario: str,

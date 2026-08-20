@@ -10,6 +10,7 @@ if find_spec("swisseph") is None:
     )
 
 from handlers.admin_prompts import (
+    build_product_keyboard,
     edit_keyboard,
     products_menu,
     prompts_root_menu,
@@ -26,12 +27,15 @@ from services.prompt_catalog import (
 from services.report_prompts import (
     PIPELINE_TEMPLATES,
     PRODUCT_PROMPTS,
+    SECTION_MAX_WORDS,
     SYSTEM_PROMPT,
     apply_prompt_overrides,
+    apply_section_meta,
     assembled_product_prompt,
     default_product_parts,
     product_prompt_for_titles,
     product_prompt_parts,
+    section_max_words,
 )
 from services.reports_new import SECTIONS
 
@@ -57,7 +61,14 @@ class PromptCatalogTests(unittest.TestCase):
 
     def test_callback_data_stays_within_telegram_limit(self):
         for key in all_prompt_keys():
-            for prefix in ("admin:predit:", "admin:prreset:", "admin:prfile:"):
+            for prefix in (
+                "admin:predit:",
+                "admin:prreset:",
+                "admin:prfile:",
+                "admin:prsw:",
+                "admin:prwe:",
+                "admin:prren:",
+            ):
                 self.assertLessEqual(len(prefix + key), 64, prefix + key)
 
     def test_override_changes_only_the_chosen_section(self):
@@ -111,8 +122,67 @@ class PromptCatalogTests(unittest.TestCase):
         self.assertIn("admin:prprod:love_free", products)
         buttons = [btn.text for row in edit_keyboard("sys", custom=False).inline_keyboard for btn in row]
         self.assertIn("По умолчанию", buttons)
+        self.assertNotIn("✏️ Переименовать", buttons)
         changed = [btn.text for row in edit_keyboard("sys", custom=True).inline_keyboard for btn in row]
         self.assertIn("По умолчанию", changed)
+        section_on = [
+            btn.text
+            for row in edit_keyboard("s.love.0", custom=False, enabled=True).inline_keyboard
+            for btn in row
+        ]
+        self.assertIn("✏️ Переименовать", section_on)
+        self.assertIn("🟢 Включён", section_on)
+        section_off = [
+            btn.text
+            for row in edit_keyboard("s.love.0", custom=True, enabled=False).inline_keyboard
+            for btn in row
+        ]
+        self.assertIn("🔴 Выключен", section_off)
+
+    def test_product_screen_lists_intro_beside_section_toggles(self):
+        markup, page, pages, total = build_product_keyboard(
+            "love_free",
+            custom=set(),
+            overrides={},
+            page=0,
+        )
+        self.assertEqual(page, 0)
+        self.assertEqual(total, len(SECTIONS["love_free"]))
+        rows = markup.inline_keyboard
+        self.assertEqual(len(rows[0]), 1)
+        self.assertEqual(rows[0][0].callback_data, "admin:predit:i.love_free")
+        self.assertEqual(len(rows[1]), 2)
+        self.assertEqual(rows[1][0].callback_data, "admin:predit:s.love_free.0")
+        self.assertEqual(rows[1][1].text, "🟢")
+        self.assertEqual(rows[1][1].callback_data, "admin:prsw:s.love_free.0")
+        texts = [btn.text for row in rows for btn in row]
+        self.assertFalse(any(text.startswith("Разделы") for text in texts))
+        disabled, _, _, _ = build_product_keyboard(
+            "love_free",
+            custom=set(),
+            overrides={"on.love_free.0": "0", "t.love_free.0": "Новое имя"},
+            page=0,
+        )
+        self.assertEqual(disabled.inline_keyboard[1][1].text, "🔴")
+        self.assertIn("Новое имя", disabled.inline_keyboard[1][0].text)
+
+    def test_section_disable_and_rename_change_generation_catalog(self):
+        original = SECTIONS["love"][0][0]
+        apply_prompt_overrides({"on.love.0": "0", "t.love.1": "Другое имя"})
+        active = apply_section_meta("love", SECTIONS["love"])
+        titles = [title for title, _ in active]
+        self.assertNotIn(original, titles)
+        self.assertIn("Другое имя", titles)
+        self.assertEqual(len(active), len(SECTIONS["love"]) - 1)
+        intro, blocks = product_prompt_parts("love")
+        self.assertIn("Другое имя", blocks[1][0])
+        prompt = product_prompt_for_titles("love", ["Другое имя"])
+        self.assertIn("Другое имя", prompt)
+        self.assertIn("Сейчас напиши ТОЛЬКО раздел «Другое имя»", prompt)
+        self.assertEqual(
+            section_max_words("love", "Другое имя"),
+            SECTION_MAX_WORDS["love"][SECTIONS["love"][1][0]],
+        )
 
     def test_current_prompts_are_stored_as_defaults_and_can_be_restored(self):
         import asyncio
@@ -148,5 +218,84 @@ class PromptCatalogTests(unittest.TestCase):
                     self.assertEqual(active["sys"], SYSTEM_PROMPT)
                     await ensure_prompt_defaults()
                     self.assertEqual(await get_prompt_default("sys"), SYSTEM_PROMPT)
+
+        asyncio.run(run())
+
+    def test_saving_prompt_clears_admin_cached_reports(self):
+        import asyncio
+        import tempfile
+        from pathlib import Path
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        from database.repository import (
+            init_db,
+            save_free_generation,
+            get_free_generation,
+            birth_fingerprint,
+        )
+        from handlers.admin_prompts import _refresh_overrides
+        from handlers.router import (
+            PENDING_FREE_REPORTS,
+            PENDING_FREE_REPORT_IDS_BY_USER,
+            store_pending_free_report,
+            resolve_pending_free_report,
+        )
+        from services.ai import _REPORT_CACHE, _remember_report, clear_report_cache
+
+        async def run() -> None:
+            with tempfile.TemporaryDirectory() as tmp:
+                db_path = Path(tmp) / "prompts.db"
+                with patch(
+                    "database.repository.settings",
+                    SimpleNamespace(database_path=db_path),
+                ), patch(
+                    "handlers.admin_prompts.settings",
+                    SimpleNamespace(database_path=db_path, admin_ids=(11,)),
+                ):
+                    await init_db()
+                    _remember_report("stale", {"title": "старый разбор"})
+                    PENDING_FREE_REPORTS.clear()
+                    PENDING_FREE_REPORT_IDS_BY_USER.clear()
+                    store_pending_free_report(
+                        11,
+                        "love",
+                        [{"title": "Как ты влюбляешься", "content": "админ"}],
+                        admin_mode=True,
+                    )
+                    store_pending_free_report(
+                        22,
+                        "love",
+                        [{"title": "Как ты влюбляешься", "content": "пользователь"}],
+                    )
+                    fp = birth_fingerprint(
+                        {"date": "1990-01-01", "time": "12:00", "latitude": 55.7, "longitude": 37.6}
+                    )
+                    await save_free_generation(
+                        11,
+                        "love",
+                        [{"title": "Как ты влюбляешься", "content": "админ"}],
+                        fp,
+                    )
+                    await save_free_generation(
+                        22,
+                        "love",
+                        [{"title": "Как ты влюбляешься", "content": "пользователь"}],
+                        fp,
+                    )
+                    await _refresh_overrides()
+                    self.assertEqual(_REPORT_CACHE, {})
+                    self.assertIsNone(resolve_pending_free_report(11, None))
+                    kept_pending = resolve_pending_free_report(22, None)
+                    self.assertIsNotNone(kept_pending)
+                    self.assertEqual(
+                        kept_pending["sections"][0]["content"], "пользователь"
+                    )
+                    self.assertIsNone(await get_free_generation(11, "love", fp))
+                    kept = await get_free_generation(22, "love", fp)
+                    self.assertEqual(kept[0]["content"], "пользователь")
+                    clear_report_cache()
+                    PENDING_FREE_REPORTS.clear()
+                    PENDING_FREE_REPORT_IDS_BY_USER.clear()
 
         asyncio.run(run())

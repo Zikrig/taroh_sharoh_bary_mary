@@ -219,6 +219,7 @@ class AdminStates(StatesGroup):
     model_value = State()
     pdf_sell_text = State()
     prompt_text = State()
+    prompt_title = State()
 
 
 PDF_SELL_KIND_LABELS = {
@@ -406,6 +407,17 @@ def admin_generations_text() -> str:
         "лимита бесплатных.\n"
         "Можно проверить бесплатный мини-разбор и сразу собрать полный PDF."
     )
+
+
+def clear_pending_free_reports_for_users(user_ids: tuple[int, ...] | list[int]) -> None:
+    wanted = {int(user_id) for user_id in user_ids}
+    if not wanted:
+        return
+    for user_id in list(PENDING_FREE_REPORT_IDS_BY_USER):
+        if user_id not in wanted:
+            continue
+        for report_id in PENDING_FREE_REPORT_IDS_BY_USER.pop(user_id, []):
+            PENDING_FREE_REPORTS.pop(report_id, None)
 
 
 def store_pending_free_report(

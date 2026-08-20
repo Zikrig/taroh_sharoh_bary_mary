@@ -16,6 +16,7 @@ from services.report_prompts import (
 
 PROMPT_SETTING_PREFIX = "prompt:"
 MAX_PROMPT_CHARS = 50_000
+MAX_SECTION_TITLE_CHARS = 60
 SECTIONS_PAGE_SIZE = 8
 
 REPORT_TYPE_ORDER = (
@@ -66,16 +67,32 @@ class PromptNode:
     hint: str = ""
 
 
+def section_enabled_key(report_type: str, index: int | str) -> str:
+    return f"on.{report_type}.{index}"
+
+
+def section_title_key(report_type: str, index: int | str) -> str:
+    return f"t.{report_type}.{index}"
+
+
+def _default_section_titles(report_type: str) -> list[str]:
+    from services.reports_new import SECTIONS
+
+    return [title for title, _ in SECTIONS.get(report_type, ())]
+
+
 def _section_nodes(report_type: str) -> list[PromptNode]:
     _intro, blocks = default_product_parts(report_type)
+    catalog = _default_section_titles(report_type)
     nodes: list[PromptNode] = []
     for index, (header, _body) in enumerate(blocks):
-        title = " ".join(line.strip() for line in header.splitlines() if line.strip())
+        fallback = " ".join(line.strip() for line in header.splitlines() if line.strip())
+        title = catalog[index] if index < len(catalog) else fallback
         nodes.append(
             PromptNode(
                 key=f"s.{report_type}.{index}",
                 label=title or f"Раздел {index + 1}",
-                hint="Инструкция к этому разделу. Заголовок в генерации не меняется.",
+                hint="Инструкция к этому разделу. Название меняется кнопкой «Переименовать».",
             )
         )
     return nodes
@@ -196,6 +213,22 @@ def default_prompt_text(key: str) -> str:
     if kind == "pipeline":
         return PIPELINE_TEMPLATES[parsed["name"]]
     raise KeyError(key)
+
+
+def count_enabled_sections(report_type: str, overrides: dict[str, str]) -> int:
+    total = len(product_section_nodes(report_type))
+    return sum(
+        1
+        for index in range(total)
+        if overrides.get(section_enabled_key(report_type, index)) != "0"
+    )
+
+
+def section_titles_for_product(report_type: str, overrides: dict[str, str]) -> list[str]:
+    return [
+        (overrides.get(section_title_key(report_type, index)) or node.label).strip()
+        for index, node in enumerate(product_section_nodes(report_type))
+    ]
 
 
 def missing_placeholders(key: str, text: str) -> list[str]:
