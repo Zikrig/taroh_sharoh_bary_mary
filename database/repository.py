@@ -113,6 +113,7 @@ async def init_db() -> None:
             """
         )
         await _ensure_free_generations_schema(db)
+        await _ensure_tracking_schema(db)
         await db.commit()
     await ensure_prompt_defaults()
 
@@ -186,6 +187,317 @@ async def _ensure_free_generations_schema(db: aiosqlite.Connection) -> None:
     )
     await db.execute("DROP TABLE free_generations")
     await db.execute("ALTER TABLE free_generations_new RENAME TO free_generations")
+
+
+async def _ensure_tracking_schema(db: aiosqlite.Connection) -> None:
+    await db.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS tracking_sources (
+            slug TEXT PRIMARY KEY,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS bot_visits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            source_slug TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_bot_visits_created ON bot_visits(created_at);
+        CREATE INDEX IF NOT EXISTS idx_bot_visits_source ON bot_visits(source_slug, created_at);
+        CREATE INDEX IF NOT EXISTS idx_bot_visits_user ON bot_visits(user_id);
+        CREATE TABLE IF NOT EXISTS report_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            kind TEXT NOT NULL,
+            report_type TEXT NOT NULL,
+            amount INTEGER NOT NULL DEFAULT 0,
+            source_slug TEXT,
+            order_id INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_report_events_created ON report_events(kind, created_at);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_report_events_order
+            ON report_events(order_id) WHERE order_id IS NOT NULL;
+        """
+    )
+    await _backfill_report_events(db)
+
+
+async def _backfill_report_events(db: aiosqlite.Connection) -> None:
+    async with db.execute("SELECT COUNT(*) FROM report_events") as cur:
+        row = await cur.fetchone()
+        if row and int(row[0] or 0) > 0:
+            return
+    await db.execute(
+        """
+        INSERT INTO report_events (
+            user_id, kind, report_type, amount, source_slug, order_id, created_at
+        )
+        SELECT
+            user_id, 'paid', report_type, amount, NULL, id, created_at
+        FROM orders
+        WHERE status IN ('paid', 'delivered', 'report_pending')
+          AND telegram_payment_id IS NOT NULL
+          AND telegram_payment_id NOT IN ('ADMIN', 'TEST')
+        """
+    )
+    await db.execute(
+        """
+        INSERT INTO report_events (
+            user_id, kind, report_type, amount, source_slug, created_at
+        )
+        SELECT
+            user_id, 'free', scenario, 0, NULL, COALESCE(updated_at, CURRENT_TIMESTAMP)
+        FROM free_generations
+        """
+    )
+
+
+def _period_filter(start: str | None, end: str | None, column: str = "created_at") -> tuple[str, list[str]]:
+    clauses: list[str] = []
+    args: list[str] = []
+    if start:
+        clauses.append(f"{column} >= ?")
+        args.append(start)
+    if end:
+        clauses.append(f"{column} < ?")
+        args.append(end)
+    if not clauses:
+        return "", args
+    return " AND " + " AND ".join(clauses), args
+
+
+async def create_tracking_source(slug: str) -> bool:
+    from services.tracking import normalize_tracking_slug
+
+    normalized = normalize_tracking_slug(slug)
+    if not normalized:
+        return False
+    async with aiosqlite.connect(settings.database_path) as db:
+        try:
+            await db.execute(
+                "INSERT INTO tracking_sources (slug) VALUES (?)",
+                (normalized,),
+            )
+            await db.commit()
+        except aiosqlite.IntegrityError:
+            return False
+    return True
+
+
+async def delete_tracking_source(slug: str) -> None:
+    async with aiosqlite.connect(settings.database_path) as db:
+        await db.execute("DELETE FROM tracking_sources WHERE slug = ?", (slug,))
+        await db.commit()
+
+
+async def list_tracking_sources() -> list[dict[str, Any]]:
+    async with aiosqlite.connect(settings.database_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """
+            SELECT
+                s.slug,
+                s.created_at,
+                COUNT(v.id) AS visits
+            FROM tracking_sources s
+            LEFT JOIN bot_visits v ON v.source_slug = s.slug
+            GROUP BY s.slug
+            ORDER BY datetime(s.created_at) DESC, s.slug
+            """
+        ) as cur:
+            return [dict(row) for row in await cur.fetchall()]
+
+
+async def tracking_source_exists(slug: str) -> bool:
+    async with aiosqlite.connect(settings.database_path) as db:
+        async with db.execute(
+            "SELECT 1 FROM tracking_sources WHERE slug = ?",
+            (slug,),
+        ) as cur:
+            return await cur.fetchone() is not None
+
+
+async def record_bot_visit(
+    user_id: int,
+    payload: str | None,
+    *,
+    created_at: str | None = None,
+) -> str | None:
+    from services.tracking import normalize_tracking_slug
+
+    slug = normalize_tracking_slug(payload)
+    async with aiosqlite.connect(settings.database_path) as db:
+        if created_at:
+            await db.execute(
+                "INSERT INTO bot_visits (user_id, source_slug, created_at) VALUES (?, ?, ?)",
+                (user_id, slug, created_at),
+            )
+        else:
+            await db.execute(
+                "INSERT INTO bot_visits (user_id, source_slug) VALUES (?, ?)",
+                (user_id, slug),
+            )
+        await db.commit()
+    return slug
+
+
+async def get_user_last_source(user_id: int) -> str | None:
+    async with aiosqlite.connect(settings.database_path) as db:
+        async with db.execute(
+            """
+            SELECT source_slug FROM bot_visits
+            WHERE user_id = ? AND source_slug IS NOT NULL
+            ORDER BY id DESC LIMIT 1
+            """,
+            (user_id,),
+        ) as cur:
+            row = await cur.fetchone()
+            return str(row[0]) if row and row[0] else None
+
+
+async def record_report_event(
+    user_id: int,
+    *,
+    kind: str,
+    report_type: str,
+    amount: int = 0,
+    order_id: int | None = None,
+    created_at: str | None = None,
+) -> None:
+    source_slug = await get_user_last_source(user_id)
+    stamp = created_at
+    async with aiosqlite.connect(settings.database_path) as db:
+        try:
+            if stamp:
+                await db.execute(
+                    """
+                    INSERT INTO report_events (
+                        user_id, kind, report_type, amount, source_slug, order_id, created_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (user_id, kind, report_type, int(amount), source_slug, order_id, stamp),
+                )
+            else:
+                await db.execute(
+                    """
+                    INSERT INTO report_events (
+                        user_id, kind, report_type, amount, source_slug, order_id
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (user_id, kind, report_type, int(amount), source_slug, order_id),
+                )
+            await db.commit()
+        except aiosqlite.IntegrityError:
+            return
+
+
+async def _count_visits(
+    db: aiosqlite.Connection,
+    *,
+    source_slug: str | None = None,
+    organic_only: bool = False,
+    start: str | None = None,
+    end: str | None = None,
+) -> tuple[int, int]:
+    extra, args = _period_filter(start, end)
+    source_sql = ""
+    if organic_only:
+        source_sql = " AND source_slug IS NULL"
+    elif source_slug is not None:
+        source_sql = " AND source_slug = ?"
+        args = [source_slug, *args]
+    async with db.execute(
+        f"SELECT COUNT(*), COUNT(DISTINCT user_id) FROM bot_visits WHERE 1=1{source_sql}{extra}",
+        args,
+    ) as cur:
+        row = await cur.fetchone()
+        return int(row[0] or 0), int(row[1] or 0)
+
+
+async def get_visit_stats(
+    *,
+    source_slug: str | None = None,
+    organic_only: bool = False,
+    start: str | None = None,
+    end: str | None = None,
+) -> dict[str, int]:
+    async with aiosqlite.connect(settings.database_path) as db:
+        visits, unique = await _count_visits(
+            db,
+            source_slug=source_slug,
+            organic_only=organic_only,
+            start=start,
+            end=end,
+        )
+    return {"visits": visits, "unique": unique}
+
+
+async def _report_kind_stats(
+    db: aiosqlite.Connection,
+    kind: str,
+    *,
+    source_slug: str | None = None,
+    start: str | None = None,
+    end: str | None = None,
+) -> dict[str, Any]:
+    extra, args = _period_filter(start, end)
+    source_sql = ""
+    query_args: list[Any] = [kind]
+    if source_slug is not None:
+        source_sql = " AND source_slug = ?"
+        query_args.append(source_slug)
+    query_args.extend(args)
+    async with db.execute(
+        f"""
+        SELECT COUNT(*), COUNT(DISTINCT user_id), COALESCE(SUM(amount), 0)
+        FROM report_events
+        WHERE kind = ?{source_sql}{extra}
+        """,
+        query_args,
+    ) as cur:
+        row = await cur.fetchone()
+    async with db.execute(
+        f"""
+        SELECT report_type, COUNT(*)
+        FROM report_events
+        WHERE kind = ?{source_sql}{extra}
+        GROUP BY report_type
+        """,
+        query_args,
+    ) as cur:
+        by_type = {str(item[0]): int(item[1]) for item in await cur.fetchall()}
+    return {
+        "total": int(row[0] or 0),
+        "unique": int(row[1] or 0),
+        "stars": int(row[2] or 0),
+        "by_type": by_type,
+    }
+
+
+async def get_report_stats(
+    *,
+    source_slug: str | None = None,
+    start: str | None = None,
+    end: str | None = None,
+) -> dict[str, Any]:
+    async with aiosqlite.connect(settings.database_path) as db:
+        free = await _report_kind_stats(
+            db, "free", source_slug=source_slug, start=start, end=end
+        )
+        paid = await _report_kind_stats(
+            db, "paid", source_slug=source_slug, start=start, end=end
+        )
+    return {"free": free, "paid": paid}
+
+
+async def get_stats_overview() -> dict[str, Any]:
+    organic = await get_visit_stats(organic_only=True)
+    total = await get_visit_stats()
+    reports = await get_report_stats()
+    return {"organic": organic, "total": total, "reports": reports}
 
 
 async def get_test_mode() -> bool:

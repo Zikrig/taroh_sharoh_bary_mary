@@ -7,6 +7,7 @@ from config.settings import settings
 from database.repository import init_db
 from handlers.router import bot_commands, router
 from handlers.admin_prompts import router as prompt_admin_router
+from handlers.admin_stats import router as stats_admin_router
 
 
 async def main() -> None:
@@ -17,6 +18,7 @@ async def main() -> None:
     await bot.set_my_commands(bot_commands())
     dispatcher = Dispatcher()
     dispatcher.include_router(prompt_admin_router)
+    dispatcher.include_router(stats_admin_router)
     dispatcher.include_router(router)
     try:
         await dispatcher.start_polling(bot)

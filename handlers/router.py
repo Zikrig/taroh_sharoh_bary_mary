@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager, suppress
 from aiogram import F, Router
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.filters import Command
+from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import BotCommand, CallbackQuery, FSInputFile, LabeledPrice, Message, User
@@ -61,6 +61,8 @@ from database.repository import (
     has_used_free_today,
     mark_free_used_today,
     normalize_gender,
+    record_bot_visit,
+    record_report_event,
     save_free_generation,
     save_profile,
     save_report_context,
@@ -527,6 +529,7 @@ def admin_menu(*, test_mode: bool, free_daily_limit: bool):
     builder.button(text=test_label, callback_data="admin:test_toggle")
     builder.button(text=limit_label, callback_data="admin:free_daily_limit_toggle")
     builder.button(text="🧪 Генерации", callback_data="admin:generations")
+    builder.button(text="📊 Статистика", callback_data="admin:stats")
     builder.button(text="💰 Цены", callback_data="admin:prices")
     builder.button(text="🤖 Модели", callback_data="admin:models")
     builder.button(text="🧠 Промпты", callback_data="admin:prompts")
@@ -736,6 +739,7 @@ def admin_text(
         "Лимит бесплатных: не больше одного бесплатного мини-разбора в сутки "
         "на пользователя. При исчерпании лимита остаётся кнопка полного PDF.\n\n"
         "Раздел «Генерации» — проверка разборов без оплаты и без лимита.\n"
+        "Раздел «Статистика» — заходы в бота, источники и прогнозы.\n"
         "Раздел «Цены» — стоимость полного PDF в Stars.\n"
         "Раздел «Модели» — бесплатные / скелет PDF / разделы PDF "
         f"(каталог AITUNNEL с ценой выхода < {int(MAX_OUTPUT_COST_RUB)} ₽/1M).\n"
@@ -1170,10 +1174,11 @@ async def save_pdf_sell_text(message: Message, state: FSMContext):
 
 
 @router.callback_query(F.data == "admin:back")
-async def back_to_admin(callback: CallbackQuery):
+async def back_to_admin(callback: CallbackQuery, state: FSMContext):
     if not is_admin(callback.from_user.id):
         await callback.answer("Нет доступа", show_alert=True)
         return
+    await state.clear()
     await callback.answer()
     await _refresh_admin_panel(callback.message, answer_text="ok")
 
@@ -1387,8 +1392,9 @@ async def save_support_text(message: Message, state: FSMContext):
     )
 
 
-@router.message(Command("start"))
-async def start(message: Message):
+@router.message(CommandStart())
+async def start(message: Message, command: CommandObject):
+    await record_bot_visit(message.from_user.id, command.args)
     await message.answer(
         await get_main_menu_text(),
         parse_mode=ParseMode.HTML,
@@ -1950,6 +1956,11 @@ async def show_teaser(
             )
             if not admin_mode:
                 await mark_free_used_today(user_id)
+                await record_report_event(
+                    user_id,
+                    kind="free",
+                    report_type=scenario_name,
+                )
             if admin_mode:
                 await send_admin_usage_summary(message, free_content)
             await message.answer(
@@ -2121,6 +2132,15 @@ async def paid(message: Message):
         await message.answer("PDF уже формируется. Дождитесь окончания текущей сборки.")
         return
     try:
+        order = await get_order(order_id, user_id)
+        if order:
+            await record_report_event(
+                user_id,
+                kind="paid",
+                report_type=scenario_name,
+                amount=int(order.get("amount") or 0),
+                order_id=order_id,
+            )
         await deliver_report(
             message,
             user_id,
