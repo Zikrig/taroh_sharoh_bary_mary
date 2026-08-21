@@ -144,24 +144,8 @@ def _by_type_lines(by_type: dict[str, int]) -> list[str]:
     return lines
 
 
-def format_overview_text(overview: dict[str, Any]) -> str:
-    organic = overview["organic"]
-    total = overview["total"]
-    reports = overview["reports"]
-    return "\n".join(
-        [
-            "📊 Статистика",
-            "",
-            f"Заходы без ссылки: {format_visits_line(organic['visits'], organic['unique'])}",
-            f"Все заходы: {format_visits_line(total['visits'], total['unique'])}",
-            f"Бесплатные прогнозы: {reports['free']['total']}",
-            f"Платные прогнозы: {reports['paid']['total']}"
-            + (f" · {reports['paid']['stars']}⭐" if reports["paid"]["stars"] else ""),
-            "",
-            "Источники — отдельные ссылки с аргументом /start.",
-            "Заходы без ссылки — обычный вход в бота.",
-        ]
-    )
+def format_overview_text() -> str:
+    return "📊 Статистика"
 
 
 def format_visits_text(
@@ -194,7 +178,7 @@ def format_reports_text(
     free = stats["free"]
     paid = stats["paid"]
     lines = [
-        "📈 Прогнозы",
+        "Заказы",
         f"Период: {period_caption(period, custom)}",
         "",
         f"Бесплатные: {free['total']} · {format_people(free['unique'])}",
@@ -223,14 +207,13 @@ def format_source_text(
     paid_total = reports["paid"]["total"]
     paid_stars = reports["paid"].get("stars") or 0
     lines = [
-        f"🔗 Источник: <b>{slug}</b>",
+        f"Ссылка: <b>{slug}</b>",
         f"Период: {period_caption(period, custom)}",
         "",
-        "Ссылка:",
         f"<code>{link}</code>",
         "",
         f"Заходы: {format_visits_line(visits, unique)}",
-        f"Бесплатные прогнозы: {free_total}",
-        f"Платные прогнозы: {paid_total}" + (f" · {paid_stars}⭐" if paid_stars else ""),
+        f"Бесплатные заказы: {free_total}",
+        f"Платные заказы: {paid_total}" + (f" · {paid_stars}⭐" if paid_stars else ""),
     ]
     return "\n".join(lines)

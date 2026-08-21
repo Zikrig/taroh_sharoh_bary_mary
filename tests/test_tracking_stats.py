@@ -27,7 +27,7 @@ from database.repository import (
     record_bot_visit,
     record_report_event,
 )
-from handlers.admin_stats import source_detail_menu
+from handlers.admin_stats import overview_menu, source_detail_menu
 from services.tracking import (
     normalize_tracking_slug,
     parse_custom_period,
@@ -53,6 +53,16 @@ class TrackingStatsTests(unittest.TestCase):
         self.assertEqual(
             tracking_link("astro_mary_bot", "inst"),
             "https://t.me/astro_mary_bot?start=inst",
+        )
+
+    def test_overview_menu_lists_orders_visits_and_links(self):
+        markup, _, _ = overview_menu(
+            [{"slug": "inst", "visits": 3}, {"slug": "vk", "visits": 1}]
+        )
+        texts = [button.text for row in markup.inline_keyboard for button in row]
+        self.assertEqual(
+            texts,
+            ["Заказы", "Заходы без ссылки", "inst", "vk", "Новая ссылка", "⬅️ Назад"],
         )
 
     def test_source_copy_callback_fits_telegram_limit(self):

@@ -15,7 +15,6 @@ from database.repository import (
     create_tracking_source,
     delete_tracking_source,
     get_report_stats,
-    get_stats_overview,
     get_visit_stats,
     list_tracking_sources,
     tracking_source_exists,
@@ -34,7 +33,7 @@ from services.tracking import (
 )
 
 router = Router()
-SOURCES_PAGE_SIZE = 8
+LINKS_PAGE_SIZE = 8
 
 
 class StatsStates(StatesGroup):
@@ -53,40 +52,24 @@ async def _guard(callback: CallbackQuery) -> bool:
     return True
 
 
-def overview_menu():
+def overview_menu(links: list[dict], page: int = 0):
     builder = InlineKeyboardBuilder()
-    builder.button(text="🚪 Заходы без ссылки", callback_data="admin:stv:o:all")
-    builder.button(text="📈 Прогнозы", callback_data="admin:str:all")
-    builder.button(text="🔗 Источники", callback_data="admin:stl:0")
-    builder.button(text="➕ Новая ссылка", callback_data="admin:sta")
-    builder.button(text="⬅️ Назад", callback_data="admin:back")
-    builder.adjust(1)
-    return builder.as_markup()
-
-
-def sources_menu(sources: list[dict], page: int = 0):
-    builder = InlineKeyboardBuilder()
-    total = len(sources)
-    pages = max(1, (total + SOURCES_PAGE_SIZE - 1) // SOURCES_PAGE_SIZE)
+    builder.button(text="Заказы", callback_data="admin:str:all")
+    builder.button(text="Заходы без ссылки", callback_data="admin:stv:o:all")
+    total = len(links)
+    pages = max(1, (total + LINKS_PAGE_SIZE - 1) // LINKS_PAGE_SIZE)
     page = min(max(page, 0), pages - 1)
-    start = page * SOURCES_PAGE_SIZE
-    chunk = sources[start : start + SOURCES_PAGE_SIZE]
+    start = page * LINKS_PAGE_SIZE
+    chunk = links[start : start + LINKS_PAGE_SIZE]
     for item in chunk:
         slug = item["slug"]
-        visits = int(item.get("visits") or 0)
-        builder.button(text=f"{slug} · {visits}", callback_data=f"admin:sts:{slug}:all")
-    builder.adjust(1)
-    nav = []
+        builder.button(text=slug, callback_data=f"admin:sts:{slug}:all")
     if page > 0:
-        nav.append(("⬅️", f"admin:stl:{page - 1}"))
+        builder.button(text="⬅️", callback_data=f"admin:stl:{page - 1}")
     if page + 1 < pages:
-        nav.append(("➡️", f"admin:stl:{page + 1}"))
-    if nav:
-        for text, data in nav:
-            builder.button(text=text, callback_data=data)
-        builder.adjust(1, *[1] * len(chunk), len(nav))
-    builder.button(text="➕ Новая ссылка", callback_data="admin:sta")
-    builder.button(text="⬅️ К статистике", callback_data="admin:stats")
+        builder.button(text="➡️", callback_data=f"admin:stl:{page + 1}")
+    builder.button(text="Новая ссылка", callback_data="admin:sta")
+    builder.button(text="⬅️ Назад", callback_data="admin:back")
     builder.adjust(1)
     return builder.as_markup(), page, pages
 
@@ -101,8 +84,8 @@ def source_detail_menu(slug: str, period: str, link: str):
         callback_data=f"admin:stc:s:{slug}",
     )
     builder.button(text="📋 Скопировать ссылку", copy_text=CopyTextButton(text=link))
-    builder.button(text="🗑 Удалить источник", callback_data=f"admin:std:{slug}")
-    builder.button(text="⬅️ К источникам", callback_data="admin:stl:0")
+    builder.button(text="🗑 Удалить ссылку", callback_data=f"admin:std:{slug}")
+    builder.button(text="⬅️ Назад", callback_data="admin:stats")
     builder.adjust(2, 2, 2, 1, 1, 1)
     return builder.as_markup()
 
@@ -134,9 +117,13 @@ async def _bot_username(message: Message) -> str:
     return me.username or "bot"
 
 
-async def show_overview(message: Message) -> None:
-    overview = await get_stats_overview()
-    await _edit_or_answer(message, format_overview_text(overview), reply_markup=overview_menu())
+async def show_overview(message: Message, page: int = 0) -> None:
+    links = await list_tracking_sources()
+    markup, page, pages = overview_menu(links, page)
+    text = format_overview_text()
+    if pages > 1:
+        text += f"\n{page + 1}/{pages}"
+    await _edit_or_answer(message, text, reply_markup=markup)
 
 
 async def show_organic(message: Message, period: str, custom: tuple[date, date] | None) -> None:
@@ -145,7 +132,7 @@ async def show_organic(message: Message, period: str, custom: tuple[date, date] 
     await _edit_or_answer(
         message,
         format_visits_text(
-            title="🚪 Заходы без ссылки",
+            title="Заходы без ссылки",
             period=period,
             visits=stats["visits"],
             unique=stats["unique"],
@@ -164,22 +151,6 @@ async def show_reports(message: Message, period: str, custom: tuple[date, date] 
         format_reports_text(stats, period=period, custom=custom),
         reply_markup=reports_menu(period),
     )
-
-
-async def show_sources(message: Message, page: int = 0) -> None:
-    sources = await list_tracking_sources()
-    markup, page, pages = sources_menu(sources, page)
-    if sources:
-        text = "🔗 Источники\n\nНажмите источник, чтобы скопировать ссылку и посмотреть статистику."
-        if pages > 1:
-            text += f"\n{page + 1}/{pages}"
-    else:
-        text = (
-            "🔗 Источники\n\n"
-            "Пока нет ссылок. Добавьте код, например inst — получите "
-            "https://t.me/бот?start=inst"
-        )
-    await _edit_or_answer(message, text, reply_markup=markup)
 
 
 async def show_source(
@@ -260,7 +231,7 @@ async def open_sources(callback: CallbackQuery, state: FSMContext):
         page = 0
     await state.clear()
     await callback.answer()
-    await show_sources(callback.message, page)
+    await show_overview(callback.message, page)
 
 
 @router.callback_query(F.data.startswith("admin:sts:"))
@@ -269,12 +240,12 @@ async def open_source(callback: CallbackQuery, state: FSMContext):
         return
     payload = (callback.data or "")[len("admin:sts:") :]
     if ":" not in payload:
-        await callback.answer("Источник не найден", show_alert=True)
+        await callback.answer("Ссылка не найдена", show_alert=True)
         return
     slug, period = payload.rsplit(":", 1)
     slug = normalize_tracking_slug(slug) or ""
     if not slug or not await tracking_source_exists(slug):
-        await callback.answer("Источник не найден", show_alert=True)
+        await callback.answer("Ссылка не найдена", show_alert=True)
         return
     if period == "c":
         await ask_custom_period(callback, state, scope="source", slug=slug)
@@ -315,7 +286,7 @@ async def confirm_delete_source(callback: CallbackQuery, state: FSMContext):
         return
     slug = normalize_tracking_slug((callback.data or "")[len("admin:std:") :]) or ""
     if not slug:
-        await callback.answer("Источник не найден", show_alert=True)
+        await callback.answer("Ссылка не найдена", show_alert=True)
         return
     await state.clear()
     await callback.answer()
@@ -325,7 +296,7 @@ async def confirm_delete_source(callback: CallbackQuery, state: FSMContext):
     builder.adjust(1)
     await _edit_or_answer(
         callback.message,
-        f"Удалить источник «{slug}»?\nСсылка пропадёт из списка, уже посчитанные заходы сохранятся.",
+        f"Удалить ссылку «{slug}»?\nОна пропадёт из списка, уже посчитанные заходы сохранятся.",
         reply_markup=builder.as_markup(),
     )
 
@@ -338,8 +309,8 @@ async def delete_source(callback: CallbackQuery, state: FSMContext):
     if slug:
         await delete_tracking_source(slug)
     await state.clear()
-    await callback.answer("Источник удалён")
-    await show_sources(callback.message, 0)
+    await callback.answer("Ссылка удалена")
+    await show_overview(callback.message, 0)
 
 
 @router.callback_query(F.data.startswith("admin:stc:"))
@@ -400,7 +371,7 @@ async def save_new_source(message: Message, state: FSMContext):
         return
     created = await create_tracking_source(slug)
     if not created:
-        await message.answer(f"Источник «{slug}» уже есть. Откройте его в списке или введите другой код.")
+        await message.answer(f"Ссылка «{slug}» уже есть. Откройте её в списке или введите другой код.")
         return
     await state.clear()
     await show_source(message, slug, "all", None)
