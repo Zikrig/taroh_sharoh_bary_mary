@@ -130,7 +130,7 @@ def reports_menu(period: str):
 
 
 async def _bot_username(message: Message) -> str:
-    me = await message.bot.me
+    me = await message.bot.get_me()
     return me.username or "bot"
 
 
