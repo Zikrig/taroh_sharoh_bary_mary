@@ -861,6 +861,40 @@ def _report_cache_key(report_type: str, user_prompt: str) -> str:
     return sha1(f"{report_type}\n{user_prompt}".encode("utf-8")).hexdigest()
 
 
+def report_cache_material(
+    *,
+    user_prompt: str,
+    prior_blob: str,
+    gender: str,
+    pipeline: str,
+    prompts: dict[str, str] | None,
+) -> str:
+    """Everything that must change the cached report, including prompt text."""
+    return (
+        active_system_prompt()
+        + "\n"
+        + active_editor_prompt()
+        + "\n"
+        + user_prompt
+        + "\n"
+        + prior_blob
+        + f"\ngender:{gender}\npipeline:{pipeline}"
+        + f"\nprompts:{_prompts_fingerprint(prompts)}"
+    )
+
+
+async def reading_continuity_id(
+    chart: dict,
+    second_chart: dict | None = None,
+) -> str:
+    """Birth data plus prompts. A prompt edit must not reuse the previous free text."""
+    from database.repository import birth_fingerprint
+
+    prompts = await get_active_prompts()
+    apply_prompt_overrides(prompts)
+    return f"{birth_fingerprint(chart, second_chart)}||p:{_prompts_fingerprint(prompts)}"
+
+
 def clear_report_cache() -> None:
     _REPORT_CACHE.clear()
 
@@ -1395,11 +1429,13 @@ async def generate_report_content(
         pipeline_tag = "free-waves-v1" if is_free else "skeleton-v2"
         cache_key = _report_cache_key(
             report_type,
-            payload["natal_text"]
-            + "\n"
-            + prior_blob
-            + f"\ngender:{resolved_gender}\npipeline:{pipeline_tag}"
-            + f"\nprompts:{_prompts_fingerprint(active_prompts)}",
+            report_cache_material(
+                user_prompt=payload["user_prompt"],
+                prior_blob=prior_blob,
+                gender=resolved_gender,
+                pipeline=pipeline_tag,
+                prompts=active_prompts,
+            ),
         )
         cached = _REPORT_CACHE.get(cache_key)
         if cached:

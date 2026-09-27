@@ -18,6 +18,7 @@ from services.ai import (
     generate_report_content,
     get_aitunnel_balance,
     list_affordable_chat_models,
+    reading_continuity_id,
 )
 from services.generation_progress import (
     TaskProgress,
@@ -27,6 +28,7 @@ from services.generation_progress import (
 )
 from services.astro import (
     calculate_chart,
+    chart_matches_profile,
     geocode,
     is_approximate_time,
     parse_date,
@@ -41,7 +43,6 @@ from database.repository import (
     GENDER_FEMALE,
     GENDER_MALE,
     PDF_SELL_TEXT_KINDS,
-    birth_fingerprint,
     complete_order,
     create_order,
     get_ai_model,
@@ -1590,6 +1591,7 @@ async def save_profile_field(message: Message, field: str, value: str, state: FS
         return
     profile[field] = value
     await save_profile(message.from_user.id, profile)
+    PENDING_REPORTS.pop(message.from_user.id, None)
     await message.answer("Данные сохранены ✅", reply_markup=back_to_edit_profile())
 
 
@@ -1711,6 +1713,7 @@ async def own_time(
                 time_text if time_text is not None else message.text
             )
             await save_profile(user_id, profile)
+            PENDING_REPORTS.pop(user_id, None)
             await message.answer("Данные сохранены ✅", reply_markup=back_to_edit_profile())
         else:
             await save_profile_field(message, "birth_time", value, state)
@@ -1765,6 +1768,7 @@ async def own_place(message: Message, state: FSMContext):
             return
         profile.update(birth_place=message.text.strip(), latitude=latitude, longitude=longitude)
         await save_profile(message.from_user.id, profile)
+        PENDING_REPORTS.pop(message.from_user.id, None)
         await state.clear()
         await message.answer("Данные сохранены ✅", reply_markup=back_to_edit_profile())
         return
@@ -1887,6 +1891,22 @@ async def partner_place(message: Message, state: FSMContext):
     )
 
 
+async def _chart_from_current_profile(user_id: int, chart: dict | None) -> dict | None:
+    """Rebuild a stored chart after the profile date, time, or place changed."""
+    if chart is None:
+        return None
+    profile = await get_profile(user_id)
+    if not profile or chart_matches_profile(chart, profile):
+        return chart
+    return calculate_chart(
+        profile["birth_date"],
+        profile["birth_time"],
+        profile["latitude"],
+        profile["longitude"],
+        time_is_approximate=bool(profile["time_is_approximate"]),
+    )
+
+
 async def show_teaser(
     message: Message,
     scenario_name: str,
@@ -1896,8 +1916,9 @@ async def show_teaser(
     user_id: int,
     admin_mode: bool = False,
 ):
+    chart = await _chart_from_current_profile(user_id, chart)
     PENDING_REPORTS[user_id] = (chart, second_chart)
-    fingerprint = birth_fingerprint(chart, second_chart)
+    fingerprint = await reading_continuity_id(chart, second_chart)
 
     # Daily free limit applies to regular users only; admin gens stay unlimited for testing.
     if (
@@ -2170,6 +2191,7 @@ async def deliver_report(
     back_markup = back_to_admin_gens() if admin_mode else back_to_menu()
     if charts:
         chart, second_chart = charts
+        chart = await _chart_from_current_profile(user_id, chart)
     elif scenario_name == "compatibility":
         # The partner chart cannot be restored from the profile: never fall back to one chart.
         await set_order_status(order_id, "report_pending")
@@ -2209,7 +2231,7 @@ async def deliver_report(
         prior_sections = await get_free_generation(
             user_id,
             scenario_name,
-            birth_fingerprint(chart, second_chart),
+            await reading_continuity_id(chart, second_chart),
         )
         profile = await get_profile(user_id)
         content = await generate_report_content(

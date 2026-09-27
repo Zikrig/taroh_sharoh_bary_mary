@@ -1,3 +1,4 @@
+import importlib.machinery
 import unittest
 import json
 from importlib.util import find_spec
@@ -7,6 +8,7 @@ from types import SimpleNamespace
 
 if find_spec("swisseph") is None:
     sys.modules["swisseph"] = SimpleNamespace(
+        __spec__=importlib.machinery.ModuleSpec("swisseph", loader=None),
         SUN=0, MOON=1, MERCURY=2, VENUS=3, MARS=4, JUPITER=5,
         SATURN=6, URANUS=7, NEPTUNE=8, PLUTO=9,
     )
@@ -29,6 +31,8 @@ from services.ai import (
     _prompts_fingerprint,
     _remember_report,
     _report_cache_key,
+    reading_continuity_id,
+    report_cache_material,
     _review_progress_alloc,
     _save_request_transcript,
     _save_response_transcript,
@@ -52,6 +56,7 @@ from services.generation_progress import (
     format_progress_percent,
 )
 from services.astro import local_time_to_utc
+from services.report_prompts import active_system_prompt, apply_prompt_overrides
 from services.prompt_guides.career import build_career_hints
 from services.report_prompts import (
     EDITOR_SYSTEM_PROMPT,
@@ -571,6 +576,8 @@ class AiServiceTests(unittest.TestCase):
     def test_system_prompt_asks_to_analyze_chart_before_writing(self):
         self.assertIn("Проанализируй всю карту", SYSTEM_PROMPT)
         self.assertIn("от 0 до 2 упоминаний", SYSTEM_PROMPT)
+        self.assertIn("строке «Асцендент:»", SYSTEM_PROMPT)
+        self.assertNotIn("Овен", SYSTEM_PROMPT)
         self.assertIn("Ноль — нормально", SYSTEM_PROMPT)
         self.assertIn("короткие абзацы", SYSTEM_PROMPT)
         self.assertIn("живые, обычные формулировки", SYSTEM_PROMPT)
@@ -747,6 +754,62 @@ class AiServiceTests(unittest.TestCase):
             _extract_preamble("Короткий план.\n\n=====\nТвой портрет\n=====\nпункт"),
             "Короткий план.",
         )
+
+    def test_same_chart_gets_a_new_cache_key_when_the_prompt_changes(self):
+        natal = "Натальная карта без смены даты"
+        apply_prompt_overrides({"sys": "старый системный промпт"})
+        try:
+            first = report_cache_material(
+                user_prompt=natal,
+                prior_blob="",
+                gender="female",
+                pipeline="free-waves-v1",
+                prompts={"sys": "старый системный промпт"},
+            )
+            self.assertIn("старый системный промпт", first)
+            apply_prompt_overrides({"sys": "новый системный промпт про другой акцент"})
+            second = report_cache_material(
+                user_prompt=natal,
+                prior_blob="",
+                gender="female",
+                pipeline="free-waves-v1",
+                prompts={"sys": "новый системный промпт про другой акцент"},
+            )
+            self.assertNotEqual(
+                _report_cache_key("love_free", first),
+                _report_cache_key("love_free", second),
+            )
+            self.assertIn(active_system_prompt(), second)
+        finally:
+            apply_prompt_overrides(None)
+
+    def test_section_override_changes_user_prompt_for_the_same_chart(self):
+        apply_prompt_overrides(None)
+        before = build_prompt_payload("love_free", chart(), None)["user_prompt"]
+        apply_prompt_overrides({"s.love_free.0": "УНИКАЛЬНАЯ ИНСТРУКЦИЯ РАЗДЕЛА 7741"})
+        try:
+            after = build_prompt_payload("love_free", chart(), None)["user_prompt"]
+        finally:
+            apply_prompt_overrides(None)
+        self.assertNotEqual(before, after)
+        self.assertIn("УНИКАЛЬНАЯ ИНСТРУКЦИЯ РАЗДЕЛА 7741", after)
+
+    def test_free_text_is_not_reused_after_a_prompt_edit(self):
+        import asyncio
+
+        sample = {"date": "1990-01-01", "time": "12:00", "latitude": 55.7, "longitude": 37.6}
+
+        async def token(prompts: dict[str, str]) -> str:
+            with patch("services.ai.get_active_prompts", return_value=prompts):
+                return await reading_continuity_id(sample)
+
+        try:
+            first = asyncio.run(token({"sys": "старый"}))
+            second = asyncio.run(token({"sys": "новый"}))
+        finally:
+            apply_prompt_overrides(None)
+        self.assertNotEqual(first, second)
+        self.assertIn("||p:", first)
 
     def test_report_cache_depends_on_prompts_and_can_be_cleared(self):
         natal = "Натальная карта"

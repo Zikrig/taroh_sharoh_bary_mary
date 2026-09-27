@@ -1,4 +1,5 @@
 import asyncio
+import importlib.machinery
 import tempfile
 import unittest
 from importlib.util import find_spec
@@ -9,6 +10,7 @@ import sys
 
 if find_spec("swisseph") is None:
     sys.modules["swisseph"] = SimpleNamespace(
+        __spec__=importlib.machinery.ModuleSpec("swisseph", loader=None),
         SUN=0, MOON=1, MERCURY=2, VENUS=3, MARS=4, JUPITER=5,
         SATURN=6, URANUS=7, NEPTUNE=8, PLUTO=9,
     )
