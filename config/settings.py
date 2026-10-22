@@ -27,6 +27,7 @@ class Settings:
         or os.getenv("PAYMENT_PROVIDER_TOKEN")
         or ""
     ).strip()
+    yookassa_test_provider_token: str = os.getenv("YOOKASSA_PROVIDER_TEST_TOKEN", "").strip()
     save_payload_samples: bool = os.getenv("SAVE_PAYLOAD_SAMPLES", "").strip().lower() in {
         "1",
         "true",

@@ -299,16 +299,40 @@ def stars_pay_keyboard(amount: int):
     return builder.as_markup()
 
 
-def yookassa_pay_keyboard(amount: int):
+def yookassa_pay_keyboard(amount: int, *, back_callback: str = "back:menu"):
     builder = InlineKeyboardBuilder()
     builder.button(text=f"Оплатить {amount}₽", pay=True)
-    builder.button(text="⬅️ В меню", callback_data="back:menu")
+    builder.button(text="⬅️ Назад", callback_data=back_callback)
     builder.adjust(1)
     return builder.as_markup()
 
 
+ADMIN_PROBE_RUBLES = 10
+
+
+def yookassa_live_token() -> str:
+    return settings.yookassa_provider_token
+
+
+def yookassa_test_token() -> str:
+    return settings.yookassa_test_provider_token
+
+
+def yookassa_user_token() -> str:
+    return yookassa_live_token() or yookassa_test_token()
+
+
 def yookassa_enabled() -> bool:
-    return bool(settings.yookassa_provider_token)
+    return bool(yookassa_user_token())
+
+
+def admin_probe_button_specs() -> list[tuple[str, str]]:
+    specs: list[tuple[str, str]] = []
+    if yookassa_test_token():
+        specs.append(("💳 Проверка 10₽ · TEST", "admin:paytest:test"))
+    if yookassa_live_token():
+        specs.append(("💳 Проверка 10₽ · LIVE", "admin:paytest:live"))
+    return specs
 
 
 def payment_choice_keyboard(scenario_name: str, *, stars: int, rubles: int):
@@ -475,11 +499,31 @@ async def send_yookassa_invoice(message: Message, scenario_name: str, user_id: i
         payload=f"report:{scenario_name}:{order_id}",
         currency="RUB",
         prices=[LabeledPrice(label=title, amount=rubles_to_kopecks(amount))],
-        provider_token=settings.yookassa_provider_token,
+        provider_token=yookassa_user_token(),
         need_email=True,
         send_email_to_provider=True,
         provider_data=yookassa_provider_data(title, amount),
         reply_markup=yookassa_pay_keyboard(amount),
+    )
+
+
+async def send_admin_yookassa_probe(message: Message, kind: str) -> None:
+    token = yookassa_test_token() if kind == "test" else yookassa_live_token()
+    if not token:
+        raise ValueError("token missing")
+    label = "TEST" if kind == "test" else "LIVE"
+    title = f"Проверка ЮKassa {label}"
+    await message.answer_invoice(
+        title=title,
+        description=f"Тестовый платёж {ADMIN_PROBE_RUBLES}₽, PDF не формируется.",
+        payload=f"admin_pay:{kind}",
+        currency="RUB",
+        prices=[LabeledPrice(label=title, amount=rubles_to_kopecks(ADMIN_PROBE_RUBLES))],
+        provider_token=token,
+        need_email=True,
+        send_email_to_provider=True,
+        provider_data=yookassa_provider_data(title, ADMIN_PROBE_RUBLES),
+        reply_markup=yookassa_pay_keyboard(ADMIN_PROBE_RUBLES, back_callback="admin:prices"),
     )
 
 
@@ -674,8 +718,10 @@ async def prices_settings_menu():
             text=f"{NAMES[scenario]} · {rub_prices[scenario]}₽",
             callback_data=f"admin:rubprice:{scenario}",
         )
+    for text, callback_data in admin_probe_button_specs():
+        builder.button(text=text, callback_data=callback_data)
     builder.button(text="⬅️ Назад", callback_data="admin:back")
-    builder.adjust(2, 2, 2, 2, 1)
+    builder.adjust(2, 2, 2, 2, 1, 1, 1)
     return builder.as_markup()
 
 
@@ -688,6 +734,10 @@ def prices_settings_message(
         "",
         "Цены за полный PDF: Telegram Stars и карта через ЮKassa.",
         "Выберите сценарий и валюту, чтобы изменить цену.",
+        "",
+        "Проверка оплаты: 10₽, PDF не формируется.",
+        f"Токен TEST: {'задан' if yookassa_test_token() else 'нет'}",
+        f"Токен LIVE: {'задан' if yookassa_live_token() else 'нет'}",
     ]
     if prices:
         rub_prices = rub_prices or {}
@@ -984,6 +1034,32 @@ async def edit_report_rub_price(callback: CallbackQuery, state: FSMContext):
         "Отправьте новую цену целым числом рублей (минимум 1).",
         reply_markup=builder.as_markup(),
     )
+
+
+@router.callback_query(F.data.startswith("admin:paytest:"))
+async def admin_yookassa_probe(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    kind = (callback.data or "").rsplit(":", 1)[-1]
+    if kind not in {"test", "live"}:
+        await callback.answer("Неизвестный токен.", show_alert=True)
+        return
+    token = yookassa_test_token() if kind == "test" else yookassa_live_token()
+    if not token:
+        await callback.answer(
+            "Этот токен ЮKassa не задан в .env.",
+            show_alert=True,
+        )
+        return
+    await callback.answer()
+    try:
+        await send_admin_yookassa_probe(callback.message, kind)
+    except (TelegramBadRequest, ValueError):
+        await callback.message.answer(
+            "Не удалось открыть счёт на 10₽. Проверьте токен ЮKassa.",
+            reply_markup=await prices_settings_menu(),
+        )
 
 
 @router.callback_query(F.data == "admin:cancel_price_edit")
@@ -2306,6 +2382,17 @@ async def pre_checkout(query):
 async def paid(message: Message):
     payment = message.successful_payment
     parts = payment.invoice_payload.split(":")
+    if parts and parts[0] == "admin_pay":
+        if not is_admin(message.from_user.id):
+            await message.answer("Этот платёж доступен только администраторам.")
+            return
+        kind = parts[1] if len(parts) > 1 else ""
+        label = "TEST" if kind == "test" else "LIVE"
+        await message.answer(
+            f"Оплата 10₽ прошла ✅\nТокен ЮKassa: {label}\nPDF не формировался.",
+            reply_markup=await prices_settings_menu(),
+        )
+        return
     if len(parts) != 3:
         await message.answer(
             "Платёж получен, но не удалось определить отчёт. Напишите в поддержку.",

@@ -20,8 +20,10 @@ from handlers.router import (
     PENDING_FREE_REPORT_IDS_BY_USER,
     PRICES,
     SCENARIO_INTROS,
+    ADMIN_PROBE_RUBLES,
     admin_generations_menu,
     admin_menu,
+    admin_probe_button_specs,
     admin_text,
     clear_pending_free_reports_for_users,
     edit_profile_menu,
@@ -80,6 +82,20 @@ class RouterUiTests(unittest.TestCase):
         self.assertEqual(callbacks[0], "pay:stars:love")
         self.assertIn("449₽", texts[1])
         self.assertEqual(callbacks[1], "pay:rub:love")
+
+    def test_admin_probe_buttons_use_both_tokens(self):
+        from unittest.mock import patch
+
+        self.assertEqual(ADMIN_PROBE_RUBLES, 10)
+        self.assertEqual(rubles_to_kopecks(ADMIN_PROBE_RUBLES), 1000)
+        with patch("handlers.router.yookassa_test_token", return_value="TEST"), patch(
+            "handlers.router.yookassa_live_token", return_value="LIVE"
+        ):
+            specs = admin_probe_button_specs()
+        self.assertEqual(
+            [callback for _text, callback in specs],
+            ["admin:paytest:test", "admin:paytest:live"],
+        )
 
     def test_upsell_texts_are_scenario_specific(self):
         self.assertEqual(set(FREE_UPSELL_TEXTS), set(PRICES))
