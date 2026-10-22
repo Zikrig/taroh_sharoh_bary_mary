@@ -1,11 +1,12 @@
 import asyncio
 import json
+import logging
 import secrets
 from contextlib import asynccontextmanager, suppress
 
 from aiogram import F, Router
 from aiogram.enums import ParseMode
-from aiogram.exceptions import TelegramBadRequest
+from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -81,6 +82,7 @@ from database.repository import (
 )
 from services.reports_new import generate_report
 
+logger = logging.getLogger(__name__)
 router = Router()
 PRICES = DEFAULT_REPORT_PRICES
 NAMES = {
@@ -299,14 +301,6 @@ def stars_pay_keyboard(amount: int):
     return builder.as_markup()
 
 
-def yookassa_pay_keyboard(amount: int, *, back_callback: str = "back:menu"):
-    builder = InlineKeyboardBuilder()
-    builder.button(text=f"Оплатить {amount}₽", pay=True)
-    builder.button(text="⬅️ Назад", callback_data=back_callback)
-    builder.adjust(1)
-    return builder.as_markup()
-
-
 ADMIN_PROBE_RUBLES = 10
 
 
@@ -363,7 +357,7 @@ def yookassa_provider_data(title: str, rubles: int) -> str:
                 "items": [
                     {
                         "description": description,
-                        "quantity": "1.00",
+                        "quantity": 1,
                         "amount": {
                             "value": f"{int(rubles):.2f}",
                             "currency": "RUB",
@@ -493,17 +487,13 @@ async def send_yookassa_invoice(message: Message, scenario_name: str, user_id: i
     if charts:
         await save_report_context(order_id, *charts)
     title = NAMES[scenario_name]
-    await message.answer_invoice(
+    await _answer_yookassa_invoice(
+        message,
         title=title,
         description="Персональный PDF-отчёт ASTRO MARY",
         payload=f"report:{scenario_name}:{order_id}",
-        currency="RUB",
-        prices=[LabeledPrice(label=title, amount=rubles_to_kopecks(amount))],
+        rubles=amount,
         provider_token=yookassa_user_token(),
-        need_email=True,
-        send_email_to_provider=True,
-        provider_data=yookassa_provider_data(title, amount),
-        reply_markup=yookassa_pay_keyboard(amount),
     )
 
 
@@ -513,18 +503,50 @@ async def send_admin_yookassa_probe(message: Message, kind: str) -> None:
         raise ValueError("token missing")
     label = "TEST" if kind == "test" else "LIVE"
     title = f"Проверка ЮKassa {label}"
-    await message.answer_invoice(
+    await _answer_yookassa_invoice(
+        message,
         title=title,
         description=f"Тестовый платёж {ADMIN_PROBE_RUBLES}₽, PDF не формируется.",
         payload=f"admin_pay:{kind}",
-        currency="RUB",
-        prices=[LabeledPrice(label=title, amount=rubles_to_kopecks(ADMIN_PROBE_RUBLES))],
+        rubles=ADMIN_PROBE_RUBLES,
         provider_token=token,
-        need_email=True,
-        send_email_to_provider=True,
-        provider_data=yookassa_provider_data(title, ADMIN_PROBE_RUBLES),
-        reply_markup=yookassa_pay_keyboard(ADMIN_PROBE_RUBLES, back_callback="admin:prices"),
     )
+
+
+def _telegram_error_text(error: BaseException) -> str:
+    text = getattr(error, "message", None) or str(error)
+    return " ".join(str(text).split())[:400]
+
+
+async def _answer_yookassa_invoice(
+    message: Message,
+    *,
+    title: str,
+    description: str,
+    payload: str,
+    rubles: int,
+    provider_token: str,
+) -> None:
+    """Send a RUB invoice. Telegram adds the Pay button; extra markup often breaks YooKassa."""
+    base = {
+        "title": title[:32],
+        "description": description[:255],
+        "payload": payload,
+        "currency": "RUB",
+        "prices": [LabeledPrice(label=title[:32], amount=rubles_to_kopecks(rubles))],
+        "provider_token": provider_token,
+    }
+    try:
+        await message.answer_invoice(
+            **base,
+            need_email=True,
+            send_email_to_provider=True,
+            provider_data=yookassa_provider_data(title, rubles),
+        )
+        return
+    except TelegramBadRequest as error:
+        logger.warning("ЮKassa invoice with receipt failed: %s", error)
+    await message.answer_invoice(**base)
 
 
 def admin_generations_menu():
@@ -1055,9 +1077,11 @@ async def admin_yookassa_probe(callback: CallbackQuery):
     await callback.answer()
     try:
         await send_admin_yookassa_probe(callback.message, kind)
-    except (TelegramBadRequest, ValueError):
+    except (TelegramAPIError, ValueError) as error:
+        logger.warning("Admin YooKassa %s probe failed: %s", kind, error)
+        detail = _telegram_error_text(error)
         await callback.message.answer(
-            "Не удалось открыть счёт на 10₽. Проверьте токен ЮKassa.",
+            f"Не удалось открыть счёт на 10₽.\n{detail}",
             reply_markup=await prices_settings_menu(),
         )
 
@@ -2301,7 +2325,8 @@ async def pay_with_yookassa(callback: CallbackQuery):
     await callback.answer()
     try:
         await send_yookassa_invoice(callback.message, scenario_name, callback.from_user.id)
-    except TelegramBadRequest:
+    except TelegramAPIError as error:
+        logger.warning("YooKassa invoice for %s failed: %s", scenario_name, error)
         await callback.message.answer(
             "Не удалось открыть оплату картой. Проверьте токен ЮKassa в настройках бота "
             "или напишите в поддержку.",

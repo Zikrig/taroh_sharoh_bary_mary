@@ -71,6 +71,7 @@ class RouterUiTests(unittest.TestCase):
         receipt = yookassa_provider_data("Разбор личности", 349)
         self.assertIn("349.00", receipt)
         self.assertIn("RUB", receipt)
+        self.assertIn('"quantity": 1', receipt)
         from unittest.mock import patch
 
         with patch("handlers.router.settings") as mock_settings:
