@@ -114,6 +114,7 @@ async def init_db() -> None:
         )
         await _ensure_free_generations_schema(db)
         await _ensure_tracking_schema(db)
+        await _ensure_payment_schema(db)
         await db.commit()
     await ensure_prompt_defaults()
 
@@ -213,6 +214,7 @@ async def _ensure_tracking_schema(db: aiosqlite.Connection) -> None:
             amount INTEGER NOT NULL DEFAULT 0,
             source_slug TEXT,
             order_id INTEGER,
+            currency TEXT NOT NULL DEFAULT 'XTR',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
         CREATE INDEX IF NOT EXISTS idx_report_events_created ON report_events(kind, created_at);
@@ -221,6 +223,29 @@ async def _ensure_tracking_schema(db: aiosqlite.Connection) -> None:
         """
     )
     await _backfill_report_events(db)
+
+
+async def _ensure_payment_schema(db: aiosqlite.Connection) -> None:
+    order_columns = {
+        row[1] for row in await (await db.execute("PRAGMA table_info(orders)")).fetchall()
+    }
+    if "currency" not in order_columns:
+        await db.execute(
+            "ALTER TABLE orders ADD COLUMN currency TEXT NOT NULL DEFAULT 'XTR'"
+        )
+    event_columns = {
+        row[1]
+        for row in await (await db.execute("PRAGMA table_info(report_events)")).fetchall()
+    }
+    if event_columns and "currency" not in event_columns:
+        await db.execute(
+            "ALTER TABLE report_events ADD COLUMN currency TEXT NOT NULL DEFAULT 'XTR'"
+        )
+    for scenario, amount in DEFAULT_REPORT_RUB_PRICES.items():
+        await db.execute(
+            "INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)",
+            (f"price_rub_{scenario}", str(amount)),
+        )
 
 
 async def _backfill_report_events(db: aiosqlite.Connection) -> None:
@@ -363,9 +388,13 @@ async def record_report_event(
     report_type: str,
     amount: int = 0,
     order_id: int | None = None,
+    currency: str = "XTR",
     created_at: str | None = None,
 ) -> None:
     source_slug = await get_user_last_source(user_id)
+    pay_currency = (currency or "XTR").upper()
+    if pay_currency not in {"XTR", "RUB"}:
+        pay_currency = "XTR"
     stamp = created_at
     async with aiosqlite.connect(settings.database_path) as db:
         try:
@@ -373,21 +402,38 @@ async def record_report_event(
                 await db.execute(
                     """
                     INSERT INTO report_events (
-                        user_id, kind, report_type, amount, source_slug, order_id, created_at
+                        user_id, kind, report_type, amount, source_slug, order_id, currency, created_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (user_id, kind, report_type, int(amount), source_slug, order_id, stamp),
+                    (
+                        user_id,
+                        kind,
+                        report_type,
+                        int(amount),
+                        source_slug,
+                        order_id,
+                        pay_currency,
+                        stamp,
+                    ),
                 )
             else:
                 await db.execute(
                     """
                     INSERT INTO report_events (
-                        user_id, kind, report_type, amount, source_slug, order_id
+                        user_id, kind, report_type, amount, source_slug, order_id, currency
                     )
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (user_id, kind, report_type, int(amount), source_slug, order_id),
+                    (
+                        user_id,
+                        kind,
+                        report_type,
+                        int(amount),
+                        source_slug,
+                        order_id,
+                        pay_currency,
+                    ),
                 )
             await db.commit()
         except aiosqlite.IntegrityError:
@@ -452,7 +498,11 @@ async def _report_kind_stats(
     query_args.extend(args)
     async with db.execute(
         f"""
-        SELECT COUNT(*), COUNT(DISTINCT user_id), COALESCE(SUM(amount), 0)
+        SELECT
+            COUNT(*),
+            COUNT(DISTINCT user_id),
+            COALESCE(SUM(CASE WHEN currency = 'RUB' THEN 0 ELSE amount END), 0),
+            COALESCE(SUM(CASE WHEN currency = 'RUB' THEN amount ELSE 0 END), 0)
         FROM report_events
         WHERE kind = ?{source_sql}{extra}
         """,
@@ -473,6 +523,7 @@ async def _report_kind_stats(
         "total": int(row[0] or 0),
         "unique": int(row[1] or 0),
         "stars": int(row[2] or 0),
+        "rubles": int(row[3] or 0),
         "by_type": by_type,
     }
 
@@ -599,6 +650,7 @@ DEFAULT_REPORT_PRICES = {
     "compatibility": 449,
     "money": 399,
 }
+DEFAULT_REPORT_RUB_PRICES = dict(DEFAULT_REPORT_PRICES)
 
 
 async def get_report_prices() -> dict[str, int]:
@@ -628,6 +680,35 @@ async def set_report_price(scenario: str, amount: int) -> None:
     if amount < 1:
         raise ValueError("price must be >= 1")
     await set_app_setting(f"price_{scenario}", str(amount))
+
+
+async def get_report_rub_prices() -> dict[str, int]:
+    prices: dict[str, int] = {}
+    for scenario, default in DEFAULT_REPORT_RUB_PRICES.items():
+        raw = await get_app_setting(f"price_rub_{scenario}")
+        try:
+            value = int(str(raw).strip()) if raw is not None else default
+        except (TypeError, ValueError):
+            value = default
+        if value < 1:
+            value = default
+        prices[scenario] = value
+    return prices
+
+
+async def get_report_rub_price(scenario: str) -> int:
+    prices = await get_report_rub_prices()
+    if scenario not in prices:
+        raise KeyError(scenario)
+    return prices[scenario]
+
+
+async def set_report_rub_price(scenario: str, amount: int) -> None:
+    if scenario not in DEFAULT_REPORT_RUB_PRICES:
+        raise KeyError(scenario)
+    if amount < 1:
+        raise ValueError("price must be >= 1")
+    await set_app_setting(f"price_rub_{scenario}", str(amount))
 
 
 DEFAULT_AI_MODELS = {
@@ -848,11 +929,16 @@ async def save_profile(user_id: int, profile: dict[str, Any]) -> None:
         await db.commit()
 
 
-async def create_order(user_id: int, report_type: str, amount: int) -> int:
+async def create_order(
+    user_id: int, report_type: str, amount: int, currency: str = "XTR"
+) -> int:
+    pay_currency = (currency or "XTR").upper()
+    if pay_currency not in {"XTR", "RUB"}:
+        pay_currency = "XTR"
     async with aiosqlite.connect(settings.database_path) as db:
         cur = await db.execute(
-            "INSERT INTO orders (user_id, report_type, amount) VALUES (?, ?, ?)",
-            (user_id, report_type, amount),
+            "INSERT INTO orders (user_id, report_type, amount, currency) VALUES (?, ?, ?, ?)",
+            (user_id, report_type, amount, pay_currency),
         )
         await db.commit()
         return cur.lastrowid

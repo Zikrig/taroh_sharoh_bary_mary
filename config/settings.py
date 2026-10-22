@@ -22,6 +22,11 @@ class Settings:
     ai_presence_penalty: float = float(os.getenv("AITUNNEL_PRESENCE_PENALTY", "0.3"))
     ai_frequency_penalty: float = float(os.getenv("AITUNNEL_FREQUENCY_PENALTY", "0.2"))
     database_path: Path = Path(os.getenv("DATABASE_PATH", "data/bot.db"))
+    yookassa_provider_token: str = (
+        os.getenv("YOOKASSA_PROVIDER_TOKEN")
+        or os.getenv("PAYMENT_PROVIDER_TOKEN")
+        or ""
+    ).strip()
     save_payload_samples: bool = os.getenv("SAVE_PAYLOAD_SAMPLES", "").strip().lower() in {
         "1",
         "true",

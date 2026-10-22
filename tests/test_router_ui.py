@@ -29,9 +29,12 @@ from handlers.router import (
     free_section_keyboard,
     gender_keyboard,
     parse_free_section_callback,
+    payment_choice_keyboard,
     pdf_offer_keyboard,
     resolve_pending_free_report,
+    rubles_to_kopecks,
     store_pending_free_report,
+    yookassa_provider_data,
 )
 from database.repository import GENDER_FEMALE, GENDER_MALE
 from config.settings import settings
@@ -60,6 +63,23 @@ class RouterUiTests(unittest.TestCase):
         button = pdf_offer_keyboard("personality", admin_mode=False).inline_keyboard[0][0]
         self.assertIn("⭐", button.text)
         self.assertEqual(button.callback_data, "buy:personality")
+
+    def test_payment_choice_offers_stars_and_yookassa(self):
+        self.assertEqual(rubles_to_kopecks(399), 39900)
+        receipt = yookassa_provider_data("Разбор личности", 349)
+        self.assertIn("349.00", receipt)
+        self.assertIn("RUB", receipt)
+        from unittest.mock import patch
+
+        with patch("handlers.router.settings") as mock_settings:
+            mock_settings.yookassa_provider_token = "test:token"
+            markup = payment_choice_keyboard("love", stars=399, rubles=449)
+        texts = [button.text for row in markup.inline_keyboard for button in row]
+        callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
+        self.assertIn("399⭐", texts[0])
+        self.assertEqual(callbacks[0], "pay:stars:love")
+        self.assertIn("449₽", texts[1])
+        self.assertEqual(callbacks[1], "pay:rub:love")
 
     def test_upsell_texts_are_scenario_specific(self):
         self.assertEqual(set(FREE_UPSELL_TEXTS), set(PRICES))
@@ -177,6 +197,7 @@ class RouterUiTests(unittest.TestCase):
         self.assertIn("📊 Статистика", texts)
         self.assertIn("admin:stats", callbacks)
         self.assertIn("Цены", text)
+        self.assertIn("ЮKassa", text)
         self.assertIn("Статистика", text)
         self.assertIn("🤖 Модели", texts)
         self.assertIn("admin:models", callbacks)

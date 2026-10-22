@@ -188,6 +188,8 @@ def format_reports_text(
     paid_line = f"Платные: {paid['total']} · {format_people(paid['unique'])}"
     if paid.get("stars"):
         paid_line += f" · {paid['stars']}⭐"
+    if paid.get("rubles"):
+        paid_line += f" · {paid['rubles']}₽"
     lines.append(paid_line)
     lines.extend(_by_type_lines(paid.get("by_type") or {}))
     return "\n".join(lines)
@@ -206,6 +208,7 @@ def format_source_text(
     free_total = reports["free"]["total"]
     paid_total = reports["paid"]["total"]
     paid_stars = reports["paid"].get("stars") or 0
+    paid_rubles = reports["paid"].get("rubles") or 0
     lines = [
         f"Ссылка: <b>{slug}</b>",
         f"Период: {period_caption(period, custom)}",
@@ -214,6 +217,8 @@ def format_source_text(
         "",
         f"Заходы: {format_visits_line(visits, unique)}",
         f"Бесплатные заказы: {free_total}",
-        f"Платные заказы: {paid_total}" + (f" · {paid_stars}⭐" if paid_stars else ""),
+        f"Платные заказы: {paid_total}"
+        + (f" · {paid_stars}⭐" if paid_stars else "")
+        + (f" · {paid_rubles}₽" if paid_rubles else ""),
     ]
     return "\n".join(lines)

@@ -126,12 +126,18 @@ class TrackingStatsTests(unittest.TestCase):
                     await record_report_event(
                         2, kind="paid", report_type="love", amount=399, order_id=15
                     )
+                    await record_report_event(
+                        4, kind="paid", report_type="money", amount=399, order_id=16, currency="RUB"
+                    )
                     reports = await get_report_stats(source_slug="inst")
                     self.assertEqual(reports["free"]["total"], 1)
                     self.assertEqual(reports["paid"]["total"], 1)
                     self.assertEqual(reports["paid"]["stars"], 399)
+                    all_paid = await get_report_stats()
+                    self.assertEqual(all_paid["paid"]["rubles"], 399)
+                    self.assertEqual(all_paid["paid"]["stars"], 399)
                     overview = await get_stats_overview()
-                    self.assertEqual(overview["reports"]["paid"]["total"], 1)
+                    self.assertEqual(overview["reports"]["paid"]["total"], 2)
                     sources = await list_tracking_sources()
                     self.assertEqual(sources[0]["slug"], "inst")
                     self.assertEqual(sources[0]["visits"], 2)

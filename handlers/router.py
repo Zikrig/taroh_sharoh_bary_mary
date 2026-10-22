@@ -1,4 +1,5 @@
 import asyncio
+import json
 import secrets
 from contextlib import asynccontextmanager, suppress
 
@@ -56,6 +57,8 @@ from database.repository import (
     get_report_context,
     get_report_price,
     get_report_prices,
+    get_report_rub_price,
+    get_report_rub_prices,
     get_test_mode,
     gender_label_ru,
     gender_symbol,
@@ -73,6 +76,7 @@ from database.repository import (
     set_app_setting,
     set_pdf_sell_text,
     set_report_price,
+    set_report_rub_price,
     set_test_mode,
 )
 from services.reports_new import generate_report
@@ -295,6 +299,62 @@ def stars_pay_keyboard(amount: int):
     return builder.as_markup()
 
 
+def yookassa_pay_keyboard(amount: int):
+    builder = InlineKeyboardBuilder()
+    builder.button(text=f"Оплатить {amount}₽", pay=True)
+    builder.button(text="⬅️ В меню", callback_data="back:menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def yookassa_enabled() -> bool:
+    return bool(settings.yookassa_provider_token)
+
+
+def payment_choice_keyboard(scenario_name: str, *, stars: int, rubles: int):
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text=f"⭐ Telegram Stars · {stars}⭐",
+        callback_data=f"pay:stars:{scenario_name}",
+    )
+    if yookassa_enabled():
+        builder.button(
+            text=f"💳 Карта · {rubles}₽",
+            callback_data=f"pay:rub:{scenario_name}",
+        )
+    builder.button(text="⬅️ Назад", callback_data="back:menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def rubles_to_kopecks(rubles: int) -> int:
+    return int(rubles) * 100
+
+
+def yookassa_provider_data(title: str, rubles: int) -> str:
+    description = (title or "PDF-отчёт")[:128]
+    return json.dumps(
+        {
+            "receipt": {
+                "items": [
+                    {
+                        "description": description,
+                        "quantity": "1.00",
+                        "amount": {
+                            "value": f"{int(rubles):.2f}",
+                            "currency": "RUB",
+                        },
+                        "vat_code": 1,
+                        "payment_mode": "full_payment",
+                        "payment_subject": "service",
+                    }
+                ]
+            }
+        },
+        ensure_ascii=False,
+    )
+
+
 def back_to_edit_profile():
     return back_keyboard("edit_profile")
 
@@ -357,7 +417,7 @@ async def send_paid_pdf_offer(
     user_id: int,
     admin_mode: bool = False,
 ) -> None:
-    """Show the paid PDF offer: Stars invoice immediately, or admin/test callback."""
+    """Show the paid PDF offer: payment choice, Stars invoice, or admin/test callback."""
     if admin_mode:
         await message.answer(
             text,
@@ -371,13 +431,23 @@ async def send_paid_pdf_offer(
             reply_markup=pdf_offer_keyboard(scenario_name, price=price),
         )
         return
+    if yookassa_enabled():
+        stars = await get_report_price(scenario_name)
+        rubles = await get_report_rub_price(scenario_name)
+        await message.answer(
+            text,
+            reply_markup=payment_choice_keyboard(
+                scenario_name, stars=stars, rubles=rubles
+            ),
+        )
+        return
     await message.answer(text, reply_markup=back_to_menu())
     await send_stars_invoice(message, scenario_name, user_id)
 
 
 async def send_stars_invoice(message: Message, scenario_name: str, user_id: int) -> None:
     amount = await get_report_price(scenario_name)
-    order_id = await create_order(user_id, scenario_name, amount)
+    order_id = await create_order(user_id, scenario_name, amount, "XTR")
     charts = PENDING_REPORTS.get(user_id)
     if charts:
         await save_report_context(order_id, *charts)
@@ -389,6 +459,27 @@ async def send_stars_invoice(message: Message, scenario_name: str, user_id: int)
         prices=[LabeledPrice(label=NAMES[scenario_name], amount=amount)],
         provider_token="",
         reply_markup=stars_pay_keyboard(amount),
+    )
+
+
+async def send_yookassa_invoice(message: Message, scenario_name: str, user_id: int) -> None:
+    amount = await get_report_rub_price(scenario_name)
+    order_id = await create_order(user_id, scenario_name, amount, "RUB")
+    charts = PENDING_REPORTS.get(user_id)
+    if charts:
+        await save_report_context(order_id, *charts)
+    title = NAMES[scenario_name]
+    await message.answer_invoice(
+        title=title,
+        description="Персональный PDF-отчёт ASTRO MARY",
+        payload=f"report:{scenario_name}:{order_id}",
+        currency="RUB",
+        prices=[LabeledPrice(label=title, amount=rubles_to_kopecks(amount))],
+        provider_token=settings.yookassa_provider_token,
+        need_email=True,
+        send_email_to_provider=True,
+        provider_data=yookassa_provider_data(title, amount),
+        reply_markup=yookassa_pay_keyboard(amount),
     )
 
 
@@ -572,28 +663,39 @@ def models_settings_message(models: dict[str, str] | None = None) -> str:
 
 async def prices_settings_menu():
     prices = await get_report_prices()
+    rub_prices = await get_report_rub_prices()
     builder = InlineKeyboardBuilder()
     for scenario in ("personality", "love", "money", "compatibility"):
         builder.button(
             text=f"{NAMES[scenario]} · {prices[scenario]}⭐",
             callback_data=f"admin:price:{scenario}",
         )
+        builder.button(
+            text=f"{NAMES[scenario]} · {rub_prices[scenario]}₽",
+            callback_data=f"admin:rubprice:{scenario}",
+        )
     builder.button(text="⬅️ Назад", callback_data="admin:back")
-    builder.adjust(1)
+    builder.adjust(2, 2, 2, 2, 1)
     return builder.as_markup()
 
 
-def prices_settings_message(prices: dict[str, int] | None = None) -> str:
+def prices_settings_message(
+    prices: dict[str, int] | None = None,
+    rub_prices: dict[str, int] | None = None,
+) -> str:
     lines = [
         "Настройка цен генерации",
         "",
-        "Цены в Telegram Stars за полный PDF.",
-        "Выберите сценарий, чтобы изменить цену.",
+        "Цены за полный PDF: Telegram Stars и карта через ЮKassa.",
+        "Выберите сценарий и валюту, чтобы изменить цену.",
     ]
     if prices:
+        rub_prices = rub_prices or {}
         lines.append("")
         for scenario in ("personality", "love", "money", "compatibility"):
-            lines.append(f"• {NAMES[scenario]}: {prices[scenario]}⭐")
+            rub = rub_prices.get(scenario, "")
+            extra = f" / {rub}₽" if rub != "" else ""
+            lines.append(f"• {NAMES[scenario]}: {prices[scenario]}⭐{extra}")
     return "\n".join(lines)
 
 
@@ -741,7 +843,7 @@ def admin_text(
         "на пользователя. При исчерпании лимита остаётся кнопка полного PDF.\n\n"
         "Раздел «Генерации» — проверка разборов без оплаты и без лимита.\n"
         "Раздел «Статистика» — заказы, заходы и ссылки.\n"
-        "Раздел «Цены» — стоимость полного PDF в Stars.\n"
+        "Раздел «Цены» — стоимость полного PDF в Stars и в рублях (ЮKassa).\n"
         "Раздел «Модели» — бесплатные / скелет PDF / разделы PDF "
         f"(каталог AITUNNEL с ценой выхода < {int(MAX_OUTPUT_COST_RUB)} ₽/1M).\n"
         "Раздел «Промпты» — системные правила, инструкции продуктов и сборка запроса."
@@ -832,9 +934,10 @@ async def open_prices_settings(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.answer()
     prices = await get_report_prices()
+    rub_prices = await get_report_rub_prices()
     await _edit_or_answer(
         callback.message,
-        prices_settings_message(prices),
+        prices_settings_message(prices, rub_prices),
         reply_markup=await prices_settings_menu(),
     )
 
@@ -851,12 +954,34 @@ async def edit_report_price(callback: CallbackQuery, state: FSMContext):
     current = await get_report_price(scenario_name)
     await callback.answer()
     await state.set_state(AdminStates.price_value)
-    await state.update_data(price_scenario=scenario_name)
+    await state.update_data(price_scenario=scenario_name, price_currency="XTR")
     builder = InlineKeyboardBuilder()
     builder.button(text="⬅️ Назад", callback_data="admin:cancel_price_edit")
     await callback.message.answer(
         f"Текущая цена «{NAMES[scenario_name]}»: {current}⭐\n\n"
         "Отправьте новую цену целым числом Stars (минимум 1).",
+        reply_markup=builder.as_markup(),
+    )
+
+
+@router.callback_query(F.data.startswith("admin:rubprice:"))
+async def edit_report_rub_price(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    scenario_name = callback.data.rsplit(":", 1)[-1]
+    if scenario_name not in PRICES:
+        await callback.answer("Этот сценарий пока недоступен.", show_alert=True)
+        return
+    current = await get_report_rub_price(scenario_name)
+    await callback.answer()
+    await state.set_state(AdminStates.price_value)
+    await state.update_data(price_scenario=scenario_name, price_currency="RUB")
+    builder = InlineKeyboardBuilder()
+    builder.button(text="⬅️ Назад", callback_data="admin:cancel_price_edit")
+    await callback.message.answer(
+        f"Текущая цена «{NAMES[scenario_name]}»: {current}₽\n\n"
+        "Отправьте новую цену целым числом рублей (минимум 1).",
         reply_markup=builder.as_markup(),
     )
 
@@ -869,8 +994,9 @@ async def cancel_price_edit(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.answer("Изменение отменено")
     prices = await get_report_prices()
+    rub_prices = await get_report_rub_prices()
     await callback.message.answer(
-        prices_settings_message(prices),
+        prices_settings_message(prices, rub_prices),
         reply_markup=await prices_settings_menu(),
     )
 
@@ -883,23 +1009,31 @@ async def save_report_price_value(message: Message, state: FSMContext):
         return
     data = await state.get_data()
     scenario_name = data.get("price_scenario")
+    currency = str(data.get("price_currency") or "XTR").upper()
     if scenario_name not in PRICES:
         await state.clear()
         await message.answer("Сценарий не выбран. Откройте настройку цен заново.")
         return
-    raw = (message.text or "").strip().replace("⭐", "").replace(" ", "")
+    raw = (message.text or "").strip().replace("⭐", "").replace("₽", "").replace(" ", "")
     try:
         amount = int(raw)
     except ValueError:
-        await message.answer("Нужно целое число Stars, например 399. Попробуйте ещё раз.")
+        unit = "рублей" if currency == "RUB" else "Stars"
+        await message.answer(f"Нужно целое число {unit}, например 399. Попробуйте ещё раз.")
         return
     if amount < 1:
-        await message.answer("Цена должна быть не меньше 1⭐. Попробуйте ещё раз.")
+        unit = "1₽" if currency == "RUB" else "1⭐"
+        await message.answer(f"Цена должна быть не меньше {unit}. Попробуйте ещё раз.")
         return
-    await set_report_price(scenario_name, amount)
+    if currency == "RUB":
+        await set_report_rub_price(scenario_name, amount)
+        mark = f"{amount}₽"
+    else:
+        await set_report_price(scenario_name, amount)
+        mark = f"{amount}⭐"
     await state.clear()
     await message.answer(
-        f"Цена «{NAMES[scenario_name]}» обновлена: {amount}⭐ ✅",
+        f"Цена «{NAMES[scenario_name]}» обновлена: {mark} ✅",
         reply_markup=back_keyboard("prices"),
     )
 
@@ -1240,8 +1374,9 @@ async def navigate_back(callback: CallbackQuery, state: FSMContext):
         await callback.message.answer(pdf_texts_message(), reply_markup=pdf_texts_menu())
     elif destination == "prices" and is_admin(callback.from_user.id):
         prices = await get_report_prices()
+        rub_prices = await get_report_rub_prices()
         await callback.message.answer(
-            prices_settings_message(prices),
+            prices_settings_message(prices, rub_prices),
             reply_markup=await prices_settings_menu(),
         )
     elif destination == "models" and is_admin(callback.from_user.id):
@@ -2068,6 +2203,36 @@ async def back_menu(callback: CallbackQuery):
     )
 
 
+@router.callback_query(F.data.startswith("pay:stars:"))
+async def pay_with_stars(callback: CallbackQuery):
+    scenario_name = callback.data.rsplit(":", 1)[-1]
+    if scenario_name not in PRICES:
+        await callback.answer("Этот сценарий пока недоступен.", show_alert=True)
+        return
+    await callback.answer()
+    await send_stars_invoice(callback.message, scenario_name, callback.from_user.id)
+
+
+@router.callback_query(F.data.startswith("pay:rub:"))
+async def pay_with_yookassa(callback: CallbackQuery):
+    scenario_name = callback.data.rsplit(":", 1)[-1]
+    if scenario_name not in PRICES:
+        await callback.answer("Этот сценарий пока недоступен.", show_alert=True)
+        return
+    if not yookassa_enabled():
+        await callback.answer("Оплата картой сейчас недоступна.", show_alert=True)
+        return
+    await callback.answer()
+    try:
+        await send_yookassa_invoice(callback.message, scenario_name, callback.from_user.id)
+    except TelegramBadRequest:
+        await callback.message.answer(
+            "Не удалось открыть оплату картой. Проверьте токен ЮKassa в настройках бота "
+            "или напишите в поддержку.",
+            reply_markup=back_to_menu(),
+        )
+
+
 @router.callback_query(F.data.startswith("buy:"))
 async def buy(callback: CallbackQuery):
     """Fallback for test-mode: the button is shown only when test mode is active."""
@@ -2161,6 +2326,7 @@ async def paid(message: Message):
                 report_type=scenario_name,
                 amount=int(order.get("amount") or 0),
                 order_id=order_id,
+                currency=str(order.get("currency") or "XTR"),
             )
         await deliver_report(
             message,
