@@ -87,8 +87,8 @@ class RouterUiTests(unittest.TestCase):
     def test_admin_probe_buttons_use_both_tokens(self):
         from unittest.mock import patch
 
-        self.assertEqual(ADMIN_PROBE_RUBLES, 10)
-        self.assertEqual(rubles_to_kopecks(ADMIN_PROBE_RUBLES), 1000)
+        self.assertEqual(ADMIN_PROBE_RUBLES, 100)
+        self.assertGreaterEqual(rubles_to_kopecks(ADMIN_PROBE_RUBLES), 8773)
         with patch("handlers.router.yookassa_test_token", return_value="TEST"), patch(
             "handlers.router.yookassa_live_token", return_value="LIVE"
         ):

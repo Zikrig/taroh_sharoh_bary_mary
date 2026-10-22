@@ -301,7 +301,8 @@ def stars_pay_keyboard(amount: int):
     return builder.as_markup()
 
 
-ADMIN_PROBE_RUBLES = 10
+# Telegram rejects RUB invoices below ~1 USD (now 8773 kopecks ≈ 88₽).
+ADMIN_PROBE_RUBLES = 100
 
 
 def yookassa_live_token() -> str:
@@ -323,9 +324,9 @@ def yookassa_enabled() -> bool:
 def admin_probe_button_specs() -> list[tuple[str, str]]:
     specs: list[tuple[str, str]] = []
     if yookassa_test_token():
-        specs.append(("💳 Проверка 10₽ · TEST", "admin:paytest:test"))
+        specs.append((f"💳 Проверка {ADMIN_PROBE_RUBLES}₽ · TEST", "admin:paytest:test"))
     if yookassa_live_token():
-        specs.append(("💳 Проверка 10₽ · LIVE", "admin:paytest:live"))
+        specs.append((f"💳 Проверка {ADMIN_PROBE_RUBLES}₽ · LIVE", "admin:paytest:live"))
     return specs
 
 
@@ -757,7 +758,7 @@ def prices_settings_message(
         "Цены за полный PDF: Telegram Stars и карта через ЮKassa.",
         "Выберите сценарий и валюту, чтобы изменить цену.",
         "",
-        "Проверка оплаты: 10₽, PDF не формируется.",
+        f"Проверка оплаты: {ADMIN_PROBE_RUBLES}₽, PDF не формируется.",
         f"Токен TEST: {'задан' if yookassa_test_token() else 'нет'}",
         f"Токен LIVE: {'задан' if yookassa_live_token() else 'нет'}",
     ]
@@ -1081,7 +1082,7 @@ async def admin_yookassa_probe(callback: CallbackQuery):
         logger.warning("Admin YooKassa %s probe failed: %s", kind, error)
         detail = _telegram_error_text(error)
         await callback.message.answer(
-            f"Не удалось открыть счёт на 10₽.\n{detail}",
+            f"Не удалось открыть счёт на {ADMIN_PROBE_RUBLES}₽.\n{detail}",
             reply_markup=await prices_settings_menu(),
         )
 
@@ -2414,7 +2415,7 @@ async def paid(message: Message):
         kind = parts[1] if len(parts) > 1 else ""
         label = "TEST" if kind == "test" else "LIVE"
         await message.answer(
-            f"Оплата 10₽ прошла ✅\nТокен ЮKassa: {label}\nPDF не формировался.",
+            f"Оплата {ADMIN_PROBE_RUBLES}₽ прошла ✅\nТокен ЮKassa: {label}\nPDF не формировался.",
             reply_markup=await prices_settings_menu(),
         )
         return
